@@ -266,23 +266,47 @@ class StateManager(QObject):
                 if "systemName" in props and props["systemName"]:
                     self._model_name = props["systemName"]
 
-                # SD Card volume state
+                # Storage Volumes (MicroSD card, external USB, internal eMMC)
+                sd_volume = None
+                internal_volume = None
+
                 for c in sys_node.get("children", []):
                     if c.get("name") == "STORAGEVOLUME":
                         vprops = {k: list(v.values())[0] for k, v in c.get("properties", {}).items()}
                         state_str = str(vprops.get("storageVolumeState", ""))
                         if "|" in state_str:
                             parts = state_str.split("|")
-                            if len(parts) >= 2 and parts[0].isdigit() and parts[1].isdigit():
+                            if len(parts) >= 3 and parts[0].isdigit() and parts[1].isdigit():
                                 cap = int(parts[0])
                                 free = int(parts[1])
-                                if cap > 0:
-                                    used = cap - free
-                                    cap_gb = cap / (1024 ** 3)
-                                    used_gb = used / (1024 ** 3)
-                                    self._sd_total = f"{cap_gb:.0f} GB"
-                                    self._sd_used = f"{used_gb:.0f} GB"
-                                    self._sd_percent = (used / cap) * 100.0
+                                removable = (parts[2] == "1")
+                                vol_info = {
+                                    "cap": cap,
+                                    "free": free,
+                                    "removable": removable,
+                                    "rec_dest": vprops.get("storageVolumeRecDestination", False)
+                                }
+                                if removable and cap > 0:
+                                    sd_volume = vol_info
+                                elif not removable and cap > 0:
+                                    internal_volume = vol_info
+
+                # Prioritize MicroSD card when inserted; otherwise fallback to internal memory
+                active_vol = sd_volume if sd_volume else internal_volume
+                if active_vol:
+                    cap = active_vol["cap"]
+                    free = active_vol["free"]
+                    used = max(0, cap - free)
+                    cap_gb = cap / (1024 ** 3)
+                    used_gb = used / (1024 ** 3)
+                    self._sd_total = f"{cap_gb:.0f} GB"
+                    if used_gb >= 10:
+                        self._sd_used = f"{used_gb:.0f} GB"
+                    elif used_gb >= 0.1:
+                        self._sd_used = f"{used_gb:.1f} GB"
+                    else:
+                        self._sd_used = "0 GB"
+                    self._sd_percent = (used / cap) * 100.0 if cap > 0 else 0.0
 
             # Get current active bank from hardware
             out, _ = self.bridge.run_cmd(["pad", "bank", "--json"])
