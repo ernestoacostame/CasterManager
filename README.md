@@ -9,10 +9,10 @@
 </p
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Platform-Linux-orange.svg" alt="Platform Linux" />
-  <img src="https://img.shields.io/badge/UI-Qt%206%20%7C%20QML-41cd52.svg" alt="Qt 6 / QML" />
-  <img src="https://img.shields.io/badge/Language-Python%20%2F%20Rust-blue.svg" alt="Python / Rust" />
-  <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License MIT" />
+  <img src="https://img.shields.io/badge/Plataforma-Linux-orange.svg" alt="Plataforma Linux" />
+  <img src="https://img.shields.io/badge/Interfaz-Qt%206%20%7C%20QML-41cd52.svg" alt="Qt 6 / QML" />
+  <img src="https://img.shields.io/badge/Lenguajes-Python%20%2F%20Rust-blue.svg" alt="Python / Rust" />
+  <img src="https://img.shields.io/badge/Licencia-MIT-yellow.svg" alt="Licencia MIT" />
 </p>
 
 ---
