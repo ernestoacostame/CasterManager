@@ -133,6 +133,22 @@ CasterManager soluciona este problema mediante dos capas:
 
 ---
 
+## Apoyo y Donaciones
+
+Si encuentras útil **CasterManager** y te gustaría apoyar su desarrollo continuo, mantenimiento y soporte de hardware de audio en Linux, puedes considerar hacer una donación:
+
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://www.buymeacoffee.com/ernestoacostame)
+[![Ko-fi](https://img.shields.io/badge/Ko--fi-F16061?style=for-the-badge&logo=ko-fi&logoColor=white)](https://ko-fi.com/ernestoacostame)
+[![PayPal](https://img.shields.io/badge/PayPal-00457C?style=for-the-badge&logo=paypal&logoColor=white)](https://www.paypal.com/paypalme/elav)
+
+- ☕ **Buy Me a Coffee:** [buymeacoffee.com/ernestoacostame](https://www.buymeacoffee.com/ernestoacostame)
+- 💖 **Ko-fi:** [ko-fi.com/ernestoacostame](https://ko-fi.com/ernestoacostame)
+- 🅿️ **PayPal:** [paypal.com/paypalme/elav](https://www.paypal.com/paypalme/elav)
+
+¡Muchas gracias por tu apoyo!
+
+---
+
 ## Créditos y Agradecimientos
 
 Este proyecto es posible gracias al trabajo previo y a la investigación de la comunidad open-source:

@@ -128,6 +128,22 @@ CasterManager solves this with a two-layer approach:
 
 ---
 
+## Support & Donations
+
+If you find **CasterManager** helpful and would like to support its ongoing development, maintenance, and Linux audio hardware support, consider making a donation:
+
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://www.buymeacoffee.com/ernestoacostame)
+[![Ko-fi](https://img.shields.io/badge/Ko--fi-F16061?style=for-the-badge&logo=ko-fi&logoColor=white)](https://ko-fi.com/ernestoacostame)
+[![PayPal](https://img.shields.io/badge/PayPal-00457C?style=for-the-badge&logo=paypal&logoColor=white)](https://www.paypal.com/paypalme/elav)
+
+- ☕ **Buy Me a Coffee:** [buymeacoffee.com/ernestoacostame](https://www.buymeacoffee.com/ernestoacostame)
+- 💖 **Ko-fi:** [ko-fi.com/ernestoacostame](https://ko-fi.com/ernestoacostame)
+- 🅿️ **PayPal:** [paypal.com/paypalme/elav](https://www.paypal.com/paypalme/elav)
+
+Thank you for your support!
+
+---
+
 ## Credits & Acknowledgements
 
 This project was made possible thanks to the work and research of the open-source community:
@@ -279,6 +295,22 @@ Las consolas RØDECaster se comunican mediante paquetes USB HID. Una particulari
 CasterManager soluciona este problema mediante dos capas:
 1. **Servicio Systemd de Usuario (`castermanager-drain.service`):** Corre silenciosamente en segundo plano, asegurando que los reportes de progreso y estado sean consumidos en todo momento sin afectar el rendimiento.
 2. **Quirk de Módulo de Kernel (`usbhid.quirks`):** Para soporte nativo a nivel de kernel, [`install.sh`](file:///home/elav/Developer/Rodecaster/install.sh) instala `/etc/modprobe.d/99-rodecaster-quirks.conf`. También puedes añadir `usbhid.quirks=0x19f7:0x0093:0x00000400` a la línea de comandos de GRUB (`GRUB_CMDLINE_LINUX_DEFAULT`).
+
+---
+
+## Apoyo y Donaciones
+
+Si encuentras útil **CasterManager** y te gustaría apoyar su desarrollo continuo, mantenimiento y soporte de hardware de audio en Linux, puedes considerar hacer una donación:
+
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://www.buymeacoffee.com/ernestoacostame)
+[![Ko-fi](https://img.shields.io/badge/Ko--fi-F16061?style=for-the-badge&logo=ko-fi&logoColor=white)](https://ko-fi.com/ernestoacostame)
+[![PayPal](https://img.shields.io/badge/PayPal-00457C?style=for-the-badge&logo=paypal&logoColor=white)](https://www.paypal.com/paypalme/elav)
+
+- ☕ **Buy Me a Coffee:** [buymeacoffee.com/ernestoacostame](https://www.buymeacoffee.com/ernestoacostame)
+- 💖 **Ko-fi:** [ko-fi.com/ernestoacostame](https://ko-fi.com/ernestoacostame)
+- 🅿️ **PayPal:** [paypal.com/paypalme/elav](https://www.paypal.com/paypalme/elav)
+
+¡Muchas gracias por tu apoyo!
 
 ---
 
