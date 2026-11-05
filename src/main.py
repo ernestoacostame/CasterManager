@@ -23,9 +23,21 @@ def main():
     from src.backend.state_manager import StateManager
 
     app = QGuiApplication(sys.argv)
-    app.setApplicationName("CasterManager")
+    app.setApplicationName("castermanager")
+    app.setDesktopFileName("castermanager")
     app.setOrganizationName("CasterManager")
     app.setOrganizationDomain("elav.castermanager")
+
+    # Set application / window icon for X11 & Wayland desktop taskbars
+    icon_png = os.path.join(project_root, "assets", "app_icon.png")
+    icon_svg = os.path.join(project_root, "assets", "app_icon.svg")
+    app_icon = QIcon()
+    if os.path.exists(icon_svg):
+        app_icon.addFile(icon_svg)
+    if os.path.exists(icon_png):
+        app_icon.addFile(icon_png)
+    if not app_icon.isNull():
+        app.setWindowIcon(app_icon)
 
     # Dark palette matching RØDE hardware aesthetic
     palette = QPalette()

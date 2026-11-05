@@ -17,7 +17,7 @@ echo "=========================================="
 echo ""
 
 # 1. Stop and disable systemd drain service
-echo "[1/3] Stopping background drain service..."
+echo "[1/4] Stopping background drain service..."
 if command -v systemctl >/dev/null 2>&1; then
     systemctl --user stop castermanager-drain.service 2>/dev/null || true
     systemctl --user disable castermanager-drain.service 2>/dev/null || true
@@ -27,12 +27,19 @@ if command -v systemctl >/dev/null 2>&1; then
     systemctl --user daemon-reload || true
 fi
 
-# 2. Remove Desktop launcher
-echo "[2/3] Removing application launcher..."
+# 2. Remove Desktop launcher & system icons
+echo "[2/4] Removing application launcher and icons..."
 rm -f "$DESKTOP_FILE"
+rm -f "$HOME/.local/share/icons/hicolor/"*"/apps/castermanager."* 2>/dev/null || true
+if command -v gtk-update-icon-cache >/dev/null 2>&1; then
+    gtk-update-icon-cache -f -t "$HOME/.local/share/icons/hicolor" 2>/dev/null || true
+fi
+if command -v kbuildsycoca6 >/dev/null 2>&1; then
+    kbuildsycoca6 2>/dev/null || true
+fi
 
 # 3. Remove udev and modprobe rules
-echo "[3/3] Removing system rules..."
+echo "[3/4] Removing system rules..."
 if [ -f "$UDEV_RULE_DST" ] || [ -f "$QUIRKS_DST" ]; then
     echo "Requesting sudo permissions to remove udev and modprobe rules..."
     sudo rm -f "$UDEV_RULE_DST" "$QUIRKS_DST"

@@ -100,8 +100,39 @@ chmod +x "$SCRIPT_DIR/bin/castermanager-drain"
 systemctl --user daemon-reload || true
 systemctl --user enable --now castermanager-drain.service || true
 
-# 5. Create Desktop shortcut
-echo "[5/5] Creating application menu launcher..."
+# 5. Install Desktop & System Icons (XDG Icon Theme Specification)
+echo "[5/6] Installing application icons to system icon theme..."
+python3 -c "
+import os, sys, shutil
+from PyQt6.QtGui import QImage, QGuiApplication
+
+app = QGuiApplication(sys.argv)
+src_png = '$SCRIPT_DIR/assets/app_icon.png'
+src_svg = '$SCRIPT_DIR/assets/app_icon.svg'
+icon_base = os.path.expanduser('~/.local/share/icons/hicolor')
+
+if os.path.exists(src_png):
+    img = QImage(src_png)
+    for s in [256, 128, 64, 48, 32, 16]:
+        dir_path = os.path.join(icon_base, f'{s}x{s}', 'apps')
+        os.makedirs(dir_path, exist_ok=True)
+        img.scaled(s, s).save(os.path.join(dir_path, 'castermanager.png'))
+
+if os.path.exists(src_svg):
+    scalable_dir = os.path.join(icon_base, 'scalable', 'apps')
+    os.makedirs(scalable_dir, exist_ok=True)
+    shutil.copyfile(src_svg, os.path.join(scalable_dir, 'castermanager.svg'))
+" || true
+
+if command -v gtk-update-icon-cache >/dev/null 2>&1; then
+    gtk-update-icon-cache -f -t "$HOME/.local/share/icons/hicolor" 2>/dev/null || true
+fi
+if command -v kbuildsycoca6 >/dev/null 2>&1; then
+    kbuildsycoca6 2>/dev/null || true
+fi
+
+# 6. Create Desktop shortcut
+echo "[6/6] Creating application menu launcher..."
 mkdir -p "$DESKTOP_DIR"
 chmod +x "$SCRIPT_DIR/run.sh"
 
@@ -110,14 +141,18 @@ cat > "$DESKTOP_FILE" << EOF
 Name=CasterManager
 Comment=Manage RØDECaster Duo & Pro II SMART Pads and audio on Linux
 Exec=$SCRIPT_DIR/run.sh
-Icon=$SCRIPT_DIR/assets/app_icon.png
+Icon=castermanager
 Terminal=false
 Type=Application
 Categories=AudioVideo;Audio;Mixer;Qt;
-StartupWMClass=CasterManager
+StartupWMClass=castermanager
+StartupNotify=true
 EOF
 
 chmod +x "$DESKTOP_FILE"
+if command -v update-desktop-database >/dev/null 2>&1; then
+    update-desktop-database "$DESKTOP_DIR" 2>/dev/null || true
+fi
 echo "Launcher installed at: $DESKTOP_FILE"
 
 echo ""
