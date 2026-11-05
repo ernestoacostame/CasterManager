@@ -6,11 +6,7 @@
 
 <p align="center">
   <strong>Native Linux Desktop Manager & SMART Pad Controller for RØDECaster Duo and Pro II</strong>
-</p>
-
-<p align="center">
-  <a href="README.md"><strong>English</strong></a> | <a href="README.es.md">Español</a>
-</p>
+</p
 
 <p align="center">
   <img src="https://img.shields.io/badge/Platform-Linux-orange.svg" alt="Platform Linux" />
@@ -164,9 +160,6 @@ This project is licensed under the [MIT License](LICENSE).
   <strong>Gestor de escritorio y controlador de SMART Pads para RØDECaster Duo y Pro II en Linux</strong>
 </p>
 
-<p align="center">
-  <a href="README.md">English</a> | <a href="README.es.md"><strong>Español</strong></a>
-</p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/Plataforma-Linux-orange.svg" alt="Plataforma Linux" />
