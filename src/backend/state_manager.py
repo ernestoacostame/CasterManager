@@ -1,7 +1,7 @@
 import os
 import logging
 from concurrent.futures import ThreadPoolExecutor
-from PyQt6.QtCore import QObject, pyqtSignal, pyqtProperty, pyqtSlot, QVariant
+from PyQt6.QtCore import QObject, pyqtSignal, pyqtProperty, pyqtSlot, QVariant, QSettings
 
 from .device_monitor import DeviceMonitor
 from .rcp_bridge import RcpBridge, PAD_COLORS
@@ -11,15 +11,137 @@ logger = logging.getLogger("CasterManager.state")
 DUO_PHYSICAL_ORDER = [0, 3, 1, 4, 2, 5]
 PRO_II_PHYSICAL_ORDER = [0, 4, 1, 5, 2, 6, 3, 7]
 
+TRANSLATIONS = {
+    "es": {
+        "settings": "Configuración",
+        "app_language": "Idioma de la aplicación",
+        "language_desc": "Selecciona el idioma de la interfaz:",
+        "spanish": "Español",
+        "english": "English",
+        "close": "Cerrar",
+        "save": "Guardar",
+        "cancel": "Cancelar",
+        "home": "Inicio",
+        "connected": "Conectada",
+        "disconnected": "Desconectada",
+        "firmware": "Firmware",
+        "microsd": "MicroSD",
+        "device_settings": "Configuración",
+        "device_disconnected_title": "RØDECaster Desconectada",
+        "device_disconnected_desc": "Conecta tu RØDECaster Duo o Pro II por cable USB a tu computadora para comenzar.",
+        "permission_notice_title": "Permisos de Dispositivo Requeridos",
+        "permission_notice_desc": "Para acceder a la consola sin permisos de root en Linux, ejecuta install.sh.",
+        "edit_profile": "Editar Perfil del Show",
+        "show_name": "Nombre del Show:",
+        "show_placeholder": "Nombre del show...",
+        "avatar_color": "Icono/Color:",
+        "choose_file": "Elegir Archivo",
+        "drag_drop": "Arrastrar y Soltar",
+        "export_audio": "Exportar Audio",
+        "mode_toggle": "Toggle",
+        "mode_oneshot": "One Shot",
+        "mode_hold": "Hold",
+        "loop_on": "Loop On",
+        "loop_off": "Loop Off",
+        "replay": "Replay",
+        "gain": "Ganancia:",
+        "transfer_mode_btn": "Activar Modo Transferencia (Cargar Audios a la Duo)",
+        "transfer_mode_title": "Tu RØDECaster está en Modo Transferencia",
+        "transfer_mode_desc": "La memoria interna o tarjeta SD está accesible en Linux como almacenamiento masivo USB.",
+        "transfer_mode_exit": "Finalizar y Salir del Modo Transferencia",
+        "trigger_selected": "▶ Disparar Pad Seleccionado",
+        "bank": "Banco",
+        "of": "de",
+        "pad": "Pad",
+        "no_audio_export": "El pad seleccionado no tiene ningún archivo para exportar.",
+        "sound_dialog_title": "Seleccionar archivo de sonido para el Pad",
+        "export_dialog_title": "Guardar Audio Exportado",
+        "audio_files_filter": "Archivos de audio (*.wav *.mp3 *.ogg *.flac *.aac)",
+        "all_files_filter": "Todos los archivos (*)",
+        "tab_sound": "Sound",
+        "tab_fx": "FX Effects",
+        "tab_mixer": "Mixer",
+        "tab_midi": "MIDI",
+        "tab_callme": "CallMe",
+        "tab_video": "Video",
+        "customize_smart_pads": "Personalizar SMART Pads",
+        "scan_device": "Buscar dispositivo ahora",
+        "pad_placeholder": "Nombre del Pad...",
+        "usb_permission_required": "⚠️ Permiso USB requerido",
+        "usb_permission_hint": "Para interactuar con el dispositivo, ejecuta:\n./install.sh en la carpeta del programa",
+    },
+    "en": {
+        "settings": "Settings",
+        "app_language": "Application Language",
+        "language_desc": "Select the interface language:",
+        "spanish": "Español",
+        "english": "English",
+        "close": "Close",
+        "save": "Save",
+        "cancel": "Cancel",
+        "home": "Home",
+        "connected": "Connected",
+        "disconnected": "Disconnected",
+        "firmware": "Firmware",
+        "microsd": "MicroSD",
+        "device_settings": "Settings",
+        "device_disconnected_title": "RØDECaster Disconnected",
+        "device_disconnected_desc": "Connect your RØDECaster Duo or Pro II via USB cable to get started.",
+        "permission_notice_title": "Device Permissions Required",
+        "permission_notice_desc": "To access the console without root permissions on Linux, run install.sh.",
+        "edit_profile": "Edit Show Profile",
+        "show_name": "Show Name:",
+        "show_placeholder": "Show name...",
+        "avatar_color": "Icon/Color:",
+        "choose_file": "Choose File",
+        "drag_drop": "Drag & Drop",
+        "export_audio": "Export Audio",
+        "mode_toggle": "Toggle",
+        "mode_oneshot": "One Shot",
+        "mode_hold": "Hold",
+        "loop_on": "Loop On",
+        "loop_off": "Loop Off",
+        "replay": "Replay",
+        "gain": "Gain:",
+        "transfer_mode_btn": "Activate Transfer Mode (Upload Audio to Duo)",
+        "transfer_mode_title": "Your RØDECaster is in Transfer Mode",
+        "transfer_mode_desc": "Internal memory or SD card is accessible in Linux as USB mass storage.",
+        "transfer_mode_exit": "Finish and Exit Transfer Mode",
+        "trigger_selected": "▶ Trigger Selected Pad",
+        "bank": "Bank",
+        "of": "of",
+        "pad": "Pad",
+        "no_audio_export": "The selected pad has no audio assigned to export.",
+        "sound_dialog_title": "Select Sound File for Pad",
+        "export_dialog_title": "Save Exported Audio",
+        "audio_files_filter": "Audio files (*.wav *.mp3 *.ogg *.flac *.aac)",
+        "all_files_filter": "All files (*)",
+        "tab_sound": "Sound",
+        "tab_fx": "FX Effects",
+        "tab_mixer": "Mixer",
+        "tab_midi": "MIDI",
+        "tab_callme": "CallMe",
+        "tab_video": "Video",
+        "customize_smart_pads": "Customize SMART Pads",
+        "scan_device": "Scan for device now",
+        "pad_placeholder": "Pad name...",
+        "usb_permission_required": "⚠️ USB permission required",
+        "usb_permission_hint": "To interact with the device, run:\n./install.sh in the program folder",
+    }
+}
+
 class StateManager(QObject):
     stateChanged = pyqtSignal()
     padsChanged = pyqtSignal()
     selectedPadChanged = pyqtSignal()
     transferStateChanged = pyqtSignal()
     toastMessage = pyqtSignal(str)
+    languageChanged = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.settings = QSettings("CasterManager", "CasterManager")
+        self._language = self.settings.value("language", "es")
         self._connected = False
         self._permission_error = False
         self._permission_path = ""
@@ -242,6 +364,23 @@ class StateManager(QObject):
     @pyqtProperty(str, notify=stateChanged)
     def permissionPath(self):
         return self._permission_path
+
+    @pyqtProperty(str, notify=languageChanged)
+    def language(self):
+        return self._language
+
+    @pyqtProperty(QVariant, notify=languageChanged)
+    def strings(self):
+        return TRANSLATIONS.get(self._language, TRANSLATIONS["es"])
+
+    @pyqtSlot(str)
+    def setLanguage(self, lang):
+        if lang in ("es", "en") and lang != self._language:
+            self._language = lang
+            self.settings.setValue("language", lang)
+            self.languageChanged.emit()
+            msg = "Idioma cambiado a Español" if lang == "es" else "Language changed to English"
+            self.toastMessage.emit(msg)
 
     @pyqtProperty(str, notify=stateChanged)
     def modelName(self):

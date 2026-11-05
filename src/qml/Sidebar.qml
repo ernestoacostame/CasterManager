@@ -73,7 +73,7 @@ Rectangle {
                         }
 
                         Text {
-                            text: "Firmware " + (stateManager ? stateManager.firmwareVersion : "1.7.7")
+                            text: (stateManager ? stateManager.strings.firmware : "Firmware") + " " + (stateManager ? stateManager.firmwareVersion : "1.7.7")
                             font.pixelSize: 11
                             color: "#8E8E93"
                         }
@@ -88,7 +88,7 @@ Rectangle {
                                 color: stateManager && stateManager.connected ? "#34C759" : "#FF3B30"
                             }
                             Text {
-                                text: stateManager && stateManager.connected ? "Conectada" : "Desconectada"
+                                text: stateManager && stateManager.connected ? (stateManager.strings.connected) : (stateManager ? stateManager.strings.disconnected : "Desconectada")
                                 font.pixelSize: 10
                                 color: stateManager && stateManager.connected ? "#34C759" : "#FF453A"
                             }
@@ -103,7 +103,7 @@ Rectangle {
 
                     RowLayout {
                         Text {
-                            text: "💾 MicroSD"
+                            text: "💾 " + (stateManager ? stateManager.strings.microsd : "MicroSD")
                             font.pixelSize: 11
                             color: "#9A9A9E"
                         }
@@ -148,14 +148,14 @@ Rectangle {
                 spacing: 6
 
                 Text {
-                    text: "⚠️ Permiso USB requerido"
+                    text: stateManager ? stateManager.strings.usb_permission_required : "⚠️ Permiso USB requerido"
                     font.pixelSize: 12
                     font.bold: true
                     color: "#FFA2A2"
                 }
 
                 Text {
-                    text: "Para interactuar con el dispositivo, ejecuta:\n./install.sh en la carpeta del programa"
+                    text: stateManager ? stateManager.strings.usb_permission_hint : "Para interactuar con el dispositivo, ejecuta:\n./install.sh en la carpeta del programa"
                     font.pixelSize: 10
                     color: "#D0D0D0"
                     wrapMode: Text.Wrap

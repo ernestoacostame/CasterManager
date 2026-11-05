@@ -33,7 +33,7 @@ Item {
 
             Text {
                 Layout.alignment: Qt.AlignHCenter
-                text: "Conecta tu RØDECaster"
+                text: stateManager ? stateManager.strings.device_disconnected_title : "RØDECaster Desconectada"
                 font.pixelSize: 22
                 font.bold: true
                 color: "#FFFFFF"
@@ -42,7 +42,7 @@ Item {
             Text {
                 Layout.alignment: Qt.AlignHCenter
                 horizontalAlignment: Text.AlignHCenter
-                text: "Conecta tu RØDECaster Duo o Pro II mediante el cable USB principal a tu ordenador.\nCasterManager la detectará y adaptará automáticamente."
+                text: stateManager ? stateManager.strings.device_disconnected_desc : "Conecta tu RØDECaster Duo o Pro II por cable USB a tu computadora para comenzar."
                 font.pixelSize: 13
                 color: "#99999E"
                 wrapMode: Text.Wrap
@@ -52,7 +52,7 @@ Item {
         // Action button
         Button {
             Layout.alignment: Qt.AlignHCenter
-            text: "Buscar dispositivo ahora"
+            text: stateManager ? stateManager.strings.scan_device : "Buscar dispositivo ahora"
             HoverHandler { cursorShape: Qt.PointingHandCursor }
 
             contentItem: Text {

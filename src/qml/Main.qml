@@ -97,10 +97,10 @@ ApplicationWindow {
             Header {
                 Layout.fillWidth: true
                 onBackClicked: {
-                    toast.showMessage("Inicio");
+                    toast.showMessage(stateManager ? stateManager.strings.home : "Inicio");
                 }
                 onSettingsClicked: {
-                    toast.showMessage("Configuración del dispositivo");
+                    settingsModalOverlay.open();
                 }
                 onEditProfileClicked: {
                     profileModalOverlay.open();
@@ -165,7 +165,7 @@ ApplicationWindow {
                 spacing: 16
 
                 Text {
-                    text: "Editar Perfil del Show"
+                    text: stateManager ? stateManager.strings.edit_profile : "Editar Perfil del Show"
                     font.pixelSize: 16
                     font.bold: true
                     color: "#FFFFFF"
@@ -176,7 +176,7 @@ ApplicationWindow {
                     Layout.fillWidth: true
                     font.pixelSize: 14
                     color: "#FFFFFF"
-                    placeholderText: "Nombre del show..."
+                    placeholderText: stateManager ? stateManager.strings.show_placeholder : "Nombre del show..."
 
                     background: Rectangle {
                         color: "#2C2C32"
@@ -189,7 +189,7 @@ ApplicationWindow {
                 RowLayout {
                     spacing: 12
                     Text {
-                        text: "Color / Icono:"
+                        text: stateManager ? stateManager.strings.avatar_color : "Color / Icono:"
                         font.pixelSize: 12
                         color: "#8E8E93"
                     }
@@ -224,13 +224,13 @@ ApplicationWindow {
                     spacing: 12
 
                     Button {
-                        text: "Cancelar"
+                        text: stateManager ? stateManager.strings.cancel : "Cancelar"
                         HoverHandler { cursorShape: Qt.PointingHandCursor }
                         onClicked: profileModalOverlay.visible = false
                     }
 
                     Button {
-                        text: "Guardar"
+                        text: stateManager ? stateManager.strings.save : "Guardar"
                         HoverHandler { cursorShape: Qt.PointingHandCursor }
                         contentItem: Text {
                             text: parent.text
@@ -264,6 +264,215 @@ ApplicationWindow {
             profileModalBox.selectedIconIdx = stateManager ? stateManager.showIcon : 0;
             profileModalOverlay.visible = true;
             showNameInput.forceActiveFocus();
+        }
+    }
+
+    // Application Settings Modal Overlay (Language & Preferences)
+    Rectangle {
+        id: settingsModalOverlay
+        objectName: "settingsModalOverlay"
+        anchors.fill: parent
+        color: "#99000000"
+        z: 9999
+        visible: false
+
+        function open() {
+            visible = true;
+        }
+
+        function close() {
+            visible = false;
+        }
+
+        MouseArea {
+            anchors.fill: parent
+            onClicked: settingsModalOverlay.close()
+        }
+
+        Rectangle {
+            id: settingsModalBox
+            anchors.centerIn: parent
+            width: 440
+            height: 300
+            radius: 12
+            color: "#222226"
+            border.color: "#3D3D45"
+            border.width: 1
+
+            MouseArea {
+                anchors.fill: parent
+                onClicked: {}
+            }
+
+            ColumnLayout {
+                anchors.fill: parent
+                anchors.margins: 24
+                spacing: 16
+
+                // Header
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 10
+
+                    Text {
+                        text: stateManager ? stateManager.strings.settings : "Configuración"
+                        font.pixelSize: 18
+                        font.bold: true
+                        color: "#FFFFFF"
+                        Layout.fillWidth: true
+                    }
+
+                    Rectangle {
+                        width: 28
+                        height: 28
+                        radius: 14
+                        color: closeHover.containsMouse ? "#333338" : "transparent"
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: "✕"
+                            font.pixelSize: 14
+                            color: closeHover.containsMouse ? "#FFFFFF" : "#8E8E93"
+                        }
+
+                        MouseArea {
+                            id: closeHover
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: settingsModalOverlay.close()
+                        }
+                    }
+                }
+
+                Rectangle {
+                    Layout.fillWidth: true
+                    height: 1
+                    color: "#333338"
+                }
+
+                // Language selection section
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: 10
+
+                    Text {
+                        text: stateManager ? stateManager.strings.app_language : "Idioma de la aplicación"
+                        font.pixelSize: 13
+                        font.weight: Font.DemiBold
+                        color: "#CBA158"
+                    }
+
+                    Text {
+                        text: stateManager ? stateManager.strings.language_desc : "Selecciona el idioma de la interfaz:"
+                        font.pixelSize: 12
+                        color: "#8E8E93"
+                    }
+
+                    RowLayout {
+                        spacing: 16
+                        Layout.fillWidth: true
+
+                        // Spanish button
+                        Rectangle {
+                            Layout.fillWidth: true
+                            height: 52
+                            radius: 8
+                            color: (stateManager && stateManager.language === "es") ? "#2C271E" : (esHover.containsMouse ? "#2C2C32" : "#1A1A1D")
+                            border.color: (stateManager && stateManager.language === "es") ? "#CBA158" : "#323238"
+                            border.width: (stateManager && stateManager.language === "es") ? 2 : 1
+
+                            RowLayout {
+                                anchors.centerIn: parent
+                                spacing: 10
+
+                                Text {
+                                    text: "🇪🇸"
+                                    font.pixelSize: 20
+                                }
+
+                                Text {
+                                    text: "Español"
+                                    font.pixelSize: 13
+                                    font.weight: (stateManager && stateManager.language === "es") ? Font.Bold : Font.Normal
+                                    color: (stateManager && stateManager.language === "es") ? "#FFFFFF" : "#C8C8CC"
+                                }
+                            }
+
+                            MouseArea {
+                                id: esHover
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    if (stateManager) stateManager.setLanguage("es");
+                                }
+                            }
+                        }
+
+                        // English button
+                        Rectangle {
+                            Layout.fillWidth: true
+                            height: 52
+                            radius: 8
+                            color: (stateManager && stateManager.language === "en") ? "#2C271E" : (enHover.containsMouse ? "#2C2C32" : "#1A1A1D")
+                            border.color: (stateManager && stateManager.language === "en") ? "#CBA158" : "#323238"
+                            border.width: (stateManager && stateManager.language === "en") ? 2 : 1
+
+                            RowLayout {
+                                anchors.centerIn: parent
+                                spacing: 10
+
+                                Text {
+                                    text: "🇬🇧"
+                                    font.pixelSize: 20
+                                }
+
+                                Text {
+                                    text: "English"
+                                    font.pixelSize: 13
+                                    font.weight: (stateManager && stateManager.language === "en") ? Font.Bold : Font.Normal
+                                    color: (stateManager && stateManager.language === "en") ? "#FFFFFF" : "#C8C8CC"
+                                }
+                            }
+
+                            MouseArea {
+                                id: enHover
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    if (stateManager) stateManager.setLanguage("en");
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Item { Layout.fillHeight: true }
+
+                // Footer button
+                Button {
+                    Layout.alignment: Qt.AlignRight
+                    text: stateManager ? stateManager.strings.close : "Cerrar"
+                    HoverHandler { cursorShape: Qt.PointingHandCursor }
+                    contentItem: Text {
+                        text: parent.text
+                        color: "#FFFFFF"
+                        font.pixelSize: 12
+                        font.weight: Font.DemiBold
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                    background: Rectangle {
+                        implicitWidth: 90
+                        implicitHeight: 34
+                        radius: 6
+                        color: parent.down ? "#A6823C" : (parent.hovered ? "#DAB265" : "#CBA158")
+                    }
+                    onClicked: settingsModalOverlay.close()
+                }
+            }
         }
     }
 }

@@ -10,8 +10,8 @@ Item {
 
     FileDialog {
         id: fileDialog
-        title: "Seleccionar archivo de sonido para el Pad"
-        nameFilters: ["Archivos de audio (*.wav *.mp3 *.ogg *.flac *.aac)", "Todos los archivos (*)"]
+        title: stateManager ? stateManager.strings.sound_dialog_title : "Seleccionar archivo de sonido para el Pad"
+        nameFilters: [stateManager ? stateManager.strings.audio_files_filter : "Archivos de audio (*.wav *.mp3 *.ogg *.flac *.aac)", stateManager ? stateManager.strings.all_files_filter : "Todos los archivos (*)"]
         onAccepted: {
             if (stateManager && selectedFile) {
                 stateManager.uploadSoundFile(selectedFile.toString(), "");
@@ -21,10 +21,10 @@ Item {
 
     FileDialog {
         id: exportFileDialog
-        title: "Guardar Audio Exportado"
+        title: stateManager ? stateManager.strings.export_dialog_title : "Guardar Audio Exportado"
         fileMode: FileDialog.SaveFile
         defaultSuffix: (root.selectedPad && root.selectedPad.file && root.selectedPad.file.endsWith(".mp3")) ? "mp3" : "wav"
-        nameFilters: ["Archivos de audio (*.wav *.mp3)", "Todos los archivos (*)"]
+        nameFilters: [stateManager ? stateManager.strings.audio_files_filter : "Archivos de audio (*.wav *.mp3)", stateManager ? stateManager.strings.all_files_filter : "Todos los archivos (*)"]
         onAccepted: {
             if (stateManager && selectedFile) {
                 stateManager.exportCurrentPad(selectedFile.toString());
@@ -66,7 +66,7 @@ Item {
                         }
 
                         Text {
-                            text: "Personalizar SMART Pads"
+                            text: stateManager ? stateManager.strings.customize_smart_pads : "Personalizar SMART Pads"
                             font.pixelSize: 14
                             font.bold: true
                             color: "#FFFFFF"
@@ -88,7 +88,7 @@ Item {
                         Text {
                             id: padLabel
                             anchors.centerIn: parent
-                            text: "Pad " + (stateManager ? (stateManager.selectedPadIndex + 1) : 1) + " (Banco " + (stateManager ? stateManager.currentBankDisplay : 1) + ")"
+                            text: (stateManager ? stateManager.strings.pad : "Pad") + " " + (stateManager ? (stateManager.selectedPadIndex + 1) : 1) + " (" + (stateManager ? stateManager.strings.bank : "Banco") + " " + (stateManager ? stateManager.currentBankDisplay : 1) + ")"
                             font.pixelSize: 11
                             font.weight: Font.Medium
                             color: "#FFFFFF"
@@ -145,7 +145,7 @@ Item {
                                     }
                                     Text {
                                         Layout.alignment: Qt.AlignHCenter
-                                        text: "Elegir Archivo"
+                                        text: stateManager ? stateManager.strings.choose_file : "Elegir Archivo"
                                         font.pixelSize: 12
                                         font.weight: Font.Medium
                                         color: actArea1.containsMouse ? "#FFFFFF" : "#C8C8CC"
@@ -181,7 +181,7 @@ Item {
                                     }
                                     Text {
                                         Layout.alignment: Qt.AlignHCenter
-                                        text: "Arrastrar y Soltar"
+                                        text: stateManager ? stateManager.strings.drag_drop : "Arrastrar y Soltar"
                                         font.pixelSize: 12
                                         font.weight: Font.Medium
                                         color: dropArea.containsDrag ? "#CBA158" : "#C8C8CC"
@@ -221,7 +221,7 @@ Item {
                                     }
                                     Text {
                                         Layout.alignment: Qt.AlignHCenter
-                                        text: "Exportar Audio"
+                                        text: stateManager ? stateManager.strings.export_audio : "Exportar Audio"
                                         font.pixelSize: 12
                                         font.weight: Font.Medium
                                         color: parent.parent.hasAudio ? (actArea3.containsMouse ? "#FFFFFF" : "#C8C8CC") : "#55555A"
@@ -235,7 +235,7 @@ Item {
                                     cursorShape: parent.hasAudio ? Qt.PointingHandCursor : Qt.ArrowCursor
                                     onClicked: {
                                         if (!parent.hasAudio) {
-                                            if (stateManager) stateManager.toastMessage("El pad seleccionado no tiene ningún archivo para exportar.");
+                                            if (stateManager) stateManager.toastMessage(stateManager.strings.no_audio_export);
                                             return;
                                         }
                                         let padName = (root.selectedPad && root.selectedPad.name) ? root.selectedPad.name.replace(/[^a-zA-Z0-9_-]/g, "_") : "pad_audio";
@@ -295,7 +295,7 @@ Item {
                                 Layout.alignment: Qt.AlignHCenter
                                 text: {
                                     let m = (root.selectedPad && root.selectedPad.mode !== undefined) ? root.selectedPad.mode : "toggle";
-                                    return (m === "oneshot") ? "One Shot" : ((m === "hold") ? "Hold" : "Toggle");
+                                    return (m === "oneshot") ? (stateManager ? stateManager.strings.mode_oneshot : "One Shot") : ((m === "hold") ? (stateManager ? stateManager.strings.mode_hold : "Hold") : (stateManager ? stateManager.strings.mode_toggle : "Toggle"));
                                 }
                                 font.pixelSize: 12
                                 font.weight: Font.Medium
@@ -339,7 +339,7 @@ Item {
 
                             Text {
                                 Layout.alignment: Qt.AlignHCenter
-                                text: root.selectedPad && root.selectedPad.loop ? "Loop On" : "Loop Off"
+                                text: root.selectedPad && root.selectedPad.loop ? (stateManager ? stateManager.strings.loop_on : "Loop On") : (stateManager ? stateManager.strings.loop_off : "Loop Off")
                                 font.pixelSize: 12
                                 font.weight: Font.Medium
                                 color: root.selectedPad && root.selectedPad.loop ? "#CBA158" : "#8E8E93"
@@ -382,7 +382,7 @@ Item {
 
                             Text {
                                 Layout.alignment: Qt.AlignHCenter
-                                text: "Replay"
+                                text: stateManager ? stateManager.strings.replay : "Replay"
                                 font.pixelSize: 12
                                 font.weight: Font.Medium
                                 color: root.selectedPad && root.selectedPad.replay ? "#CBA158" : "#8E8E93"
@@ -396,7 +396,7 @@ Item {
                         spacing: 14
 
                         Text {
-                            text: "Ganancia:"
+                            text: stateManager ? stateManager.strings.gain : "Ganancia:"
                             font.pixelSize: 12
                             color: "#8E8E93"
                         }
@@ -455,7 +455,7 @@ Item {
                         font.pixelSize: 16
                         font.bold: true
                         color: "#FFFFFF"
-                        placeholderText: "Nombre del Pad..."
+                        placeholderText: stateManager ? stateManager.strings.pad_placeholder : "Nombre del Pad..."
 
                         background: Rectangle {
                             color: nameField.activeFocus ? "#28282D" : "transparent"
@@ -524,7 +524,7 @@ Item {
                 // Test / Trigger Button
                 Button {
                     Layout.alignment: Qt.AlignHCenter
-                    text: "▶ Disparar Pad Seleccionado"
+                    text: stateManager ? stateManager.strings.trigger_selected : "▶ Disparar Pad Seleccionado"
                     HoverHandler { cursorShape: Qt.PointingHandCursor }
 
                     contentItem: Text {
@@ -579,7 +579,7 @@ Item {
                     }
 
                     Text {
-                        text: "Banco " + (stateManager ? stateManager.currentBankDisplay : 1) + " de 8"
+                        text: (stateManager ? stateManager.strings.bank : "Banco") + " " + (stateManager ? stateManager.currentBankDisplay : 1) + " " + (stateManager ? stateManager.strings.of : "de") + " 8"
                         font.pixelSize: 13
                         font.bold: true
                         color: "#E0E0E0"
