@@ -6,7 +6,7 @@
 
 <p align="center">
   <strong>Native Linux Desktop Manager & SMART Pad Controller for RØDECaster Duo and Pro II</strong>
-</p
+</p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/Platform-Linux-orange.svg" alt="Platform Linux" />
