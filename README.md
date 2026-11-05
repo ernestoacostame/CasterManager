@@ -21,7 +21,7 @@
 
 ---
 
-![CasterManager Screenshot](docs/screenshot.png)
+<img width="1310" height="900" alt="castermanager_en" src="https://github.com/user-attachments/assets/5d63bcd0-7f43-493e-b1ec-24f439bdbd30" />
 
 ## Overview
 
@@ -177,7 +177,7 @@ This project is licensed under the [MIT License](LICENSE).
 
 ---
 
-![Captura de pantalla de CasterManager](docs/screenshot.png)
+<img width="1310" height="900" alt="castermanager_es" src="https://github.com/user-attachments/assets/6ea37280-6802-4626-8e2a-134a04e29913" />
 
 ## Descripción
 
