@@ -9,6 +9,10 @@
 </p>
 
 <p align="center">
+  <a href="#castermanager">English</a> | <a href="#castermanager-español">Español</a>
+</p>
+
+<p align="center">
   <img src="https://img.shields.io/badge/Platform-Linux-orange.svg" alt="Platform Linux" />
   <img src="https://img.shields.io/badge/UI-Qt%206%20%7C%20QML-41cd52.svg" alt="Qt 6 / QML" />
   <img src="https://img.shields.io/badge/Language-Python%20%2F%20Rust-blue.svg" alt="Python / Rust" />
@@ -166,7 +170,10 @@ CasterManager is an independent open-source project and is not affiliated, assoc
 
 This project is licensed under the [MIT License](LICENSE).
 
-# CasterManager
+---
+---
+
+# CasterManager (Español)
 
 <p align="center">
   <img src="assets/app_icon.png" width="96" height="96" alt="Logo de CasterManager" />
@@ -174,6 +181,10 @@ This project is licensed under the [MIT License](LICENSE).
 
 <p align="center">
   <strong>Gestor de escritorio y controlador de SMART Pads para RØDECaster Duo y Pro II en Linux</strong>
+</p>
+
+<p align="center">
+  <a href="#castermanager">English</a> | <a href="#castermanager-español">Español</a>
 </p>
 
 
