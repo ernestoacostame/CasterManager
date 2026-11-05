@@ -42,42 +42,22 @@ Rectangle {
                     Rectangle {
                         width: 44
                         height: 44
-                        radius: 6
+                        radius: 8
                         color: "#161618"
-                        border.color: "#3A3A40"
+                        border.color: "#2C2C30"
+                        border.width: 1
+                        clip: true
 
-                        Column {
+                        Image {
                             anchors.centerIn: parent
-                            spacing: 3
-                            // Faders indicator
-                            Row {
-                                spacing: 3
-                                anchors.horizontalCenter: parent.horizontalCenter
-                                Repeater {
-                                    model: stateManager && stateManager.isDuo ? 4 : 6
-                                    Rectangle {
-                                        width: 2.5
-                                        height: 14
-                                        color: "#888888"
-                                        radius: 1
-                                    }
-                                }
-                            }
-                            // Pads indicator
-                            Grid {
-                                columns: 2
-                                spacing: 2
-                                anchors.horizontalCenter: parent.horizontalCenter
-                                Repeater {
-                                    model: stateManager && stateManager.isDuo ? 6 : 8
-                                    Rectangle {
-                                        width: 4
-                                        height: 4
-                                        radius: 1
-                                        color: modelData % 2 === 0 ? "#FF3C3C" : "#5050FF"
-                                    }
-                                }
-                            }
+                            width: 36
+                            height: 36
+                            source: "../../assets/rodecaster.svg"
+                            fillMode: Image.PreserveAspectFit
+                            mipmap: true
+                            smooth: true
+                            sourceSize.width: 72
+                            sourceSize.height: 72
                         }
                     }
 
