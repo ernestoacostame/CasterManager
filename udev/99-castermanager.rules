@@ -1,0 +1,22 @@
+# CasterManager - Udev rules for RØDECaster Duo and RØDECaster Pro II
+# Grants read and write access to the USB HID interfaces for non-root users
+
+# RØDECaster Duo
+KERNEL=="hidraw*", ATTRS{idVendor}=="19f7", ATTRS{idProduct}=="0050", MODE="0666", TAG+="uaccess"
+KERNEL=="hidraw*", ATTRS{idVendor}=="19f7", ATTRS{idProduct}=="0079", MODE="0666", TAG+="uaccess"
+KERNEL=="hidraw*", ATTRS{idVendor}=="19f7", ATTRS{idProduct}=="0093", MODE="0666", TAG+="uaccess"
+KERNEL=="hidraw*", ATTRS{idVendor}=="19f7", ATTRS{idProduct}=="0095", MODE="0666", TAG+="uaccess"
+KERNEL=="hidraw*", ATTRS{idVendor}=="19f7", ATTRS{idProduct}=="004e", MODE="0666", TAG+="uaccess"
+
+# RØDECaster Pro II
+KERNEL=="hidraw*", ATTRS{idVendor}=="19f7", ATTRS{idProduct}=="0030", MODE="0666", TAG+="uaccess"
+KERNEL=="hidraw*", ATTRS{idVendor}=="19f7", ATTRS{idProduct}=="0037", MODE="0666", TAG+="uaccess"
+KERNEL=="hidraw*", ATTRS{idVendor}=="19f7", ATTRS{idProduct}=="0072", MODE="0666", TAG+="uaccess"
+KERNEL=="hidraw*", ATTRS{idVendor}=="19f7", ATTRS{idProduct}=="0078", MODE="0666", TAG+="uaccess"
+KERNEL=="hidraw*", ATTRS{idVendor}=="19f7", ATTRS{idProduct}=="0092", MODE="0666", TAG+="uaccess"
+KERNEL=="hidraw*", ATTRS{idVendor}=="19f7", ATTRS{idProduct}=="0094", MODE="0666", TAG+="uaccess"
+KERNEL=="hidraw*", ATTRS{idVendor}=="19f7", ATTRS{idProduct}=="0026", MODE="0666", TAG+="uaccess"
+
+# Fallback catch-all for any RØDE hidraw device
+KERNEL=="hidraw*", ATTRS{idVendor}=="19f7", MODE="0666", TAG+="uaccess"
+

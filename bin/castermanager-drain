@@ -1,0 +1,68 @@
+#!/usr/bin/env python3
+"""
+CasterManager HID Drainer Daemon
+Runs quietly in the background of the user session.
+Continuously keeps /dev/hidraw* for RØDECaster open and drained.
+Prevents the RØDECaster firmware from freezing when buttons/pads are pressed or sounds play.
+Uses virtually 0% CPU.
+"""
+import os
+import glob
+import time
+import select
+import signal
+import sys
+
+RODE_VID = "19f7"
+running = True
+
+def sig_handler(signum, frame):
+    global running
+    running = False
+
+signal.signal(signal.SIGINT, sig_handler)
+signal.signal(signal.SIGTERM, sig_handler)
+
+def find_rodecaster_hidraw():
+    for h in glob.glob("/sys/class/hidraw/hidraw*"):
+        try:
+            target = os.path.realpath(h)
+            if RODE_VID in target.lower():
+                dev_name = os.path.basename(h)
+                path = f"/dev/{dev_name}"
+                if os.path.exists(path) and os.access(path, os.R_OK):
+                    return path
+        except Exception:
+            pass
+    return None
+
+def main():
+    while running:
+        hidraw = find_rodecaster_hidraw()
+        if not hidraw:
+            time.sleep(2)
+            continue
+
+        try:
+            fd = os.open(hidraw, os.O_RDONLY | os.O_NONBLOCK)
+            while running:
+                r, _, _ = select.select([fd], [], [], 1.0)
+                if r:
+                    try:
+                        # Drain incoming report chunks
+                        _ = os.read(fd, 4096)
+                    except (BlockingIOError, OSError):
+                        pass
+                if not os.path.exists(hidraw):
+                    break
+        except Exception:
+            time.sleep(1)
+        finally:
+            try:
+                os.close(fd)
+            except Exception:
+                pass
+
+if __name__ == "__main__":
+    main()
+

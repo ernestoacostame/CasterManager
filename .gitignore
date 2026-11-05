@@ -1,0 +1,33 @@
+# Reverse engineering and upstream reference materials (excluded)
+Resources/
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Python environments
+.venv/
+env/
+venv/
+ENV/
+
+# Temporary screenshots & testing artifacts in root
+castermanager_*.png
+crop_*.png
+official_*.png
+new_flat_icons_*.png
+
+# Build & packaging
+build/
+dist/
+*.egg-info/
+.pytest_cache/
+
+# IDE & OS temporary files
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*~
