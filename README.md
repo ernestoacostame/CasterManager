@@ -9,6 +9,10 @@
 </p>
 
 <p align="center">
+  <a href="README.md"><strong>English</strong></a> | <a href="README.es.md">Español</a>
+</p>
+
+<p align="center">
   <img src="https://img.shields.io/badge/Platform-Linux-orange.svg" alt="Platform Linux" />
   <img src="https://img.shields.io/badge/UI-Qt%206%20%7C%20QML-41cd52.svg" alt="Qt 6 / QML" />
   <img src="https://img.shields.io/badge/Language-Python%20%2F%20Rust-blue.svg" alt="Python / Rust" />
