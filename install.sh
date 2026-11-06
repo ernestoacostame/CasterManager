@@ -20,7 +20,7 @@ echo "=========================================="
 echo ""
 
 # 1. Check Python and PyQt6
-echo "[1/5] Checking prerequisites..."
+echo "[1/6] Checking prerequisites..."
 if ! command -v python3 >/dev/null 2>&1; then
     echo "ERROR: python3 is not installed."
     exit 1
@@ -33,11 +33,11 @@ if ! python3 -c "import PyQt6.QtQml, PyQt6.QtQuick" 2>/dev/null; then
 fi
 
 # 2. Install udev rules and kernel quirks
-echo "[2/5] Installing udev rules and kernel quirks for RØDECaster devices..."
+echo "[2/6] Installing udev rules and kernel quirks for RØDECaster devices..."
 if [ "$EUID" -ne 0 ]; then
     echo "Requesting sudo permissions to install udev rules and modprobe quirks..."
-    sudo cp "$UDEV_RULE_SRC" "$UDEV_RULE_DST"
-    sudo cp "$QUIRKS_SRC" "$QUIRKS_DST"
+    sudo cp --remove-destination "$UDEV_RULE_SRC" "$UDEV_RULE_DST"
+    sudo cp --remove-destination "$QUIRKS_SRC" "$QUIRKS_DST"
     sudo udevadm control --reload-rules
     sudo udevadm trigger --subsystem-match=hidraw || true
     # Fix permissions immediately on any currently active node
@@ -52,8 +52,8 @@ if [ "$EUID" -ne 0 ]; then
         fi
     done
 else
-    cp "$UDEV_RULE_SRC" "$UDEV_RULE_DST"
-    cp "$QUIRKS_SRC" "$QUIRKS_DST"
+    cp --remove-destination "$UDEV_RULE_SRC" "$UDEV_RULE_DST"
+    cp --remove-destination "$QUIRKS_SRC" "$QUIRKS_DST"
     udevadm control --reload-rules
     udevadm trigger --subsystem-match=hidraw || true
     for h in /sys/class/hidraw/hidraw*; do
@@ -68,17 +68,17 @@ else
 fi
 
 # 3. Compile or copy Rust backend binary if needed
-echo "[3/5] Checking CasterManager backend engine..."
+echo "[3/6] Checking CasterManager backend engine..."
 if [ -f "$SCRIPT_DIR/Resources/rcp2-cli-main/target/release/rcp2-cli" ]; then
-    cp "$SCRIPT_DIR/Resources/rcp2-cli-main/target/release/rcp2-cli" "$SCRIPT_DIR/bin/rcp2-cli"
+    cp --remove-destination "$SCRIPT_DIR/Resources/rcp2-cli-main/target/release/rcp2-cli" "$SCRIPT_DIR/bin/rcp2-cli"
     chmod +x "$SCRIPT_DIR/bin/rcp2-cli"
 elif [ -f "$SCRIPT_DIR/Resources/rcp2-cli-main/target/debug/rcp2-cli" ]; then
-    cp "$SCRIPT_DIR/Resources/rcp2-cli-main/target/debug/rcp2-cli" "$SCRIPT_DIR/bin/rcp2-cli"
+    cp --remove-destination "$SCRIPT_DIR/Resources/rcp2-cli-main/target/debug/rcp2-cli" "$SCRIPT_DIR/bin/rcp2-cli"
     chmod +x "$SCRIPT_DIR/bin/rcp2-cli"
 fi
 
 # 4. Install Background Drain Service (Prevents hardware freezes)
-echo "[4/5] Installing background HID drain service..."
+echo "[4/6] Installing background HID drain service..."
 SYSTEMD_USER_DIR="$HOME/.config/systemd/user"
 mkdir -p "$SYSTEMD_USER_DIR"
 cat > "$SYSTEMD_USER_DIR/castermanager-drain.service" << EOF
