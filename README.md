@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <strong>Native Linux Desktop Manager & SMART Pad Controller for RØDECaster Duo and Pro II</strong>
+  <strong>Native Linux Desktop Management Suite & Audio Controller for RØDECaster Duo and Pro II</strong>
 </p>
 
 <p align="center">
@@ -25,36 +25,58 @@
 
 ## Overview
 
-**CasterManager** is a modern, responsive Linux desktop application designed to control and configure **RØDECaster Duo** and **RØDECaster Pro II** audio production consoles. Built with Qt 6 (PyQt6 + QML) and backed by a high-performance Rust protocol engine, it brings full control over SMART pads, audio file transfers, playback settings, and show profiles to Linux users.
+**CasterManager** is a native, modern, and comprehensive Linux desktop suite created for the **RØDECaster Duo** and **RØDECaster Pro II** audio production consoles. Built on Qt 6 (PyQt6 + QML) with a high-performance Rust protocol bridge (`rcp2-cli`), it delivers a complete management interface matching and extending official desktop utilities: live fader mixing, input routing, SMART Pads customization (sounds & hardware Voice FX), MicroSD recording transfers, and device configuration.
 
 ---
 
 ## Key Features
 
-- **🎛️ SMART Pad Matrix Management:**
-  - Visual 2x3 (Duo) and 2x4 (Pro II) interactive grid layout matching the physical hardware buttons.
-  - Seamless bank navigation across all 8 pad banks (up to 48 / 64 pads).
-  - One-click pad trigger and auditioning directly from the desktop.
-  - Clear / delete pad sound assignments with instant hardware synchronization.
+### 🎚️ Live Audio Mixer & Fader Control
+- **Interactive Multi-Channel Fader Strips:** Real-time bi-directional level synchronization with the console hardware.
+- **Physical vs. Virtual Fader Architecture:**
+  - Clearly identifies physical hardware sliders (`[FÍSICO]`) and software virtual faders (`[VIRTUAL]`).
+  - Allows full interactive control of virtual faders (e.g., SMART Pads audio, Bluetooth, USB Chat) directly from the Linux desktop, updating console levels in real time.
+- **Channel Mute & Listen (Solo):** Instant toggle buttons with hardware LED color matching.
+- **Input Source Routing Matrix:** Reassign any channel on the fly from the pool of available sources:
+  - Neutrik Combo XLR 1 & 2 (with +48V Phantom Power badges)
+  - Wireless Series IV dual internal receivers
+  - USB 1 Audio Main (Multichannel 24-bit / 48 kHz)
+  - USB 2 Audio Chat (automatic mix-minus)
+  - Bluetooth Stereo (A2DP & call routing)
+  - SMART Pads audio stream
+  - TRRS Headset microphone
 
-- **📁 Audio Import & Export:**
-  - **Upload:** Select any audio file (`.wav`, `.mp3`, `.ogg`, `.flac`, `.aac`) or drag & drop. The application automatically triggers eMMC mass-storage transfer mode, converts/copies the file, and remounts storage.
-  - **Export:** Save sound files assigned to any SMART pad directly to your computer.
+### 🎛️ SMART Pads Customizer (Sounds & Voice FX)
+- **Interactive Matrix View:** 2x3 (Duo) and 2x4 (Pro II) grid layouts across all 8 banks (up to 48 / 64 total pads).
+- **Sound Playback Management:**
+  - Import audio via file dialog or Drag & Drop (`.wav`, `.mp3`, `.ogg`, `.flac`, `.aac`).
+  - Export assigned audio files directly to your PC.
+  - Play modes: `Toggle` (play/pause), `One Shot` (complete playback), `Hold` (momentary).
+  - Loop, Replay, gain trim (-12 dB to +12 dB), and 12 hardware LED colors.
+- **Hardware Voice FX Presets:**
+  - Assign native voice effects directly to pads: **Voice Disguise**, **Megaphone**, **Large Robot**, **Pitch Shift**, **Monster**, and **Small Robot**.
+  - Target channel selector: route effects to **Mic 1** or **Mic 2**.
+  - Trigger mode: **Latch (Toggle)** or **Hold (Momentary)**.
+- **Mixer Actions:** Assign hardware Censor Bleep and Ducking functions.
 
-- **⚙️ Real-Time Playback Parameter Customization:**
-  - **Play Modes:** Toggle between `Toggle` (play/pause), `One Shot` (complete playback), and `Hold` (momentary press).
-  - **Loop Control:** Switch loop mode on or off.
-  - **Replay Option:** Instant restart on tap vs. ignore/pause.
-  - **Gain Control:** Fine-tune audio playback volume in real time.
-  - **Color Palette:** Customize each pad's LED backlight with 12 hardware-matched colors.
+### 🎙️ MicroSD Recording Management & USB Transfer
+- **Real-Time Storage Monitoring:** Displays MicroSD capacity, used space, and free space (supports 32 GB, 64 GB, 128 GB, 256 GB+ cards).
+- **One-Click USB Mass Storage Mode:** Automatically switches the console to transfer mode and mounts the MicroSD partition (`/dev/sdX1`) in Linux.
+- **Podcast Take Browser:** Parses `Meta.xml` metadata for recorded episodes, showing take name, date, time, duration, channel format (Stereo Mix vs. 24-bit Multichannel), and file size.
+- **Quick Folder Access:** Open any take folder directly in your default file manager (Dolphin, Nautilus, Nemo, Thunar) with one click.
+- **Quick Eject (`⏏`):** Safely unmounts the card and returns the console to live audio mode.
 
-- **👤 Show & Profile Customizer:**
-  - Change the active show name displayed on the console.
-  - Customize the user avatar color.
+### ⚙️ Hardware & Device Configuration
+- **Unified Screen & Button Backlight:** Synchronized brightness sliders controlling both rotary encoder dials and idle/inactive buttons uniformly without delay.
+- **Metering Scale Modes:** Switch between **Default** (standard unity gain markers) and **Broadcast** (dBFS precision scale with compressor gain reduction meters).
+- **Headphone Profiles:** Configure output impedance and tuning (RØDE NTH-100, High Sensitivity, Low Sensitivity).
+- **Audio Routing & Protection:** Auto-mute monitor outputs when faders are raised, auto-mute Bluetooth when mic is live, pre/post-fader listen (PFL/AFL), and multitrack modes.
+- **Haptics & USB MIDI:** Enable or adjust tactile vibration and USB MIDI bi-directional communication.
 
-- **🛡️ Integrated Anti-Freeze Background Daemon (`castermanager-drain`):**
-  - Fixes the known Linux hardware lockup bug where the RØDECaster firmware blocks indefinitely on USB HID writes when no host process is reading the endpoint.
-  - Includes a lightweight user systemd service (`castermanager-drain.service`) that uses virtually 0% CPU and keeps the console fully responsive 24/7, even when the GUI is closed.
+### 🌐 Bilingual Interface & Desktop Polish
+- **i18n Support:** Fully translated interface in **English** and **Spanish** with instant switching and persistent `QSettings`.
+- **System Desktop Integration:** Complete XDG hicolor icon theme (16x16 up to 256x256 + scalable SVG) and Wayland/X11 taskbar integration.
+- **Anti-Freeze Daemon (`castermanager-drain`):** High-performance systemd background daemon that drains USB HID queues continuously, preventing firmware lockups even when the GUI is closed.
 
 ---
 
@@ -90,22 +112,23 @@ Clone the repository and run the automated installation script:
 
 ```bash
 git clone https://github.com/ernestoacostame/CasterManager.git
-cd castermanager
+cd CasterManager
 ./install.sh
 ```
 
 ### What `install.sh` does:
 1. Verifies Python 3 and PyQt6 dependencies.
 2. Installs `udev` rules (`/etc/udev/rules.d/99-castermanager.rules`) for non-root USB access.
-3. Configures kernel module quirks (`/etc/modprobe.d/99-rodecaster-quirks.conf`) to avoid HID buffer blocking.
-4. Sets up and enables the background drain daemon (`castermanager-drain.service`) via systemd user session.
-5. Creates a native desktop shortcut in your application launcher (`CasterManager`).
+3. Configures kernel module quirks (`/etc/modprobe.d/99-rodecaster-quirks.conf`) to prevent USB HID buffer saturation.
+4. Prepares the native backend CLI binary.
+5. Installs and enables the background HID drain daemon (`castermanager-drain.service`) in your systemd user session.
+6. Installs system icons across all hicolor resolutions and creates the desktop application launcher (`CasterManager`).
 
 ---
 
 ## Running the Application
 
-Launch CasterManager from your desktop application launcher or run:
+Launch CasterManager from your application menu or start it from terminal:
 
 ```bash
 ./run.sh
@@ -115,16 +138,16 @@ Launch CasterManager from your desktop application launcher or run:
 
 ## Hardware Compatibility
 
-| Model | Supported | Physical Controls | SMART Pads |
-| :--- | :---: | :---: | :---: |
-| **RØDECaster Duo** |  Yes | 4 Faders, 2 Pots | 6 per bank (2x3) |
-| **RØDECaster Pro II** | Yes | 6 Faders, 4 Pots | 8 per bank (2x4) |
+| Model | Supported | Physical Controls | Virtual Faders | SMART Pads |
+| :--- | :---: | :---: | :---: | :---: |
+| **RØDECaster Duo** | Yes | 4 Faders, 2 Pots | 2 Software Faders | 6 per bank (2x3) |
+| **RØDECaster Pro II** | Yes | 6 Faders, 4 Pots | 3 Software Faders | 8 per bank (2x4) |
 
 ---
 
 ## Preventing Console Freezes on Linux (The USB HID Quirk)
 
-RØDECaster consoles communicate via USB HID packets. A firmware characteristic causes the device to block indefinitely if an input report write cannot complete when Linux closes the device handle.
+RØDECaster consoles communicate via USB HID packets. A firmware characteristic causes the device to block indefinitely if an input report write cannot complete when Linux closes or neglects the device handle.
 
 CasterManager solves this with a two-layer approach:
 1. **Systemd User Daemon (`castermanager-drain.service`):** Runs continuously in the background, consuming <5 MB of RAM and ~0% CPU, ensuring that incoming HID packets are drained at all times.
@@ -152,7 +175,7 @@ Thank you for your support!
 
 This project was made possible thanks to the work and research of the open-source community:
 
-- **[rcp2-cli](https://github.com/jnbr/rcp2-cli) by jnbr:** Incredible reverse engineering of the RØDECaster Pro II and Duo USB protocol (`rcp2-protocol`, `rcp2-core`), CLI, and mass-storage tooling.
+- **[rcp2-cli](https://github.com/jnbr/rcp2-cli) by jnbr:** Reverse engineering of the RØDECaster Pro II and Duo USB protocol (`rcp2-protocol`, `rcp2-core`), CLI, and mass-storage tooling.
 - **The Linux Audio & RØDECaster Reverse Engineering Community:**
   - Community research on `rodecaster-utility` and protocol structures.
   - The [open-caster](https://github.com/) project and Linux driver experimentation.
@@ -180,13 +203,12 @@ This project is licensed under the [MIT License](LICENSE).
 </p>
 
 <p align="center">
-  <strong>Gestor de escritorio y controlador de SMART Pads para RØDECaster Duo y Pro II en Linux</strong>
+  <strong>Suite de gestión de escritorio y controlador de audio para RØDECaster Duo y Pro II en Linux</strong>
 </p>
 
 <p align="center">
   <a href="#castermanager">English</a> | <a href="#castermanager-español">Español</a>
 </p>
-
 
 <p align="center">
   <img src="https://img.shields.io/badge/Plataforma-Linux-orange.svg" alt="Plataforma Linux" />
@@ -201,36 +223,58 @@ This project is licensed under the [MIT License](LICENSE).
 
 ## Descripción
 
-**CasterManager** es una aplicación de escritorio nativa para Linux diseñada para controlar y configurar las consolas de producción de audio **RØDECaster Duo** y **RØDECaster Pro II**. Construida con Qt 6 (PyQt6 + QML) y respaldada por un motor de protocolo de alto rendimiento en Rust, ofrece control total de pads SMART, transferencia de archivos de audio, parámetros de reproducción y perfiles de show en Linux.
+**CasterManager** es una suite de escritorio nativa, moderna y completa para Linux, diseñada para las consolas de producción de audio **RØDECaster Duo** y **RØDECaster Pro II**. Construida con Qt 6 (PyQt6 + QML) y respaldada por un puente de protocolo en Rust (`rcp2-cli`), proporciona una suite completa equivalente y superior a las herramientas de escritorio oficiales: mezclador de faders en vivo, matriz de enrutamiento, personalización de SMART Pads (sonidos y efectos de voz por hardware), transferencia de tomas grabadas en la MicroSD y configuración general del hardware.
 
 ---
 
 ## Características Principales
 
-- **🎛️ Gestión de Matriz de SMART Pads:**
-  - Disposición visual interactiva 2x3 (Duo) y 2x4 (Pro II) idéntica a la botonera física del hardware.
-  - Navegación fluida entre los 8 bancos de pads (hasta 48 o 64 pads en total).
-  - Disparo y prueba de pads con un solo clic directamente desde el escritorio.
-  - Borrado y limpieza de sonidos asignados con sincronización inmediata en la consola.
+### 🎚️ Mezclador de Audio en Vivo y Control de Faders
+- **Tiras de Fader Interactivas Multicanal:** Sincronización bidireccional en tiempo real con el hardware de la consola.
+- **Arquitectura de Faders Físicos vs. Virtuales:**
+  - Identificación visual clara entre potenciómetros deslizantes reales (`[FÍSICO]`) y faders virtuales por software (`[VIRTUAL]`).
+  - Control interactivo de los faders virtuales (audio de SMART Pads, Bluetooth, USB Chat) directamente desde la pantalla de Linux, moviendo el fader y modificando el volumen real de la consola al instante.
+- **Silencio (Mute) y Escucha (Listen / Solo):** Botones con retroiluminación LED sincronizada por hardware.
+- **Matriz de Enrutamiento de Entradas:** Asignación de fuentes de entrada a cualquier canal en vivo:
+  - Neutrik Combo XLR 1 y 2 (con indicadores de alimentación Phantom +48V)
+  - Receptores duales integrados Wireless Series IV (2.4 GHz)
+  - Audio USB 1 Principal (Multicanal 24-bit / 48 kHz)
+  - Audio USB 2 Chat (con mix-minus automático integrado)
+  - Bluetooth Stereo (A2DP y llamadas de voz)
+  - Reproductor interno de SMART Pads
+  - Micrófono de auriculares Headset TRRS
 
-- **📁 Importación y Exportación de Audio:**
-  - **Carga de sonido:** Selecciona cualquier archivo de audio (`.wav`, `.mp3`, `.ogg`, `.flac`, `.aac`) o arrástralo y suéltalo. La aplicación activa el modo de almacenamiento masivo eMMC, convierte/copia el archivo y remonta el almacenamiento de manera segura.
-  - **Exportación de audio:** Guarda el audio asignado a cualquier SMART pad directamente en tu computadora.
+### 🎛️ Gestor de SMART Pads (Sonidos y Efectos de Voz FX)
+- **Matriz Visual Interactiva:** Diseños 2x3 (Duo) y 2x4 (Pro II) en los 8 bancos (hasta 48 o 64 pads en total).
+- **Gestión de Pistas de Audio:**
+  - Carga mediante selector o Arrastrar y Soltar (`.wav`, `.mp3`, `.ogg`, `.flac`, `.aac`).
+  - Exportación directa del archivo de audio del pad hacia tu computadora.
+  - Modos de reproducción: `Toggle` (reproducir/pausar), `One Shot` (disparo completo) y `Hold` (mantener presionado).
+  - Bucle (`Loop`), reinicio rápido (`Replay`), ganancia (-12 dB a +12 dB) y 12 colores LED oficiales.
+- **Efectos de Voz FX por Hardware:**
+  - Asignación de efectos de voz nativos del firmware: **Voice Disguise**, **Megaphone**, **Large Robot**, **Pitch Shift**, **Monster** y **Small Robot**.
+  - Selector de canal destino: enruta el efecto a **Mic 1** o **Mic 2**.
+  - Comportamiento de disparo: **Alternar (Latch)** o **Mantener (Hold)**.
+- **Acciones de Mezclador:** Botón de censura (Censor Bleep) y atenuación automática (Ducking).
 
-- **⚙️ Configuración de Reproducción en Tiempo Real:**
-  - **Modos de reproducción:** Alterna entre `Toggle` (reproducir/pausar), `One Shot` (reproducción completa) y `Hold` (mantener pulsado).
-  - **Control de bucle:** Activa o desactiva la repetición continua (`Loop On / Off`).
-  - **Función Replay:** Reinicio inmediato al pulsar vs. pausar/ignorar.
-  - **Ganancia:** Ajusta el volumen de reproducción en tiempo real mediante slider de dB.
-  - **Paleta de colores:** Personaliza la iluminación LED de cada pad con los 12 colores nativos del hardware.
+### 🎙️ Gestor de Grabaciones en MicroSD y Modo Transferencia USB
+- **Monitoreo de Almacenamiento en Tiempo Real:** Detección de tarjetas MicroSD (32 GB, 64 GB, 128 GB, 256 GB+), espacio usado y porcentaje disponible.
+- **Modo Transferencia de un Clic:** Pone la consola en modo de transferencia USB y monta automáticamente la partición exFAT de la MicroSD (`/dev/sdX1`) en el sistema Linux.
+- **Explorador de Tomas Grabadas:** Lee el archivo `Meta.xml` de cada grabación y muestra el nombre del podcast, fecha, hora, duración exacta, formato (Estéreo o Multicanal de 24 bits) y tamaño en disco.
+- **Acceso Directo a Archivos:** Botón para abrir la carpeta de la grabación directamente en tu gestor de archivos favorito (Dolphin, Nautilus, Nemo, Thunar).
+- **Botón de Expulsión Rápida (`⏏`):** Desmonta la tarjeta y devuelve la consola al modo normal con un solo clic desde la barra lateral.
 
-- **👤 Personalización de Perfil y Show:**
-  - Cambia el nombre del show mostrado en la pantalla de la consola.
-  - Personaliza el color del avatar del usuario.
+### ⚙️ Configuración del Dispositivo
+- **Brillo Unificado de Pantalla y Botones:** Sliders sin retardo que sincronizan simultáneamente los diales giratorios activos y todos los botones en reposo (Mute, Solo, REC, Pads).
+- **Vúmetros (Metering):** Alterna entre **Default** (VU estándar de ganancia unitaria) y **Broadcast** (escala dBFS precisa con reducción de ganancia de compresor).
+- **Perfiles de Auriculares:** Ajustes para RØDE NTH-100, alta sensibilidad y baja sensibilidad.
+- **Enrutamiento y Protección:** Silenciado automático de monitores al subir faders de micro, silenciado de Bluetooth, escucha pre/post-fader (PFL/AFL) y modos de grabación multitrack.
+- **Vibración Háptica y Control MIDI:** Configura la respuesta táctil de los pads y la comunicación MIDI bidireccional por USB.
 
-- **🛡️ Demonio Anti-Bloqueo de Hardware en Segundo Plano (`castermanager-drain`):**
-  - Resuelve el bug del firmware de RØDE donde la consola se congela al pulsar botones si ningún proceso en Linux está leyendo el endpoint USB HID.
-  - Se instala como servicio de usuario en systemd (`castermanager-drain.service`), consumiendo ~0% de CPU y <5 MB de RAM, manteniendo la consola desbloqueada las 24 horas del día.
+### 🌐 Soporte Bilingüe e Integración con el Escritorio
+- **Idiomas:** Interfaz completa en **Español** e **Inglés**, configurable desde la ventana de ajustes y guardada con persistencia en `QSettings`.
+- **Integración XDG:** Icono nativo en todas las resoluciones estándar de `hicolor` (16x16 hasta 256x256 + SVG vectorial) compatible con Wayland y X11.
+- **Demonio Anti-Bloqueo (`castermanager-drain`):** Servicio systemd en segundo plano que consume los reportes HID 24/7 con ~0% de CPU, garantizando que el firmware nunca se bloquee.
 
 ---
 
@@ -274,7 +318,7 @@ cd CasterManager
 1. Verifica las dependencias de Python 3 y PyQt6.
 2. Instala las reglas `udev` (`/etc/udev/rules.d/99-castermanager.rules`) para acceso USB HID sin privilegios de root.
 3. Instala los quirks de kernel (`/etc/modprobe.d/99-rodecaster-quirks.conf`) para prevenir saturación de buffers.
-4. Prepara el binario del backend CLI.
+4. Prepara el binario del backend CLI (`bin/rcp2-cli`).
 5. Registra, habilita e inicia el servicio en segundo plano (`castermanager-drain.service`) en systemd.
 6. Instala los iconos de la aplicación en el tema estándar del sistema (`hicolor`) y crea el lanzador de escritorio (`CasterManager`).
 
@@ -292,10 +336,10 @@ Puedes abrir CasterManager desde el menú de aplicaciones de tu entorno (KDE Pla
 
 ## Compatibilidad de Hardware
 
-| Modelo | Soportado | Controles Físicos | SMART Pads |
-| :--- | :---: | :---: | :---: |
-| **RØDECaster Duo** | Sí | 4 Faders, 2 Pots | 6 por banco (2x3) |
-| **RØDECaster Pro II** | Sí | 6 Faders, 4 Pots | 8 por banco (2x4) |
+| Modelo | Soportado | Controles Físicos | Faders Virtuales | SMART Pads |
+| :--- | :---: | :---: | :---: | :---: |
+| **RØDECaster Duo** | Sí | 4 Faders, 2 Pots | 2 Faders Virtuales | 6 por banco (2x3) |
+| **RØDECaster Pro II** | Sí | 6 Faders, 4 Pots | 3 Faders Virtuales | 8 por banco (2x4) |
 
 ---
 
@@ -305,7 +349,7 @@ Las consolas RØDECaster se comunican mediante paquetes USB HID. Una particulari
 
 CasterManager soluciona este problema mediante dos capas:
 1. **Servicio Systemd de Usuario (`castermanager-drain.service`):** Corre silenciosamente en segundo plano, asegurando que los reportes de progreso y estado sean consumidos en todo momento sin afectar el rendimiento.
-2. **Quirk de Módulo de Kernel (`usbhid.quirks`):** Para soporte nativo a nivel de kernel, [`install.sh`](file:///home/elav/Developer/Rodecaster/install.sh) instala `/etc/modprobe.d/99-rodecaster-quirks.conf`. También puedes añadir `usbhid.quirks=0x19f7:0x0093:0x00000400` a la línea de comandos de GRUB (`GRUB_CMDLINE_LINUX_DEFAULT`).
+2. **Quirk de Módulo de Kernel (`usbhid.quirks`):** Para soporte nativo a nivel de kernel, `install.sh` instala `/etc/modprobe.d/99-rodecaster-quirks.conf`. También puedes añadir `usbhid.quirks=0x19f7:0x0093:0x00000400` a la línea de comandos de GRUB (`GRUB_CMDLINE_LINUX_DEFAULT`).
 
 ---
 
@@ -346,4 +390,3 @@ CasterManager es un proyecto de código abierto independiente y no está afiliad
 ## Licencia
 
 Este proyecto está distribuido bajo la licencia [MIT](LICENSE).
-
