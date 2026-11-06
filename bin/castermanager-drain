@@ -48,11 +48,14 @@ def main():
             while running:
                 r, _, _ = select.select([fd], [], [], 1.0)
                 if r:
-                    try:
-                        # Drain incoming report chunks
-                        _ = os.read(fd, 4096)
-                    except (BlockingIOError, OSError):
-                        pass
+                    # Drain ALL queued incoming report chunks until buffer is empty
+                    while running:
+                        try:
+                            chunk = os.read(fd, 4096)
+                            if not chunk:
+                                break
+                        except (BlockingIOError, OSError):
+                            break
                 if not os.path.exists(hidraw):
                     break
         except Exception:

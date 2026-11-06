@@ -100,13 +100,34 @@ Item {
                                     }
                                 }
 
-                                // Level readout (dB / %)
-                                Text {
-                                    text: Math.round(modelData.level) + "%"
-                                    font.pixelSize: 13
-                                    font.bold: true
-                                    color: "#CBA158"
+                                // Level readout (dB / %) & Type Badge (FÍSICO vs VIRTUAL)
+                                RowLayout {
                                     Layout.alignment: Qt.AlignHCenter
+                                    spacing: 6
+
+                                    Text {
+                                        text: Math.round(modelData.level) + "%"
+                                        font.pixelSize: 13
+                                        font.bold: true
+                                        color: "#CBA158"
+                                    }
+
+                                    Rectangle {
+                                        width: modelData.is_virtual ? 48 : 42
+                                        height: 15
+                                        radius: 3
+                                        color: modelData.is_virtual ? "#2D2616" : "#242428"
+                                        border.color: modelData.is_virtual ? "#CBA158" : "#44444C"
+                                        border.width: 1
+
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: modelData.is_virtual ? "VIRTUAL" : "FÍSICO"
+                                            font.pixelSize: 8
+                                            font.bold: true
+                                            color: modelData.is_virtual ? "#CBA158" : "#8E8E93"
+                                        }
+                                    }
                                 }
 
                                 // Interactive Vertical Level Slider

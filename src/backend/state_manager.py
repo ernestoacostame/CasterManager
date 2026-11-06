@@ -312,12 +312,19 @@ class StateManager(QObject):
         self._pending_screen_brightness = None
         self._pending_button_brightness = None
 
+        # Debounced fader levels timer
+        self._fader_timer = QTimer(self)
+        self._fader_timer.setSingleShot(True)
+        self._fader_timer.setInterval(120)
+        self._fader_timer.timeout.connect(self._flush_faders_hardware)
+        self._pending_fader_levels = {}
+
         # Faders state
         self._faders = self._init_default_faders()
 
         # Polling timer for live fader & recording status
         self._live_poll_timer = QTimer(self)
-        self._live_poll_timer.setInterval(1500)
+        self._live_poll_timer.setInterval(3000)
         self._live_poll_timer.timeout.connect(self._poll_live_hardware)
         self._live_poll_timer.start()
 
@@ -333,13 +340,14 @@ class StateManager(QObject):
         self.monitor.start()
 
     def _init_default_faders(self):
+        phys_limit = 4 if self._is_duo else 6
         return [
-            {"index": 0, "name": "Mic 1", "color": "#FF3C3C", "icon": "mic", "level": 70, "mute": False, "listen": False},
-            {"index": 1, "name": "Mic 2 / Chat", "color": "#28C850", "icon": "chat", "level": 70, "mute": False, "listen": False},
-            {"index": 2, "name": "USB 1", "color": "#FF8C28", "icon": "usb", "level": 70, "mute": False, "listen": False},
-            {"index": 3, "name": "USB 2", "color": "#A050E6", "icon": "usb", "level": 70, "mute": False, "listen": False},
-            {"index": 4, "name": "SMART Pads", "color": "#FF3C3C", "icon": "pads", "level": 70, "mute": False, "listen": False},
-            {"index": 5, "name": "Bluetooth", "color": "#3C96FF", "icon": "bluetooth", "level": 70, "mute": False, "listen": False},
+            {"index": 0, "name": "Mic 1", "color": "#FF3C3C", "icon": "mic", "level": 70, "mute": False, "listen": False, "is_virtual": False},
+            {"index": 1, "name": "Mic 2 / Chat", "color": "#28C850", "icon": "chat", "level": 70, "mute": False, "listen": False, "is_virtual": False},
+            {"index": 2, "name": "USB 1", "color": "#FF8C28", "icon": "usb", "level": 70, "mute": False, "listen": False, "is_virtual": False},
+            {"index": 3, "name": "USB 2", "color": "#A050E6", "icon": "usb", "level": 70, "mute": False, "listen": False, "is_virtual": False},
+            {"index": 4, "name": "SMART Pads", "color": "#FF3C3C", "icon": "pads", "level": 70, "mute": False, "listen": False, "is_virtual": True},
+            {"index": 5, "name": "Bluetooth", "color": "#3C96FF", "icon": "bluetooth", "level": 70, "mute": False, "listen": False, "is_virtual": True},
         ]
 
     def _init_empty_banks(self):
@@ -604,7 +612,10 @@ class StateManager(QObject):
                             "loop": bool(p.get("padLoop", False)),
                             "replay": bool(p.get("padReplay", False)),
                             "gain": float(p.get("padGain", 0.0)),
-                            "file": p.get("padFilePath", "")
+                            "file": p.get("padFilePath", ""),
+                            "fx_id": int(p.get("padTriggerControl", 8)),
+                            "fx_channel": int(p.get("padEffectInput", 0)),
+                            "fx_mode": int(p.get("padEffectTriggerMode", 1))
                         }
                         self._banks[bank][pos] = pad_entry
 
@@ -1252,8 +1263,23 @@ class StateManager(QObject):
     @pyqtSlot(int, int)
     def setFaderLevel(self, index, level):
         if 0 <= index < len(self._faders):
-            self._faders[index]["level"] = max(0, min(100, level))
+            clamped = max(0, min(100, level))
+            self._faders[index]["level"] = clamped
             self.fadersChanged.emit()
+            self._pending_fader_levels[index] = clamped
+            self._fader_timer.start()
+
+    def _flush_faders_hardware(self):
+        if not self._connected or self._permission_error or not self._pending_fader_levels:
+            return
+        to_send = dict(self._pending_fader_levels)
+        self._pending_fader_levels.clear()
+        for idx, lvl in to_send.items():
+            raw_val = int(round(lvl * 127.0 / 100.0))
+            # On Duo: node [0, 4..7] are physical faders, [0, 8..9] are virtual faders
+            # Setting virtual faders [0, 8] (SMART Pads) and [0, 9] (Bluetooth) directly updates hardware audio level!
+            target_node = f"0,{4 + idx}"
+            self.executor.submit(self.bridge.run_cmd, ["set-property", target_node, "faderLevel", f"u32:{raw_val}"])
 
     # Live Recording
     @pyqtProperty(bool, notify=recordingChanged)
@@ -1329,7 +1355,11 @@ class StateManager(QObject):
         if self._pending_button_brightness is not None:
             bb = self._pending_button_brightness
             self._pending_button_brightness = None
+            # Update BOTH active buttons (rotary dials, encoders) and inactive buttons (Mute, Listen, Rec, Pads)
+            # Default ratio on hardware is 4:1 (active 254 / inactive 64)
+            inactive_bb = max(0, min(255, int(round(bb * 64.0 / 255.0))))
             self.executor.submit(self.bridge.run_cmd, ["set-property", "7", "activeButtonsBrightness", f"u32:{bb}"])
+            self.executor.submit(self.bridge.run_cmd, ["set-property", "7", "inactiveButtonsBrightness", f"u32:{inactive_bb}"])
 
     @pyqtProperty(bool, notify=deviceConfigChanged)
     def autoBrightness(self):
@@ -1514,6 +1544,54 @@ class StateManager(QObject):
         self.deviceConfigChanged.emit()
         if self._connected and not self._permission_error:
             self.executor.submit(self.bridge.run_cmd, ["set-property", "15", "systemMidiControl", f"bool:{str(val).lower()}"])
+
+    @pyqtSlot(int, str, int, int)
+    def assignPadEffect(self, fx_id, fx_name, input_ch=0, trigger_mode=1):
+        """
+        Assigns a hardware Voice FX preset to the current pad with proper properties.
+        fx_id: 8=Voice Disguise, 9=Megaphone, 10=Large Robot, 12=Pitch Shift, 13=Monster, 14=Small Robot
+        input_ch: 0=Mic 1, 1=Mic 2
+        trigger_mode: 1=Latching, 0=Momentary
+        """
+        order = DUO_PHYSICAL_ORDER if self._is_duo else PRO_II_PHYSICAL_ORDER
+        logical_pos = order[self._selected_pad_index] if self._selected_pad_index < len(order) else self._selected_pad_index
+        pad = self._banks[self._current_bank][logical_pos]
+
+        pad["type"] = "fx"
+        pad["name"] = fx_name
+        pad["file"] = ""
+        pad["fx_id"] = fx_id
+        pad["fx_channel"] = input_ch
+        pad["fx_mode"] = trigger_mode
+
+        fx_colors = {8: 8, 9: 9, 10: 10, 12: 0, 13: 1, 14: 2}
+        col = fx_colors.get(fx_id, 8)
+        pad["color_idx"] = col
+        pad["color_hex"] = PAD_COLORS[col]["hex"]
+
+        self.padsChanged.emit()
+        self.selectedPadChanged.emit()
+
+        if self._connected and not self._permission_error:
+            def do_assign():
+                b_str = str(self._current_bank)
+                p_str = str(self._selected_pad_index)
+                # Set proper hardware properties to prevent audio engine lockup
+                self.bridge.run_cmd(["pad", "set-prop", b_str, p_str, "padType", "u32:2"])
+                self.bridge.run_cmd(["pad", "set-prop", b_str, p_str, "padFilePath", "str:"])
+                self.bridge.run_cmd(["pad", "set-prop", b_str, p_str, "padName", f"str:{fx_name}"])
+                self.bridge.run_cmd(["pad", "set-prop", b_str, p_str, "padColourIndex", f"u32:{col}"])
+                self.bridge.run_cmd(["pad", "set-prop", b_str, p_str, "padEffectTriggerMode", f"u32:{trigger_mode}"])
+                self.bridge.run_cmd(["pad", "set-prop", b_str, p_str, "padEffectInput", f"u32:{input_ch}"])
+                self.bridge.run_cmd(["pad", "set-prop", b_str, p_str, "padTriggerControl", f"u32:{fx_id}"])
+                self.bridge.run_cmd(["pad", "set-prop", b_str, p_str, "padTriggerSend", "u32:2"])
+                self.bridge.run_cmd(["pad", "set-prop", b_str, p_str, "padTriggerChannel", "u32:1"])
+                self.bridge.run_cmd(["pad", "set-prop", b_str, p_str, "padTriggerMode", "u32:1"])
+                self.bridge.run_cmd(["pad", "set-prop", b_str, p_str, "padTriggerOn", "u32:127"])
+                self.bridge.run_cmd(["pad", "set-prop", b_str, p_str, "padTriggerOff", "u32:0"])
+                self.bridge.run_cmd(["pad", "set-prop", b_str, p_str, "padActive", "bool:false"])
+            self.executor.submit(do_assign)
+        self.toastMessage.emit(f"Efecto '{fx_name}' configurado")
 
     @pyqtSlot(str)
     def updatePadType(self, ptype):

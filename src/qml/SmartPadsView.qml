@@ -8,6 +8,8 @@ Item {
 
     property var selectedPad: stateManager ? stateManager.selectedPad : ({})
     property int activeCategory: (root.selectedPad && root.selectedPad.type === "fx") ? 1 : ((root.selectedPad && root.selectedPad.type === "mixer") ? 2 : ((root.selectedPad && root.selectedPad.type === "midi") ? 3 : 0))
+    property int fxTargetChannel: (root.selectedPad && root.selectedPad.fx_channel !== undefined) ? root.selectedPad.fx_channel : 0
+    property int fxTriggerMode: (root.selectedPad && root.selectedPad.fx_mode !== undefined) ? root.selectedPad.fx_mode : 1
 
     FileDialog {
         id: fileDialog
@@ -576,34 +578,91 @@ Item {
                     spacing: 16
                     visible: root.activeCategory === 1
 
-                    // Target Channels Selector
-                    Rectangle {
+                    // Target Channel & Trigger Mode Selectors
+                    RowLayout {
                         Layout.fillWidth: true
-                        height: 60
-                        radius: 8
-                        color: "#1C1C1F"
-                        border.color: "#2C2C32"
+                        spacing: 12
 
-                        RowLayout {
-                            anchors.fill: parent
-                            anchors.margins: 14
-                            Text { text: "Canales Destino:"; font.pixelSize: 12; font.bold: true; color: "#FFFFFF" }
-                            Item { Layout.fillWidth: true }
-                            Row {
-                                spacing: 8
-                                Rectangle {
-                                    width: 80; height: 30; radius: 6; color: "#CBA158"
-                                    Text { anchors.centerIn: parent; text: "Mic 1"; font.pixelSize: 11; font.bold: true; color: "#121214" }
+                        // Target Channel Card
+                        Rectangle {
+                            Layout.fillWidth: true
+                            height: 60
+                            radius: 8
+                            color: "#1C1C1F"
+                            border.color: "#2C2C32"
+
+                            RowLayout {
+                                anchors.fill: parent
+                                anchors.margins: 14
+                                Text { text: "Canal Destino:"; font.pixelSize: 12; font.bold: true; color: "#FFFFFF" }
+                                Item { Layout.fillWidth: true }
+                                Row {
+                                    spacing: 8
+                                    Rectangle {
+                                        width: 76; height: 32; radius: 6
+                                        color: root.fxTargetChannel === 0 ? "#CBA158" : "#28282E"
+                                        Text { anchors.centerIn: parent; text: "Mic 1"; font.pixelSize: 11; font.bold: root.fxTargetChannel === 0; color: root.fxTargetChannel === 0 ? "#121214" : "#D0D0D0" }
+                                        MouseArea {
+                                            anchors.fill: parent
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: root.fxTargetChannel = 0
+                                        }
+                                    }
+                                    Rectangle {
+                                        width: 76; height: 32; radius: 6
+                                        color: root.fxTargetChannel === 1 ? "#CBA158" : "#28282E"
+                                        Text { anchors.centerIn: parent; text: "Mic 2"; font.pixelSize: 11; font.bold: root.fxTargetChannel === 1; color: root.fxTargetChannel === 1 ? "#121214" : "#D0D0D0" }
+                                        MouseArea {
+                                            anchors.fill: parent
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: root.fxTargetChannel = 1
+                                        }
+                                    }
                                 }
-                                Rectangle {
-                                    width: 80; height: 30; radius: 6; color: "#28282E"
-                                    Text { anchors.centerIn: parent; text: "Mic 2"; font.pixelSize: 11; color: "#D0D0D0" }
+                            }
+                        }
+
+                        // Trigger Mode Card (Latch vs Momentary)
+                        Rectangle {
+                            Layout.fillWidth: true
+                            height: 60
+                            radius: 8
+                            color: "#1C1C1F"
+                            border.color: "#2C2C32"
+
+                            RowLayout {
+                                anchors.fill: parent
+                                anchors.margins: 14
+                                Text { text: "Comportamiento:"; font.pixelSize: 12; font.bold: true; color: "#FFFFFF" }
+                                Item { Layout.fillWidth: true }
+                                Row {
+                                    spacing: 8
+                                    Rectangle {
+                                        width: 76; height: 32; radius: 6
+                                        color: root.fxTriggerMode === 1 ? "#CBA158" : "#28282E"
+                                        Text { anchors.centerIn: parent; text: "Latch"; font.pixelSize: 11; font.bold: root.fxTriggerMode === 1; color: root.fxTriggerMode === 1 ? "#121214" : "#D0D0D0" }
+                                        MouseArea {
+                                            anchors.fill: parent
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: root.fxTriggerMode = 1
+                                        }
+                                    }
+                                    Rectangle {
+                                        width: 76; height: 32; radius: 6
+                                        color: root.fxTriggerMode === 0 ? "#CBA158" : "#28282E"
+                                        Text { anchors.centerIn: parent; text: "Hold"; font.pixelSize: 11; font.bold: root.fxTriggerMode === 0; color: root.fxTriggerMode === 0 ? "#121214" : "#D0D0D0" }
+                                        MouseArea {
+                                            anchors.fill: parent
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: root.fxTriggerMode = 0
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
 
-                    // FX Grid Cards
+                    // FX Grid Cards (Native RØDECaster Voice FX Presets)
                     GridLayout {
                         Layout.fillWidth: true
                         columns: 2
@@ -612,21 +671,21 @@ Item {
 
                         Repeater {
                             model: [
-                                {"name": "Reverb", "desc": "Ambiente de sala / Hall", "icon": "🏛️"},
-                                {"name": "Echo", "desc": "Repetición con retardo", "icon": "🔁"},
-                                {"name": "Megaphone", "desc": "Filtro paso banda radio", "icon": "📢"},
-                                {"name": "Robot", "desc": "Sintetizador vocoder", "icon": "🤖"},
-                                {"name": "Voice Disguise", "desc": "Tono anónimo profundo", "icon": "🎭"},
-                                {"name": "Pitch Shift", "desc": "Transporte semitonal", "icon": "🎼"}
+                                {"id": 8, "name": "Voice Disguise", "desc": "Tono anónimo profundo / Pitch bajo", "icon": "🎭"},
+                                {"id": 9, "name": "Megaphone", "desc": "Filtro paso banda radio / megáfono", "icon": "📢"},
+                                {"id": 10, "name": "Large Robot", "desc": "Sintetizador vocoder robótico", "icon": "🤖"},
+                                {"id": 12, "name": "Pitch Shift", "desc": "Transporte tonal agudo (Pitch Up)", "icon": "🎼"},
+                                {"id": 13, "name": "Monster", "desc": "Voz gutural oscura y pesada", "icon": "👹"},
+                                {"id": 14, "name": "Small Robot", "desc": "Vocoder electrónico sintetizado", "icon": "🦾"}
                             ]
 
                             Rectangle {
                                 Layout.fillWidth: true
                                 height: 68
                                 radius: 8
-                                color: fxCardArea.containsMouse ? "#2A2A30" : "#202024"
-                                border.color: fxCardArea.containsMouse ? "#CBA158" : "#2E2E36"
-                                border.width: 1
+                                color: fxCardArea.containsMouse ? "#2A2A30" : ((root.selectedPad && root.selectedPad.fx_id === modelData.id && root.selectedPad.type === "fx") ? "#2D2820" : "#202024")
+                                border.color: (root.selectedPad && root.selectedPad.fx_id === modelData.id && root.selectedPad.type === "fx") ? "#CBA158" : (fxCardArea.containsMouse ? "#CBA158" : "#2E2E36")
+                                border.width: (root.selectedPad && root.selectedPad.fx_id === modelData.id && root.selectedPad.type === "fx") ? 2 : 1
 
                                 RowLayout {
                                     anchors.fill: parent
@@ -639,6 +698,14 @@ Item {
                                         Text { text: modelData.name; font.pixelSize: 13; font.bold: true; color: "#FFFFFF" }
                                         Text { text: modelData.desc; font.pixelSize: 10; color: "#8E8E93" }
                                     }
+                                    Item { Layout.fillWidth: true }
+                                    Text {
+                                        visible: root.selectedPad && root.selectedPad.fx_id === modelData.id && root.selectedPad.type === "fx"
+                                        text: "✓ Asignado"
+                                        font.pixelSize: 11
+                                        font.bold: true
+                                        color: "#CBA158"
+                                    }
                                 }
 
                                 MouseArea {
@@ -647,7 +714,9 @@ Item {
                                     hoverEnabled: true
                                     cursorShape: Qt.PointingHandCursor
                                     onClicked: {
-                                        if (stateManager) stateManager.updatePadName(modelData.name);
+                                        if (stateManager) {
+                                            stateManager.assignPadEffect(modelData.id, modelData.name, root.fxTargetChannel, root.fxTriggerMode);
+                                        }
                                     }
                                 }
                             }
