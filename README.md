@@ -21,7 +21,12 @@
 
 ---
 
-<img width="1310" height="900" alt="castermanager_en" src="https://github.com/user-attachments/assets/5d63bcd0-7f43-493e-b1ec-24f439bdbd30" />
+<img width="1310" height="900" alt="castermanager_new" src="https://github.com/user-attachments/assets/5a801bd9-fa28-49d4-acf2-3edb60840cd1" />
+<img width="1310" height="900" alt="castermanager_system" src="https://github.com/user-attachments/assets/e3f71d46-b7a8-46ee-a3ff-59a7a5154680" />
+<img width="1310" height="900" alt="castermanager_pad" src="https://github.com/user-attachments/assets/5dcc845d-d8d3-434e-983b-0a5dfff4e30e" />
+<img width="1310" height="900" alt="castermanager_display" src="https://github.com/user-attachments/assets/d72cb0f8-e331-468e-9cd1-3592a73c5038" />
+<img width="1310" height="900" alt="castermanager_devicespng" src="https://github.com/user-attachments/assets/0f719030-8116-41bd-ae1c-eb2399c560b1" />
+<img width="1310" height="900" alt="castermanager_audio" src="https://github.com/user-attachments/assets/d7eddd9d-c8e6-4dd8-947b-5c9a58dd4924" />
 
 ## Overview
 
@@ -219,7 +224,12 @@ This project is licensed under the [MIT License](LICENSE).
 
 ---
 
-<img width="1310" height="900" alt="castermanager_es" src="https://github.com/user-attachments/assets/6ea37280-6802-4626-8e2a-134a04e29913" />
+<img width="1310" height="900" alt="castermanager_new" src="https://github.com/user-attachments/assets/5a801bd9-fa28-49d4-acf2-3edb60840cd1" />
+<img width="1310" height="900" alt="castermanager_system" src="https://github.com/user-attachments/assets/e3f71d46-b7a8-46ee-a3ff-59a7a5154680" />
+<img width="1310" height="900" alt="castermanager_pad" src="https://github.com/user-attachments/assets/5dcc845d-d8d3-434e-983b-0a5dfff4e30e" />
+<img width="1310" height="900" alt="castermanager_display" src="https://github.com/user-attachments/assets/d72cb0f8-e331-468e-9cd1-3592a73c5038" />
+<img width="1310" height="900" alt="castermanager_devicespng" src="https://github.com/user-attachments/assets/0f719030-8116-41bd-ae1c-eb2399c560b1" />
+<img width="1310" height="900" alt="castermanager_audio" src="https://github.com/user-attachments/assets/d7eddd9d-c8e6-4dd8-947b-5c9a58dd4924" />
 
 ## Descripción
 
