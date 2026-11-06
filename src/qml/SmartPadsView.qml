@@ -124,14 +124,14 @@ Item {
                         spacing: 6
                         Repeater {
                             model: [
-                                {"id": "sound", "name": stateManager ? stateManager.strings.tab_sound : "Sonido", "icon": "🎵"},
-                                {"id": "fx", "name": stateManager ? stateManager.strings.tab_fx : "Efectos FX", "icon": "✨"},
-                                {"id": "mixer", "name": stateManager ? stateManager.strings.tab_mixer : "Mezclador", "icon": "🎚️"},
-                                {"id": "midi", "name": stateManager ? stateManager.strings.tab_midi : "MIDI", "icon": "🎹"}
+                                {"id": "sound", "name": stateManager ? stateManager.strings.tab_sound : "Sonido", "icon": "tab_sound"},
+                                {"id": "fx", "name": stateManager ? stateManager.strings.tab_fx : "Efectos FX", "icon": "tab_fx"},
+                                {"id": "mixer", "name": stateManager ? stateManager.strings.tab_mixer : "Mezclador", "icon": "tab_mixer"},
+                                {"id": "midi", "name": stateManager ? stateManager.strings.tab_midi : "MIDI", "icon": "tab_midi"}
                             ]
 
                             Rectangle {
-                                width: 112
+                                width: 114
                                 height: 32
                                 radius: 6
                                 color: root.activeCategory === index ? "#CBA158" : (catArea.containsMouse ? "#26262C" : "transparent")
@@ -140,16 +140,21 @@ Item {
 
                                 Row {
                                     anchors.centerIn: parent
-                                    spacing: 6
-                                    Text {
-                                        text: modelData.icon
-                                        font.pixelSize: 11
+                                    spacing: 7
+                                    FlatIcon {
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        name: modelData.icon
+                                        implicitWidth: 14
+                                        implicitHeight: 14
+                                        strokeWidth: 2.0
+                                        color: root.activeCategory === index ? "#121214" : (catArea.containsMouse ? "#FFFFFF" : "#B0B0B5")
                                     }
                                     Text {
+                                        anchors.verticalCenter: parent.verticalCenter
                                         text: modelData.name
                                         font.pixelSize: 11
                                         font.bold: root.activeCategory === index
-                                        color: root.activeCategory === index ? "#121214" : "#B0B0B5"
+                                        color: root.activeCategory === index ? "#121214" : (catArea.containsMouse ? "#FFFFFF" : "#B0B0B5")
                                     }
                                 }
 
@@ -184,6 +189,8 @@ Item {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 clip: true
+                topPadding: 32
+                bottomPadding: 24
 
                 // TAB 0: SOUND
                 ColumnLayout {
@@ -343,8 +350,15 @@ Item {
                             spacing: 10
 
                             RowLayout {
+                                spacing: 8
+                                FlatIcon {
+                                    name: "speaker"
+                                    implicitWidth: 14
+                                    implicitHeight: 14
+                                    color: "#CBA158"
+                                }
                                 Text {
-                                    text: "🔊 " + (stateManager ? stateManager.strings.factory_sounds : "Sonidos de Fábrica")
+                                    text: stateManager ? stateManager.strings.factory_sounds : "Sonidos de Fábrica"
                                     font.pixelSize: 12
                                     font.bold: true
                                     color: "#FFFFFF"
