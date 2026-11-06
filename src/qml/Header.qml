@@ -33,22 +33,28 @@ Rectangle {
             width: 36
             height: 36
             radius: 18
-            color: backArea.containsMouse ? "#2A2A2A" : "transparent"
+            opacity: (stateManager && stateManager.currentView !== "home") ? 1.0 : 0.3
+            color: (backArea.containsMouse && stateManager && stateManager.currentView !== "home") ? "#2A2A2A" : "transparent"
 
             Text {
                 anchors.centerIn: parent
                 text: "‹"
                 font.pixelSize: 28
                 font.bold: true
-                color: backArea.containsMouse ? "#FFFFFF" : "#AAAAAA"
+                color: (backArea.containsMouse && stateManager && stateManager.currentView !== "home") ? "#FFFFFF" : "#AAAAAA"
             }
 
             MouseArea {
                 id: backArea
                 anchors.fill: parent
                 hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onClicked: root.backClicked()
+                cursorShape: (stateManager && stateManager.currentView !== "home") ? Qt.PointingHandCursor : Qt.ArrowCursor
+                onClicked: {
+                    if (stateManager && stateManager.currentView !== "home") {
+                        stateManager.navigateHome();
+                    }
+                    root.backClicked();
+                }
             }
         }
 
@@ -79,6 +85,49 @@ Rectangle {
         }
 
         Item { Layout.fillWidth: true }
+
+        // Live REC Control Button
+        Rectangle {
+            height: 32
+            width: recHeaderRow.width + 20
+            radius: 16
+            color: (stateManager && stateManager.isRecording) ? "#FF3B30" : "#242428"
+            border.color: (stateManager && stateManager.isRecording) ? "#FF453A" : "#383840"
+            border.width: 1
+
+            Row {
+                id: recHeaderRow
+                anchors.centerIn: parent
+                spacing: 6
+
+                Rectangle {
+                    width: 8
+                    height: 8
+                    radius: 4
+                    color: (stateManager && stateManager.isRecording) ? "#FFFFFF" : "#FF3B30"
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+
+                Text {
+                    text: (stateManager && stateManager.isRecording) 
+                          ? ("REC " + stateManager.recordTimeString) 
+                          : "REC"
+                    font.pixelSize: 11
+                    font.bold: true
+                    color: "#FFFFFF"
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+            }
+
+            MouseArea {
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: {
+                    if (stateManager) stateManager.toggleRecord();
+                }
+            }
+        }
 
         // Profile Avatar + Name (Interactive click to edit)
         Rectangle {

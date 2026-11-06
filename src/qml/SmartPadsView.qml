@@ -7,6 +7,7 @@ Item {
     id: root
 
     property var selectedPad: stateManager ? stateManager.selectedPad : ({})
+    property int activeCategory: (root.selectedPad && root.selectedPad.type === "fx") ? 1 : ((root.selectedPad && root.selectedPad.type === "mixer") ? 2 : ((root.selectedPad && root.selectedPad.type === "midi") ? 3 : 0))
 
     FileDialog {
         id: fileDialog
@@ -105,20 +106,94 @@ Item {
                 }
             }
 
-            // Main Editor Body
-            Item {
+            // Category Tab Strip (Sound | FX Effects | Mixer | MIDI)
+            Rectangle {
+                Layout.fillWidth: true
+                height: 44
+                color: "#151518"
+
+                RowLayout {
+                    anchors.fill: parent
+                    anchors.leftMargin: 24
+                    anchors.rightMargin: 24
+                    spacing: 8
+
+                    Row {
+                        spacing: 6
+                        Repeater {
+                            model: [
+                                {"id": "sound", "name": stateManager ? stateManager.strings.tab_sound : "Sonido", "icon": "🎵"},
+                                {"id": "fx", "name": stateManager ? stateManager.strings.tab_fx : "Efectos FX", "icon": "✨"},
+                                {"id": "mixer", "name": stateManager ? stateManager.strings.tab_mixer : "Mezclador", "icon": "🎚️"},
+                                {"id": "midi", "name": stateManager ? stateManager.strings.tab_midi : "MIDI", "icon": "🎹"}
+                            ]
+
+                            Rectangle {
+                                width: 112
+                                height: 32
+                                radius: 6
+                                color: root.activeCategory === index ? "#CBA158" : (catArea.containsMouse ? "#26262C" : "transparent")
+                                border.color: root.activeCategory === index ? "#CBA158" : (catArea.containsMouse ? "#363640" : "transparent")
+                                border.width: 1
+
+                                Row {
+                                    anchors.centerIn: parent
+                                    spacing: 6
+                                    Text {
+                                        text: modelData.icon
+                                        font.pixelSize: 11
+                                    }
+                                    Text {
+                                        text: modelData.name
+                                        font.pixelSize: 11
+                                        font.bold: root.activeCategory === index
+                                        color: root.activeCategory === index ? "#121214" : "#B0B0B5"
+                                    }
+                                }
+
+                                MouseArea {
+                                    id: catArea
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        root.activeCategory = index;
+                                        if (stateManager) stateManager.updatePadType(modelData.id);
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Item { Layout.fillWidth: true }
+                }
+
+                Rectangle {
+                    anchors.bottom: parent.bottom
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    height: 1
+                    color: "#222226"
+                }
+            }
+
+            // Main Editor Body (Flickable ScrollView for responsive sizing)
+            ScrollView {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
+                clip: true
 
+                // TAB 0: SOUND
                 ColumnLayout {
-                    anchors.centerIn: parent
-                    spacing: 34
-                    width: Math.min(520, parent.width - 40)
+                    width: root.width - 320 - 48
+                    anchors.horizontalCenter: parent ? parent.horizontalCenter : undefined
+                    spacing: 20
+                    visible: root.activeCategory === 0
 
                     // Three Main Sound Actions Box
                     Rectangle {
                         Layout.fillWidth: true
-                        height: 120
+                        height: 110
                         radius: 10
                         color: "#202023"
                         border.color: "#2E2E33"
@@ -139,14 +214,14 @@ Item {
                                     FlatIcon {
                                         Layout.alignment: Qt.AlignHCenter
                                         name: "folder"
-                                        implicitWidth: 28
-                                        implicitHeight: 28
+                                        implicitWidth: 26
+                                        implicitHeight: 26
                                         color: actArea1.containsMouse ? "#CBA158" : "#C8C8CC"
                                     }
                                     Text {
                                         Layout.alignment: Qt.AlignHCenter
                                         text: stateManager ? stateManager.strings.choose_file : "Elegir Archivo"
-                                        font.pixelSize: 12
+                                        font.pixelSize: 11
                                         font.weight: Font.Medium
                                         color: actArea1.containsMouse ? "#FFFFFF" : "#C8C8CC"
                                     }
@@ -161,7 +236,7 @@ Item {
                                 }
                             }
 
-                            Rectangle { width: 1; height: 70; color: "#2E2E33"; Layout.alignment: Qt.AlignVCenter }
+                            Rectangle { width: 1; height: 60; color: "#2E2E33"; Layout.alignment: Qt.AlignVCenter }
 
                             // 2. Drag & Drop
                             Item {
@@ -175,14 +250,14 @@ Item {
                                     FlatIcon {
                                         Layout.alignment: Qt.AlignHCenter
                                         name: "drag_drop"
-                                        implicitWidth: 28
-                                        implicitHeight: 28
+                                        implicitWidth: 26
+                                        implicitHeight: 26
                                         color: dropArea.containsDrag ? "#CBA158" : "#C8C8CC"
                                     }
                                     Text {
                                         Layout.alignment: Qt.AlignHCenter
                                         text: stateManager ? stateManager.strings.drag_drop : "Arrastrar y Soltar"
-                                        font.pixelSize: 12
+                                        font.pixelSize: 11
                                         font.weight: Font.Medium
                                         color: dropArea.containsDrag ? "#CBA158" : "#C8C8CC"
                                     }
@@ -199,7 +274,7 @@ Item {
                                 }
                             }
 
-                            Rectangle { width: 1; height: 70; color: "#2E2E33"; Layout.alignment: Qt.AlignVCenter }
+                            Rectangle { width: 1; height: 60; color: "#2E2E33"; Layout.alignment: Qt.AlignVCenter }
 
                             // 3. Export
                             Item {
@@ -215,14 +290,14 @@ Item {
                                     FlatIcon {
                                         Layout.alignment: Qt.AlignHCenter
                                         name: "export"
-                                        implicitWidth: 28
-                                        implicitHeight: 28
+                                        implicitWidth: 26
+                                        implicitHeight: 26
                                         color: parent.parent.hasAudio ? (actArea3.containsMouse ? "#CBA158" : "#C8C8CC") : "#55555A"
                                     }
                                     Text {
                                         Layout.alignment: Qt.AlignHCenter
                                         text: stateManager ? stateManager.strings.export_audio : "Exportar Audio"
-                                        font.pixelSize: 12
+                                        font.pixelSize: 11
                                         font.weight: Font.Medium
                                         color: parent.parent.hasAudio ? (actArea3.containsMouse ? "#FFFFFF" : "#C8C8CC") : "#55555A"
                                     }
@@ -248,20 +323,92 @@ Item {
                         }
                     }
 
-                    // Playback options (Toggle, Loop, Replay) - FLAT MINIMALIST STYLE
+                    // Official RØDE Factory Sounds Picker
+                    Rectangle {
+                        Layout.fillWidth: true
+                        height: factoryCol.height + 24
+                        radius: 10
+                        color: "#1C1C1F"
+                        border.color: "#2C2C32"
+                        border.width: 1
+
+                        ColumnLayout {
+                            id: factoryCol
+                            anchors.top: parent.top
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.margins: 14
+                            spacing: 10
+
+                            RowLayout {
+                                Text {
+                                    text: "🔊 " + (stateManager ? stateManager.strings.factory_sounds : "Sonidos de Fábrica")
+                                    font.pixelSize: 12
+                                    font.bold: true
+                                    color: "#FFFFFF"
+                                }
+                                Item { Layout.fillWidth: true }
+                                Text {
+                                    text: stateManager ? stateManager.strings.load_factory_sound : "Cargar sonido oficial RØDE"
+                                    font.pixelSize: 10
+                                    color: "#8E8E93"
+                                }
+                            }
+
+                            GridLayout {
+                                Layout.fillWidth: true
+                                columns: 4
+                                rowSpacing: 6
+                                columnSpacing: 6
+
+                                Repeater {
+                                    model: stateManager ? stateManager.factorySounds : []
+
+                                    Rectangle {
+                                        Layout.fillWidth: true
+                                        height: 30
+                                        radius: 6
+                                        color: factArea.containsMouse ? "#32323A" : "#242428"
+                                        border.color: factArea.containsMouse ? "#CBA158" : "#323238"
+                                        border.width: 1
+
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: modelData.name
+                                            font.pixelSize: 10
+                                            font.weight: Font.Medium
+                                            color: factArea.containsMouse ? "#FFFFFF" : "#D0D0D5"
+                                        }
+
+                                        MouseArea {
+                                            id: factArea
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: {
+                                                if (stateManager) stateManager.loadFactorySound(modelData.id);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Playback options (Toggle, Loop, Replay)
                     RowLayout {
                         Layout.alignment: Qt.AlignHCenter
-                        spacing: 48
+                        spacing: 40
 
                         // Mode (Toggle / One Shot / Hold)
                         ColumnLayout {
-                            spacing: 8
+                            spacing: 6
                             Layout.alignment: Qt.AlignHCenter
 
                             Rectangle {
-                                width: 50
-                                height: 50
-                                radius: 25
+                                width: 44
+                                height: 44
+                                radius: 22
                                 color: modeArea.containsMouse ? "#2C2C32" : "#222226"
                                 border.color: modeArea.containsMouse ? "#44444D" : "#323238"
                                 border.width: 1
@@ -273,8 +420,8 @@ Item {
                                         let m = (root.selectedPad && root.selectedPad.mode !== undefined) ? root.selectedPad.mode : "toggle";
                                         return (m === "oneshot") ? "oneshot" : ((m === "hold") ? "hold" : "toggle");
                                     }
-                                    implicitWidth: 22
-                                    implicitHeight: 22
+                                    implicitWidth: 20
+                                    implicitHeight: 20
                                     color: "#FFFFFF"
                                 }
 
@@ -297,7 +444,7 @@ Item {
                                     let m = (root.selectedPad && root.selectedPad.mode !== undefined) ? root.selectedPad.mode : "toggle";
                                     return (m === "oneshot") ? (stateManager ? stateManager.strings.mode_oneshot : "One Shot") : ((m === "hold") ? (stateManager ? stateManager.strings.mode_hold : "Hold") : (stateManager ? stateManager.strings.mode_toggle : "Toggle"));
                                 }
-                                font.pixelSize: 12
+                                font.pixelSize: 11
                                 font.weight: Font.Medium
                                 color: "#FFFFFF"
                             }
@@ -305,13 +452,13 @@ Item {
 
                         // Loop (Loop Off / On)
                         ColumnLayout {
-                            spacing: 8
+                            spacing: 6
                             Layout.alignment: Qt.AlignHCenter
 
                             Rectangle {
-                                width: 50
-                                height: 50
-                                radius: 25
+                                width: 44
+                                height: 44
+                                radius: 22
                                 color: root.selectedPad && root.selectedPad.loop ? "#2C271E" : (loopArea.containsMouse ? "#2C2C32" : "#222226")
                                 border.color: root.selectedPad && root.selectedPad.loop ? "#CBA158" : (loopArea.containsMouse ? "#44444D" : "#323238")
                                 border.width: 1
@@ -320,8 +467,8 @@ Item {
                                 FlatIcon {
                                     anchors.centerIn: parent
                                     name: root.selectedPad && root.selectedPad.loop ? "loop_on" : "loop_off"
-                                    implicitWidth: 22
-                                    implicitHeight: 22
+                                    implicitWidth: 20
+                                    implicitHeight: 20
                                     color: root.selectedPad && root.selectedPad.loop ? "#CBA158" : "#8E8E93"
                                 }
 
@@ -340,7 +487,7 @@ Item {
                             Text {
                                 Layout.alignment: Qt.AlignHCenter
                                 text: root.selectedPad && root.selectedPad.loop ? (stateManager ? stateManager.strings.loop_on : "Loop On") : (stateManager ? stateManager.strings.loop_off : "Loop Off")
-                                font.pixelSize: 12
+                                font.pixelSize: 11
                                 font.weight: Font.Medium
                                 color: root.selectedPad && root.selectedPad.loop ? "#CBA158" : "#8E8E93"
                             }
@@ -348,13 +495,13 @@ Item {
 
                         // Replay
                         ColumnLayout {
-                            spacing: 8
+                            spacing: 6
                             Layout.alignment: Qt.AlignHCenter
 
                             Rectangle {
-                                width: 50
-                                height: 50
-                                radius: 25
+                                width: 44
+                                height: 44
+                                radius: 22
                                 color: root.selectedPad && root.selectedPad.replay ? "#2C271E" : (replayArea.containsMouse ? "#2C2C32" : "#222226")
                                 border.color: root.selectedPad && root.selectedPad.replay ? "#CBA158" : (replayArea.containsMouse ? "#44444D" : "#323238")
                                 border.width: 1
@@ -363,8 +510,8 @@ Item {
                                 FlatIcon {
                                     anchors.centerIn: parent
                                     name: "replay"
-                                    implicitWidth: 22
-                                    implicitHeight: 22
+                                    implicitWidth: 20
+                                    implicitHeight: 20
                                     color: root.selectedPad && root.selectedPad.replay ? "#CBA158" : "#8E8E93"
                                 }
 
@@ -383,7 +530,7 @@ Item {
                             Text {
                                 Layout.alignment: Qt.AlignHCenter
                                 text: stateManager ? stateManager.strings.replay : "Replay"
-                                font.pixelSize: 12
+                                font.pixelSize: 11
                                 font.weight: Font.Medium
                                 color: root.selectedPad && root.selectedPad.replay ? "#CBA158" : "#8E8E93"
                             }
@@ -418,6 +565,188 @@ Item {
                             font.pixelSize: 12
                             font.bold: true
                             color: "#CBA158"
+                        }
+                    }
+                }
+
+                // TAB 1: FX EFFECTS
+                ColumnLayout {
+                    width: root.width - 320 - 48
+                    anchors.horizontalCenter: parent ? parent.horizontalCenter : undefined
+                    spacing: 16
+                    visible: root.activeCategory === 1
+
+                    // Target Channels Selector
+                    Rectangle {
+                        Layout.fillWidth: true
+                        height: 60
+                        radius: 8
+                        color: "#1C1C1F"
+                        border.color: "#2C2C32"
+
+                        RowLayout {
+                            anchors.fill: parent
+                            anchors.margins: 14
+                            Text { text: "Canales Destino:"; font.pixelSize: 12; font.bold: true; color: "#FFFFFF" }
+                            Item { Layout.fillWidth: true }
+                            Row {
+                                spacing: 8
+                                Rectangle {
+                                    width: 80; height: 30; radius: 6; color: "#CBA158"
+                                    Text { anchors.centerIn: parent; text: "Mic 1"; font.pixelSize: 11; font.bold: true; color: "#121214" }
+                                }
+                                Rectangle {
+                                    width: 80; height: 30; radius: 6; color: "#28282E"
+                                    Text { anchors.centerIn: parent; text: "Mic 2"; font.pixelSize: 11; color: "#D0D0D0" }
+                                }
+                            }
+                        }
+                    }
+
+                    // FX Grid Cards
+                    GridLayout {
+                        Layout.fillWidth: true
+                        columns: 2
+                        rowSpacing: 10
+                        columnSpacing: 10
+
+                        Repeater {
+                            model: [
+                                {"name": "Reverb", "desc": "Ambiente de sala / Hall", "icon": "🏛️"},
+                                {"name": "Echo", "desc": "Repetición con retardo", "icon": "🔁"},
+                                {"name": "Megaphone", "desc": "Filtro paso banda radio", "icon": "📢"},
+                                {"name": "Robot", "desc": "Sintetizador vocoder", "icon": "🤖"},
+                                {"name": "Voice Disguise", "desc": "Tono anónimo profundo", "icon": "🎭"},
+                                {"name": "Pitch Shift", "desc": "Transporte semitonal", "icon": "🎼"}
+                            ]
+
+                            Rectangle {
+                                Layout.fillWidth: true
+                                height: 68
+                                radius: 8
+                                color: fxCardArea.containsMouse ? "#2A2A30" : "#202024"
+                                border.color: fxCardArea.containsMouse ? "#CBA158" : "#2E2E36"
+                                border.width: 1
+
+                                RowLayout {
+                                    anchors.fill: parent
+                                    anchors.margins: 12
+                                    spacing: 12
+
+                                    Text { text: modelData.icon; font.pixelSize: 22 }
+                                    ColumnLayout {
+                                        spacing: 2
+                                        Text { text: modelData.name; font.pixelSize: 13; font.bold: true; color: "#FFFFFF" }
+                                        Text { text: modelData.desc; font.pixelSize: 10; color: "#8E8E93" }
+                                    }
+                                }
+
+                                MouseArea {
+                                    id: fxCardArea
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        if (stateManager) stateManager.updatePadName(modelData.name);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // TAB 2: MIXER
+                ColumnLayout {
+                    width: root.width - 320 - 48
+                    anchors.horizontalCenter: parent ? parent.horizontalCenter : undefined
+                    spacing: 16
+                    visible: root.activeCategory === 2
+
+                    Repeater {
+                        model: [
+                            {"name": "Censor Bleep", "desc": "Emite un pitido de censura de 1 kHz y silencia los micrófonos seleccionados", "icon": "🔇"},
+                            {"name": "Trash Talk", "desc": "Silencia los micrófonos hacia los oyentes pero los mantiene en los auriculares", "icon": "🗣️"},
+                            {"name": "Ducking", "desc": "Atenúa la música de fondo automáticamente mientras este pad está pulsado", "icon": "📉"}
+                        ]
+
+                        Rectangle {
+                            Layout.fillWidth: true
+                            height: 76
+                            radius: 10
+                            color: mixCardArea.containsMouse ? "#2A2A30" : "#202024"
+                            border.color: mixCardArea.containsMouse ? "#CBA158" : "#2E2E36"
+                            border.width: 1
+
+                            RowLayout {
+                                anchors.fill: parent
+                                anchors.margins: 14
+                                spacing: 14
+
+                                Text { text: modelData.icon; font.pixelSize: 26 }
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 4
+                                    Text { text: modelData.name; font.pixelSize: 14; font.bold: true; color: "#FFFFFF" }
+                                    Text { text: modelData.desc; font.pixelSize: 11; color: "#9A9A9E"; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+                                }
+                            }
+
+                            MouseArea {
+                                id: mixCardArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    if (stateManager) stateManager.updatePadName(modelData.name);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // TAB 3: MIDI
+                ColumnLayout {
+                    width: root.width - 320 - 48
+                    anchors.horizontalCenter: parent ? parent.horizontalCenter : undefined
+                    spacing: 16
+                    visible: root.activeCategory === 3
+
+                    Rectangle {
+                        Layout.fillWidth: true
+                        height: midiCol.height + 28
+                        radius: 10
+                        color: "#202024"
+                        border.color: "#2E2E36"
+                        border.width: 1
+
+                        ColumnLayout {
+                            id: midiCol
+                            anchors.top: parent.top
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.margins: 14
+                            spacing: 14
+
+                            Text { text: "Comando MIDI USB"; font.pixelSize: 14; font.bold: true; color: "#FFFFFF" }
+
+                            RowLayout {
+                                Text { text: "Tipo de Mensaje:"; font.pixelSize: 12; color: "#8E8E93"; Layout.preferredWidth: 140 }
+                                Row {
+                                    spacing: 8
+                                    Rectangle { width: 90; height: 30; radius: 6; color: "#CBA158"; Text { anchors.centerIn: parent; text: "Control (CC)"; font.pixelSize: 11; font.bold: true; color: "#121214" } }
+                                    Rectangle { width: 90; height: 30; radius: 6; color: "#28282E"; Text { anchors.centerIn: parent; text: "Nota (Note)"; font.pixelSize: 11; color: "#D0D0D0" } }
+                                }
+                            }
+
+                            RowLayout {
+                                Text { text: "Canal MIDI (1-16):"; font.pixelSize: 12; color: "#8E8E93"; Layout.preferredWidth: 140 }
+                                Text { text: "Canal 1"; font.pixelSize: 12; font.bold: true; color: "#FFFFFF" }
+                            }
+
+                            RowLayout {
+                                Text { text: "Control / Nota:"; font.pixelSize: 12; color: "#8E8E93"; Layout.preferredWidth: 140 }
+                                Text { text: "#" + (stateManager ? (stateManager.selectedPadIndex + 1) : 1); font.pixelSize: 12; font.bold: true; color: "#CBA158" }
+                            }
                         }
                     }
                 }

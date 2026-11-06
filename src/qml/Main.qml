@@ -107,19 +107,45 @@ ApplicationWindow {
                 }
             }
 
-            // Body: SmartPadsView when connected, DisconnectedView otherwise
+            // Body: Router across views when connected, DisconnectedView otherwise
             Item {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
 
-                SmartPadsView {
-                    anchors.fill: parent
-                    visible: stateManager && stateManager.connected
-                }
-
+                // 1. Disconnected view
                 DisconnectedView {
                     anchors.fill: parent
                     visible: !stateManager || !stateManager.connected
+                }
+
+                // 2. Home Hub View (4 cards)
+                HomeHubView {
+                    anchors.fill: parent
+                    visible: stateManager && stateManager.connected && stateManager.currentView === "home"
+                }
+
+                // 3. Audio Setup View (Live Faders, Channel Strips, Input pool)
+                AudioSetupView {
+                    anchors.fill: parent
+                    visible: stateManager && stateManager.connected && stateManager.currentView === "audio_setup"
+                }
+
+                // 4. Device Config View (Outputs, Display & Brightness, System & MIDI)
+                DeviceConfigView {
+                    anchors.fill: parent
+                    visible: stateManager && stateManager.connected && stateManager.currentView === "device_config"
+                }
+
+                // 5. SMART Pads View (Sound, FX Effects, Mixer, MIDI)
+                SmartPadsView {
+                    anchors.fill: parent
+                    visible: stateManager && stateManager.connected && stateManager.currentView === "smartpads"
+                }
+
+                // 6. Recordings View (MicroSD storage, Mass storage transfer, Live REC)
+                RecordingsView {
+                    anchors.fill: parent
+                    visible: stateManager && stateManager.connected && stateManager.currentView === "recordings"
                 }
             }
         }

@@ -11,6 +11,17 @@ logger = logging.getLogger("CasterManager.state")
 DUO_PHYSICAL_ORDER = [0, 3, 1, 4, 2, 5]
 PRO_II_PHYSICAL_ORDER = [0, 4, 1, 5, 2, 6, 3, 7]
 
+FACTORY_SOUNDS = [
+    {"id": "applause", "name": "Applause", "filename": "Applause.wav"},
+    {"id": "airhorn", "name": "Airhorn", "filename": "Airhorn.wav"},
+    {"id": "crickets", "name": "Crickets", "filename": "Crickets.wav"},
+    {"id": "rim_shot", "name": "Rim Shot", "filename": "Rim_Shot.wav"},
+    {"id": "trombone", "name": "Trombone", "filename": "Trombone.wav"},
+    {"id": "music_bed", "name": "Music Bed", "filename": "Music_Bed.wav"},
+    {"id": "chimes", "name": "Chimes", "filename": "Chimes.wav"},
+    {"id": "record_scratch", "name": "Record Scratch", "filename": "Record_Scratch.wav"},
+]
+
 TRANSLATIONS = {
     "es": {
         "settings": "Configuración",
@@ -58,17 +69,66 @@ TRANSLATIONS = {
         "export_dialog_title": "Guardar Audio Exportado",
         "audio_files_filter": "Archivos de audio (*.wav *.mp3 *.ogg *.flac *.aac)",
         "all_files_filter": "Todos los archivos (*)",
-        "tab_sound": "Sound",
-        "tab_fx": "FX Effects",
-        "tab_mixer": "Mixer",
+        "tab_sound": "Sonido",
+        "tab_fx": "Efectos FX",
+        "tab_mixer": "Mezclador",
         "tab_midi": "MIDI",
         "tab_callme": "CallMe",
-        "tab_video": "Video",
+        "tab_video": "Vídeo",
         "customize_smart_pads": "Personalizar SMART Pads",
         "scan_device": "Buscar dispositivo ahora",
         "pad_placeholder": "Nombre del Pad...",
         "usb_permission_required": "⚠️ Permiso USB requerido",
         "usb_permission_hint": "Para interactuar con el dispositivo, ejecuta:\n./install.sh en la carpeta del programa",
+        "hub_audio_setup": "Configuración de Audio",
+        "hub_audio_setup_desc": "Faders, canales, enrutamiento y vúmetros en vivo",
+        "hub_device_config": "Configuración del Dispositivo",
+        "hub_device_config_desc": "Salidas, pantalla, brillo, vúmetros y sistema",
+        "hub_smart_pads": "Personalizar SMART Pads",
+        "hub_smart_pads_desc": "Sonidos, efectos de voz, censura y comandos MIDI",
+        "hub_recordings": "Transferir Grabaciones",
+        "hub_recordings_desc": "Gestiona podcasts y tomas grabadas en la MicroSD",
+        "tab_output": "Salida",
+        "tab_display": "Pantalla",
+        "tab_system": "Sistema",
+        "headphones": "Auriculares",
+        "monitor": "Monitores",
+        "routing": "Enrutamiento",
+        "listen": "Escucha (Solo)",
+        "multitrack": "Multipista",
+        "processing": "Procesamiento",
+        "brightness": "Brillo",
+        "metering": "Vúmetros",
+        "haptics": "Respuesta Háptica",
+        "rec_button": "Botón REC",
+        "display_brightness": "Pantalla",
+        "buttons_brightness": "Botones",
+        "auto_brightness": "Brillo Automático",
+        "dim_after": "Atenuar tras",
+        "auto_mute_output": "Silenciar monitores al subir fader de micrófono",
+        "auto_mute_bt": "Silenciar Bluetooth al subir micrófono",
+        "fixed_output_level": "Nivel de salida fijo (Línea)",
+        "pre_fader_listen": "Escucha Pre-Fader (PFL)",
+        "after_fader_listen": "Escucha Post-Fader (AFL)",
+        "midi_control": "Control MIDI",
+        "midi_control_desc": "Permitir comunicación MIDI bidireccional por USB",
+        "information": "Información",
+        "serial_number": "Número de Serie",
+        "reset_device": "Restablecer Consola",
+        "factory_sounds": "Sonidos de Fábrica",
+        "load_factory_sound": "Cargar sonido oficial RØDE",
+        "rec_start": "Grabar",
+        "rec_pause": "Pausar",
+        "rec_stop": "Detener",
+        "drop_marker": "Poner Marca",
+        "faders_title": "Mezclador de Faders en Vivo",
+        "input_sources_pool": "Fuentes de Entrada Disponibles",
+        "latching": "Latching (Fijo)",
+        "momentary": "Momentary (Pulsar)",
+        "target_channels": "Canales Destino",
+        "censor_bleep": "Censura (Bleep)",
+        "trash_talk": "Trash Talk",
+        "ducking": "Ducking",
     },
     "en": {
         "settings": "Settings",
@@ -127,6 +187,55 @@ TRANSLATIONS = {
         "pad_placeholder": "Pad name...",
         "usb_permission_required": "⚠️ USB permission required",
         "usb_permission_hint": "To interact with the device, run:\n./install.sh in the program folder",
+        "hub_audio_setup": "Audio Setup",
+        "hub_audio_setup_desc": "Live fader strips, channel routing and VU meters",
+        "hub_device_config": "Device Configuration",
+        "hub_device_config_desc": "Outputs, display, brightness, metering and system",
+        "hub_smart_pads": "Customize SMART Pads",
+        "hub_smart_pads_desc": "Sounds, voice effects, censor bleep and MIDI commands",
+        "hub_recordings": "Transfer Recordings",
+        "hub_recordings_desc": "Manage podcast takes recorded on the MicroSD card",
+        "tab_output": "Output",
+        "tab_display": "Display",
+        "tab_system": "System",
+        "headphones": "Headphones",
+        "monitor": "Monitor",
+        "routing": "Routing",
+        "listen": "Listen (Solo)",
+        "multitrack": "Multitrack",
+        "processing": "Processing",
+        "brightness": "Brightness",
+        "metering": "Metering",
+        "haptics": "Haptics",
+        "rec_button": "REC Button",
+        "display_brightness": "Display",
+        "buttons_brightness": "Buttons",
+        "auto_brightness": "Automatic Brightness",
+        "dim_after": "Dim After",
+        "auto_mute_output": "Auto-mute monitor output when fader is raised",
+        "auto_mute_bt": "Auto-mute Bluetooth when microphone is live",
+        "fixed_output_level": "Fixed Output Level (Line)",
+        "pre_fader_listen": "Pre-fader Listen (PFL)",
+        "after_fader_listen": "After-fader Listen (AFL)",
+        "midi_control": "MIDI Control",
+        "midi_control_desc": "Allow bi-directional MIDI communication over USB",
+        "information": "Information",
+        "serial_number": "Serial Number",
+        "reset_device": "Reset Device",
+        "factory_sounds": "Factory Sounds",
+        "load_factory_sound": "Load official RØDE sound",
+        "rec_start": "Record",
+        "rec_pause": "Pause",
+        "rec_stop": "Stop",
+        "drop_marker": "Drop Marker",
+        "faders_title": "Live Fader Mixer",
+        "input_sources_pool": "Available Input Sources",
+        "latching": "Latching",
+        "momentary": "Momentary",
+        "target_channels": "Target Channels",
+        "censor_bleep": "Censor (Bleep)",
+        "trash_talk": "Trash Talk",
+        "ducking": "Ducking",
     }
 }
 
@@ -137,11 +246,16 @@ class StateManager(QObject):
     transferStateChanged = pyqtSignal()
     toastMessage = pyqtSignal(str)
     languageChanged = pyqtSignal()
+    viewChanged = pyqtSignal()
+    fadersChanged = pyqtSignal()
+    recordingChanged = pyqtSignal()
+    deviceConfigChanged = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.settings = QSettings("CasterManager", "CasterManager")
         self._language = self.settings.value("language", "es")
+        self._current_view = "home"
         self._connected = False
         self._permission_error = False
         self._permission_path = ""
@@ -164,8 +278,31 @@ class StateManager(QObject):
         self._transfer_mode = False
         self._transfer_status = ""
 
+        # Live Recording State
+        self._is_recording = False
+        self._record_time_ms = 0
+
+        # Device Configuration State (Display, Outputs, System)
+        self._screen_brightness = 250
+        self._button_brightness = 255
+        self._auto_brightness = False
+        self._dim_after_sec = 0
+        self._broadcast_meters = False
+        self._haptic_feedback = 1
+        self._headphone1_type = 0
+        self._headphone2_type = 0
+        self._monitor_auto_mute = True
+        self._bt_auto_mute = False
+        self._monitor_fixed_level = False
+        self._listen_prefader = False
+        self._multitrack_mode = 2
+        self._midi_control = False
+
         self.bridge = RcpBridge()
         self.executor = ThreadPoolExecutor(max_workers=2)
+
+        # Faders state
+        self._faders = self._init_default_faders()
 
         self.monitor = DeviceMonitor(self)
         self.monitor.device_changed.connect(self._on_device_changed)
@@ -177,6 +314,16 @@ class StateManager(QObject):
 
         # Start monitoring
         self.monitor.start()
+
+    def _init_default_faders(self):
+        return [
+            {"index": 0, "name": "Mic 1", "color": "#FF3C3C", "icon": "mic", "level": 70, "mute": False, "listen": False},
+            {"index": 1, "name": "Mic 2 / Chat", "color": "#28C850", "icon": "chat", "level": 70, "mute": False, "listen": False},
+            {"index": 2, "name": "USB 1", "color": "#FF8C28", "icon": "usb", "level": 70, "mute": False, "listen": False},
+            {"index": 3, "name": "USB 2", "color": "#A050E6", "icon": "usb", "level": 70, "mute": False, "listen": False},
+            {"index": 4, "name": "SMART Pads", "color": "#FF3C3C", "icon": "pads", "level": 70, "mute": False, "listen": False},
+            {"index": 5, "name": "Bluetooth", "color": "#3C96FF", "icon": "bluetooth", "level": 70, "mute": False, "listen": False},
+        ]
 
     def _init_empty_banks(self):
         banks = []
@@ -308,6 +455,81 @@ class StateManager(QObject):
                         self._sd_used = "0 GB"
                     self._sd_percent = (used / cap) * 100.0 if cap > 0 else 0.0
 
+            # GUI Settings (Brightness, Meters)
+            gui_node = find_node(dump, "GUI")
+            if gui_node:
+                gprops = {k: list(v.values())[0] for k, v in gui_node.get("properties", {}).items()}
+                if "screenBrightness" in gprops:
+                    self._screen_brightness = int(gprops["screenBrightness"])
+                if "activeButtonsBrightness" in gprops:
+                    self._button_brightness = int(gprops["activeButtonsBrightness"])
+                if "autoBrightness" in gprops:
+                    self._auto_brightness = bool(gprops["autoBrightness"])
+                if "broadcastMeters" in gprops:
+                    self._broadcast_meters = bool(gprops["broadcastMeters"])
+                if "screenDimAfterSeconds" in gprops:
+                    try:
+                        self._dim_after_sec = int(gprops["screenDimAfterSeconds"])
+                    except (ValueError, TypeError):
+                        self._dim_after_sec = 0
+
+            # Recorder state
+            rec_node = find_node(dump, "RECORDER")
+            if rec_node:
+                rprops = {k: list(v.values())[0] for k, v in rec_node.get("properties", {}).items()}
+                self._is_recording = (rprops.get("recordState", 0) == 2)
+                self._record_time_ms = int(rprops.get("recordTimeMs", 0))
+
+            # Outputs and Headphones
+            out_node = find_node(dump, "OUTPUT")
+            if out_node:
+                oprops = {k: list(v.values())[0] for k, v in out_node.get("properties", {}).items()}
+                if "outputMonAutoMute" in oprops:
+                    self._monitor_auto_mute = bool(oprops["outputMonAutoMute"])
+                if "outputBTAutoMute" in oprops:
+                    self._bt_auto_mute = bool(oprops["outputBTAutoMute"])
+                if "outputMonFixed" in oprops:
+                    self._monitor_fixed_level = bool(oprops["outputMonFixed"])
+                if "outputPrefader" in oprops:
+                    self._listen_prefader = bool(oprops["outputPrefader"])
+                if "recordingMultitrackMode" in oprops:
+                    self._multitrack_mode = int(oprops["recordingMultitrackMode"])
+
+            # System settings (Haptics, MIDI)
+            if sys_node:
+                sprops = {k: list(v.values())[0] for k, v in sys_node.get("properties", {}).items()}
+                if "systemHapticSetting" in sprops:
+                    self._haptic_feedback = int(sprops["systemHapticSetting"])
+                if "systemMidiControl" in sprops:
+                    self._midi_control = bool(sprops["systemMidiControl"])
+                if "systemSerialNumber" in sprops and sprops["systemSerialNumber"] != "REDACTED":
+                    self._serial = sprops["systemSerialNumber"]
+
+            # Headphone nodes (children 9 and 10)
+            children = dump.get("children", [])
+            hp_nodes = [c for c in children if c.get("name") == "HEADPHONE"]
+            if len(hp_nodes) >= 1:
+                hp1_props = {k: list(v.values())[0] for k, v in hp_nodes[0].get("properties", {}).items()}
+                self._headphone1_type = int(hp1_props.get("headphoneType", 0))
+            if len(hp_nodes) >= 2:
+                hp2_props = {k: list(v.values())[0] for k, v in hp_nodes[1].get("properties", {}).items()}
+                self._headphone2_type = int(hp2_props.get("headphoneType", 0))
+
+            # Live Faders
+            fout, _ = self.bridge.run_cmd(["fader", "list", "--json"])
+            if fout:
+                import json
+                try:
+                    f_list = json.loads(fout)
+                    for item in f_list:
+                        idx = item.get("index", 0)
+                        if 0 <= idx < len(self._faders):
+                            self._faders[idx]["mute"] = bool(item.get("mute", False))
+                            self._faders[idx]["listen"] = bool(item.get("listen", False))
+                            self._faders[idx]["level"] = int(round(float(item.get("level", 0.7)) * 100))
+                except Exception as e:
+                    logger.debug(f"Error parsing fader list: {e}")
+
             # Get current active bank from hardware
             out, _ = self.bridge.run_cmd(["pad", "bank", "--json"])
             if out:
@@ -371,6 +593,9 @@ class StateManager(QObject):
             self.stateChanged.emit()
             self.padsChanged.emit()
             self.selectedPadChanged.emit()
+            self.fadersChanged.emit()
+            self.recordingChanged.emit()
+            self.deviceConfigChanged.emit()
             self.toastMessage.emit(f"Sincronizado con {self._model_name}")
 
         except Exception as e:
@@ -786,6 +1011,298 @@ class StateManager(QObject):
         self._transfer_mode = False
         self._transfer_status = ""
         self.transferStateChanged.emit()
+
+    # Navigation & Views
+    @pyqtProperty(str, notify=viewChanged)
+    def currentView(self):
+        return self._current_view
+
+    @pyqtSlot(str)
+    def navigateTo(self, view):
+        if self._current_view != view:
+            self._current_view = view
+            self.viewChanged.emit()
+
+    @pyqtSlot()
+    def navigateHome(self):
+        if self._current_view != "home":
+            self._current_view = "home"
+            self.viewChanged.emit()
+
+    # Factory Sounds
+    @pyqtProperty(QVariant, notify=stateChanged)
+    def factorySounds(self):
+        return FACTORY_SOUNDS
+
+    @pyqtSlot(str)
+    def loadFactorySound(self, sound_id):
+        sound = next((s for s in FACTORY_SOUNDS if s["id"] == sound_id), None)
+        if not sound:
+            return
+        filename = sound["filename"]
+        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        path1 = os.path.join(base_dir, "assets", "sounds", filename)
+        if os.path.exists(path1):
+            self.uploadSoundFile(path1, sound["name"])
+            return
+
+        import glob
+        pattern = os.path.join(base_dir, "Resources", "rode", "**", filename)
+        matches = glob.glob(pattern, recursive=True)
+        if matches:
+            self.uploadSoundFile(matches[0], sound["name"])
+        else:
+            self.toastMessage.emit(f"Sonido {filename} no encontrado")
+
+    # Faders & Mixer
+    @pyqtProperty(QVariant, notify=fadersChanged)
+    def faders(self):
+        return self._faders
+
+    @pyqtSlot(int)
+    def toggleFaderMute(self, index):
+        if 0 <= index < len(self._faders):
+            new_mute = not self._faders[index]["mute"]
+            self._faders[index]["mute"] = new_mute
+            self.fadersChanged.emit()
+            if self._connected and not self._permission_error:
+                action = "on" if new_mute else "off"
+                self.executor.submit(self.bridge.run_cmd, ["fader", "mute", str(index), action])
+            msg = f"{self._faders[index]['name']}: " + ("Mute" if new_mute else "Unmute")
+            self.toastMessage.emit(msg)
+
+    @pyqtSlot(int)
+    def toggleFaderListen(self, index):
+        if 0 <= index < len(self._faders):
+            new_listen = not self._faders[index]["listen"]
+            self._faders[index]["listen"] = new_listen
+            self.fadersChanged.emit()
+            if self._connected and not self._permission_error:
+                action = "on" if new_listen else "off"
+                self.executor.submit(self.bridge.run_cmd, ["fader", "listen", str(index), action])
+            msg = f"{self._faders[index]['name']}: Listen " + ("Activado" if new_listen else "Desactivado")
+            self.toastMessage.emit(msg)
+
+    @pyqtSlot(int, int)
+    def setFaderLevel(self, index, level):
+        if 0 <= index < len(self._faders):
+            self._faders[index]["level"] = max(0, min(100, level))
+            self.fadersChanged.emit()
+
+    # Live Recording
+    @pyqtProperty(bool, notify=recordingChanged)
+    def isRecording(self):
+        return self._is_recording
+
+    @pyqtProperty(str, notify=recordingChanged)
+    def recordTimeString(self):
+        total_sec = self._record_time_ms // 1000
+        mins = total_sec // 60
+        secs = total_sec % 60
+        if mins >= 60:
+            hrs = mins // 60
+            mins = mins % 60
+            return f"{hrs:02d}:{mins:02d}:{secs:02d}"
+        return f"{mins:02d}:{secs:02d}"
+
+    @pyqtSlot()
+    def toggleRecord(self):
+        new_state = not self._is_recording
+        self._is_recording = new_state
+        self.recordingChanged.emit()
+        target_val = "u32:2" if new_state else "u32:0"
+        if self._connected and not self._permission_error:
+            self.executor.submit(
+                self.bridge.run_cmd,
+                ["set-property", "3", "requestRecordState", target_val]
+            )
+        msg = "Grabación iniciada" if new_state else "Grabación detenida"
+        self.toastMessage.emit(msg)
+
+    @pyqtSlot()
+    def dropMarker(self):
+        if self._connected and not self._permission_error:
+            self.executor.submit(
+                self.bridge.run_cmd,
+                ["set-property", "3", "requestDropMarker", "f64:1.0"]
+            )
+        self.toastMessage.emit("Marca colocada en la grabación")
+
+    # Device Configuration
+    @pyqtProperty(int, notify=deviceConfigChanged)
+    def screenBrightness(self):
+        return self._screen_brightness
+
+    @pyqtSlot(int)
+    def setScreenBrightness(self, val):
+        val = max(0, min(255, val))
+        self._screen_brightness = val
+        self.deviceConfigChanged.emit()
+        if self._connected and not self._permission_error:
+            self.executor.submit(self.bridge.run_cmd, ["set-property", "7", "screenBrightness", f"u32:{val}"])
+
+    @pyqtProperty(int, notify=deviceConfigChanged)
+    def buttonBrightness(self):
+        return self._button_brightness
+
+    @pyqtSlot(int)
+    def setButtonBrightness(self, val):
+        val = max(0, min(255, val))
+        self._button_brightness = val
+        self.deviceConfigChanged.emit()
+        if self._connected and not self._permission_error:
+            self.executor.submit(self.bridge.run_cmd, ["set-property", "7", "activeButtonsBrightness", f"u32:{val}"])
+
+    @pyqtProperty(bool, notify=deviceConfigChanged)
+    def autoBrightness(self):
+        return self._auto_brightness
+
+    @pyqtSlot(bool)
+    def setAutoBrightness(self, val):
+        self._auto_brightness = val
+        self.deviceConfigChanged.emit()
+        if self._connected and not self._permission_error:
+            self.executor.submit(self.bridge.run_cmd, ["set-property", "7", "autoBrightness", f"u32:{1 if val else 0}"])
+
+    @pyqtProperty(int, notify=deviceConfigChanged)
+    def dimAfterSeconds(self):
+        return self._dim_after_sec
+
+    @pyqtSlot(int)
+    def setDimAfterSeconds(self, sec):
+        self._dim_after_sec = sec
+        self.deviceConfigChanged.emit()
+        if self._connected and not self._permission_error:
+            self.executor.submit(self.bridge.run_cmd, ["set-property", "7", "screenDimAfterSeconds", f"u32:{sec}"])
+
+    @pyqtProperty(bool, notify=deviceConfigChanged)
+    def broadcastMeters(self):
+        return self._broadcast_meters
+
+    @pyqtSlot(bool)
+    def setBroadcastMeters(self, val):
+        self._broadcast_meters = val
+        self.deviceConfigChanged.emit()
+        if self._connected and not self._permission_error:
+            self.executor.submit(self.bridge.run_cmd, ["set-property", "7", "broadcastMeters", f"bool:{str(val).lower()}"])
+
+    @pyqtProperty(int, notify=deviceConfigChanged)
+    def headphone1Type(self):
+        return self._headphone1_type
+
+    @pyqtSlot(int)
+    def setHeadphone1Type(self, val):
+        self._headphone1_type = val
+        self.deviceConfigChanged.emit()
+        if self._connected and not self._permission_error:
+            self.executor.submit(self.bridge.run_cmd, ["set-property", "9", "headphoneType", f"u32:{val}"])
+
+    @pyqtProperty(int, notify=deviceConfigChanged)
+    def headphone2Type(self):
+        return self._headphone2_type
+
+    @pyqtSlot(int)
+    def setHeadphone2Type(self, val):
+        self._headphone2_type = val
+        self.deviceConfigChanged.emit()
+        if self._connected and not self._permission_error:
+            self.executor.submit(self.bridge.run_cmd, ["set-property", "10", "headphoneType", f"u32:{val}"])
+
+    @pyqtProperty(bool, notify=deviceConfigChanged)
+    def monitorAutoMute(self):
+        return self._monitor_auto_mute
+
+    @pyqtSlot(bool)
+    def setMonitorAutoMute(self, val):
+        self._monitor_auto_mute = val
+        self.deviceConfigChanged.emit()
+        if self._connected and not self._permission_error:
+            self.executor.submit(self.bridge.run_cmd, ["set-property", "13", "outputMonAutoMute", f"bool:{str(val).lower()}"])
+
+    @pyqtProperty(bool, notify=deviceConfigChanged)
+    def btAutoMute(self):
+        return self._bt_auto_mute
+
+    @pyqtSlot(bool)
+    def setBtAutoMute(self, val):
+        self._bt_auto_mute = val
+        self.deviceConfigChanged.emit()
+        if self._connected and not self._permission_error:
+            self.executor.submit(self.bridge.run_cmd, ["set-property", "13", "outputBTAutoMute", f"bool:{str(val).lower()}"])
+
+    @pyqtProperty(bool, notify=deviceConfigChanged)
+    def monitorFixedLevel(self):
+        return self._monitor_fixed_level
+
+    @pyqtSlot(bool)
+    def setMonitorFixedLevel(self, val):
+        self._monitor_fixed_level = val
+        self.deviceConfigChanged.emit()
+        if self._connected and not self._permission_error:
+            self.executor.submit(self.bridge.run_cmd, ["set-property", "13", "outputMonFixed", f"bool:{str(val).lower()}"])
+
+    @pyqtProperty(bool, notify=deviceConfigChanged)
+    def listenPrefader(self):
+        return self._listen_prefader
+
+    @pyqtSlot(bool)
+    def setListenPrefader(self, val):
+        self._listen_prefader = val
+        self.deviceConfigChanged.emit()
+        if self._connected and not self._permission_error:
+            self.executor.submit(self.bridge.run_cmd, ["set-property", "13", "outputPrefader", f"bool:{str(val).lower()}"])
+
+    @pyqtProperty(int, notify=deviceConfigChanged)
+    def multitrackMode(self):
+        return self._multitrack_mode
+
+    @pyqtSlot(int)
+    def setMultitrackMode(self, val):
+        self._multitrack_mode = val
+        self.deviceConfigChanged.emit()
+        if self._connected and not self._permission_error:
+            self.executor.submit(self.bridge.run_cmd, ["set-property", "13", "recordingMultitrackMode", f"u32:{val}"])
+
+    @pyqtProperty(int, notify=deviceConfigChanged)
+    def hapticFeedback(self):
+        return self._haptic_feedback
+
+    @pyqtSlot(int)
+    def setHapticFeedback(self, val):
+        self._haptic_feedback = val
+        self.deviceConfigChanged.emit()
+        if self._connected and not self._permission_error:
+            self.executor.submit(self.bridge.run_cmd, ["set-property", "15", "systemHapticSetting", f"u32:{val}"])
+
+    @pyqtProperty(bool, notify=deviceConfigChanged)
+    def midiControl(self):
+        return self._midi_control
+
+    @pyqtSlot(bool)
+    def setMidiControl(self, val):
+        self._midi_control = val
+        self.deviceConfigChanged.emit()
+        if self._connected and not self._permission_error:
+            self.executor.submit(self.bridge.run_cmd, ["set-property", "15", "systemMidiControl", f"bool:{str(val).lower()}"])
+
+    @pyqtSlot(str)
+    def updatePadType(self, ptype):
+        order = DUO_PHYSICAL_ORDER if self._is_duo else PRO_II_PHYSICAL_ORDER
+        logical_pos = order[self._selected_pad_index] if self._selected_pad_index < len(order) else self._selected_pad_index
+        pad = self._banks[self._current_bank][logical_pos]
+        pad["type"] = ptype
+        if ptype == "fx":
+            if not pad.get("name"):
+                pad["name"] = "Reverb FX"
+        elif ptype == "mixer":
+            if not pad.get("name"):
+                pad["name"] = "Censor Bleep"
+        elif ptype == "midi":
+            if not pad.get("name"):
+                pad["name"] = "MIDI CC#1"
+        self.padsChanged.emit()
+        self.selectedPadChanged.emit()
+        self.toastMessage.emit(f"Tipo: {ptype.upper()}")
 
     @pyqtSlot()
     def refresh(self):
