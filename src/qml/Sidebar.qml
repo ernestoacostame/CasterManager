@@ -107,6 +107,36 @@ Rectangle {
                             font.pixelSize: 11
                             color: "#9A9A9E"
                         }
+
+                        // Eject / Unmount Button when Transfer Mode is active
+                        Rectangle {
+                            visible: Boolean(stateManager && stateManager.transferModeActive)
+                            width: 22
+                            height: 22
+                            radius: 4
+                            color: ejectArea.containsMouse ? "#442A2A" : "#282830"
+                            border.color: "#CBA158"
+                            border.width: 1
+
+                            Text {
+                                anchors.centerIn: parent
+                                text: "⏏"
+                                font.pixelSize: 12
+                                font.bold: true
+                                color: "#CBA158"
+                            }
+
+                            MouseArea {
+                                id: ejectArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    if (stateManager) stateManager.exitTransferMode();
+                                }
+                            }
+                        }
+
                         Item { Layout.fillWidth: true }
                         Text {
                             text: (stateManager ? stateManager.sdCardUsed : "0 GB") + " / " + (stateManager ? stateManager.sdCardTotal : "119 GB")

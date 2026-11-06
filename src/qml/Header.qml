@@ -88,11 +88,13 @@ Rectangle {
 
         // Live REC Control Button
         Rectangle {
-            height: 32
-            width: recHeaderRow.width + 20
+            Layout.preferredHeight: 32
+            Layout.preferredWidth: recHeaderRow.width + 24
+            Layout.alignment: Qt.AlignVCenter
+            Layout.rightMargin: 12
             radius: 16
-            color: (stateManager && stateManager.isRecording) ? "#FF3B30" : "#242428"
-            border.color: (stateManager && stateManager.isRecording) ? "#FF453A" : "#383840"
+            color: (stateManager && stateManager.isRecording) ? "#E62E2D" : (recArea.containsMouse ? "#2A2A30" : "#202024")
+            border.color: (stateManager && stateManager.isRecording) ? "#FF453A" : "#363640"
             border.width: 1
 
             Row {
@@ -106,6 +108,13 @@ Rectangle {
                     radius: 4
                     color: (stateManager && stateManager.isRecording) ? "#FFFFFF" : "#FF3B30"
                     anchors.verticalCenter: parent.verticalCenter
+
+                    SequentialAnimation on opacity {
+                        running: stateManager && stateManager.isRecording
+                        loops: Animation.Infinite
+                        NumberAnimation { from: 1.0; to: 0.2; duration: 600 }
+                        NumberAnimation { from: 0.2; to: 1.0; duration: 600 }
+                    }
                 }
 
                 Text {
@@ -120,6 +129,7 @@ Rectangle {
             }
 
             MouseArea {
+                id: recArea
                 anchors.fill: parent
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor

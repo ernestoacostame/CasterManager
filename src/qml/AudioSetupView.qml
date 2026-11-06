@@ -5,6 +5,8 @@ import QtQuick.Controls
 Item {
     id: root
 
+    property int selectedChannelIndex: 0
+
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: 28
@@ -67,16 +69,16 @@ Item {
                             Layout.fillWidth: true
                             Layout.fillHeight: true
                             radius: 10
-                            color: "#222226"
-                            border.color: modelData.mute ? "#FF3B30" : (modelData.listen ? "#34C759" : "#303036")
-                            border.width: modelData.mute || modelData.listen ? 1.5 : 1
+                            color: root.selectedChannelIndex === modelData.index ? "#282830" : "#222226"
+                            border.color: modelData.mute ? "#FF3B30" : (modelData.listen ? "#34C759" : (root.selectedChannelIndex === modelData.index ? "#CBA158" : "#303036"))
+                            border.width: (root.selectedChannelIndex === modelData.index || modelData.mute || modelData.listen) ? 2 : 1
 
                             ColumnLayout {
                                 anchors.fill: parent
                                 anchors.margins: 12
                                 spacing: 10
 
-                                // Channel Label & Color Pill
+                                // Channel Label & Color Pill (Clickable to select channel)
                                 RowLayout {
                                     Layout.fillWidth: true
                                     spacing: 8
@@ -92,7 +94,7 @@ Item {
                                         text: modelData.name || ("Canal " + (index + 1))
                                         font.pixelSize: 12
                                         font.bold: true
-                                        color: "#FFFFFF"
+                                        color: root.selectedChannelIndex === modelData.index ? "#CBA158" : "#FFFFFF"
                                         elide: Text.ElideRight
                                         Layout.fillWidth: true
                                     }
@@ -139,7 +141,7 @@ Item {
                                             Rectangle {
                                                 anchors.bottom: parent.bottom
                                                 width: parent.width
-                                                height: faderSlider.visualPosition * parent.height
+                                                height: (faderSlider.value / 100.0) * parent.height
                                                 color: modelData.color || "#CBA158"
                                                 radius: 3
                                             }
@@ -216,6 +218,12 @@ Item {
                                     }
                                 }
                             }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                z: -1
+                                onClicked: root.selectedChannelIndex = modelData.index
+                            }
                         }
                     }
                 }
@@ -228,209 +236,79 @@ Item {
             Layout.fillHeight: true
             spacing: 12
 
-            Text {
-                text: stateManager ? stateManager.strings.input_sources_pool : "Fuentes de Entrada Disponibles"
-                font.pixelSize: 14
-                font.bold: true
-                color: "#FFFFFF"
+            RowLayout {
+                Layout.fillWidth: true
+                Text {
+                    text: stateManager ? stateManager.strings.input_sources_pool : "Fuentes de Entrada Disponibles"
+                    font.pixelSize: 14
+                    font.bold: true
+                    color: "#FFFFFF"
+                }
+                Item { Layout.fillWidth: true }
+                Text {
+                    text: "Haz clic en una fuente para asignarla al " + (stateManager && stateManager.faders[root.selectedChannelIndex] ? stateManager.faders[root.selectedChannelIndex].name : "Canal " + (root.selectedChannelIndex + 1))
+                    font.pixelSize: 11
+                    color: "#CBA158"
+                }
             }
 
             GridLayout {
                 Layout.fillWidth: true
                 columns: 4
-                rowSpacing: 12
-                columnSpacing: 12
+                rowSpacing: 10
+                columnSpacing: 10
 
-                // Source Item 1: Combo XLR 1
-                Rectangle {
-                    Layout.fillWidth: true
-                    height: 54
-                    radius: 8
-                    color: "#212125"
-                    border.color: "#303036"
-                    border.width: 1
+                Repeater {
+                    model: [
+                        {"id": 0, "name": "Input 1 (Mic / Inst)", "desc": "Neutrik Combo XLR", "icon": "🎙️", "tag": "+48V"},
+                        {"id": 1, "name": "Input 2 (Mic / Inst)", "desc": "Neutrik Combo XLR", "icon": "🎙️", "tag": "+48V"},
+                        {"id": 2, "name": "Wireless 1", "desc": "Receptor 2.4 GHz dual", "icon": "📡", "tag": ""},
+                        {"id": 3, "name": "Wireless 2", "desc": "Receptor 2.4 GHz dual", "icon": "📡", "tag": ""},
+                        {"id": 7, "name": "USB 1 Audio (Main)", "desc": "Multicanal 24-bit / 48kHz", "icon": "💻", "tag": ""},
+                        {"id": 8, "name": "USB 1 Chat", "desc": "Mix-minus automático", "icon": "💬", "tag": ""},
+                        {"id": 9, "name": "USB 2 Audio", "desc": "Secundario / Smartphone", "icon": "📱", "tag": ""},
+                        {"id": 10, "name": "Bluetooth Stereo", "desc": "A2DP y llamadas de voz", "icon": "📶", "tag": ""},
+                        {"id": 11, "name": "SMART Pads Audio", "desc": "Reproductor interno", "icon": "🎛️", "tag": ""},
+                        {"id": 4, "name": "Headset TRRS", "desc": "Micrófono de auriculares", "icon": "🎧", "tag": ""}
+                    ]
 
-                    RowLayout {
-                        anchors.fill: parent
-                        anchors.margins: 12
-                        spacing: 10
+                    Rectangle {
+                        Layout.fillWidth: true
+                        height: 54
+                        radius: 8
+                        color: srcArea.containsMouse ? "#2A2A30" : "#212125"
+                        border.color: srcArea.containsMouse ? "#CBA158" : "#303036"
+                        border.width: 1
 
-                        Text { text: "🎙️"; font.pixelSize: 18 }
-                        ColumnLayout {
-                            spacing: 2
-                            Text { text: "Input 1 (Mic / Inst)"; font.pixelSize: 12; font.bold: true; color: "#FFFFFF" }
-                            Text { text: "Neutrik Combo XLR"; font.pixelSize: 10; color: "#8E8E93" }
+                        RowLayout {
+                            anchors.fill: parent
+                            anchors.margins: 12
+                            spacing: 10
+
+                            Text { text: modelData.icon; font.pixelSize: 18 }
+                            ColumnLayout {
+                                spacing: 2
+                                Text { text: modelData.name; font.pixelSize: 12; font.bold: true; color: "#FFFFFF" }
+                                Text { text: modelData.desc; font.pixelSize: 10; color: "#8E8E93" }
+                            }
+                            Item { Layout.fillWidth: true }
+                            Rectangle {
+                                visible: modelData.tag.length > 0
+                                width: 32; height: 18; radius: 4; color: "#2E2E34"
+                                Text { anchors.centerIn: parent; text: modelData.tag; font.pixelSize: 9; font.bold: true; color: "#FF9F0A" }
+                            }
                         }
-                        Item { Layout.fillWidth: true }
-                        Rectangle {
-                            width: 32; height: 18; radius: 4; color: "#2E2E34"
-                            Text { anchors.centerIn: parent; text: "+48V"; font.pixelSize: 9; font.bold: true; color: "#FF9F0A" }
-                        }
-                    }
-                }
 
-                // Source Item 2: Combo XLR 2
-                Rectangle {
-                    Layout.fillWidth: true
-                    height: 54
-                    radius: 8
-                    color: "#212125"
-                    border.color: "#303036"
-                    border.width: 1
-
-                    RowLayout {
-                        anchors.fill: parent
-                        anchors.margins: 12
-                        spacing: 10
-
-                        Text { text: "🎙️"; font.pixelSize: 18 }
-                        ColumnLayout {
-                            spacing: 2
-                            Text { text: "Input 2 (Mic / Inst)"; font.pixelSize: 12; font.bold: true; color: "#FFFFFF" }
-                            Text { text: "Neutrik Combo XLR"; font.pixelSize: 10; color: "#8E8E93" }
-                        }
-                        Item { Layout.fillWidth: true }
-                        Rectangle {
-                            width: 32; height: 18; radius: 4; color: "#2E2E34"
-                            Text { anchors.centerIn: parent; text: "+48V"; font.pixelSize: 9; font.bold: true; color: "#FF9F0A" }
-                        }
-                    }
-                }
-
-                // Source Item 3: Wireless Receiver
-                Rectangle {
-                    Layout.fillWidth: true
-                    height: 54
-                    radius: 8
-                    color: "#212125"
-                    border.color: "#303036"
-                    border.width: 1
-
-                    RowLayout {
-                        anchors.fill: parent
-                        anchors.margins: 12
-                        spacing: 10
-
-                        Text { text: "📡"; font.pixelSize: 18 }
-                        ColumnLayout {
-                            spacing: 2
-                            Text { text: "Wireless Series IV"; font.pixelSize: 12; font.bold: true; color: "#FFFFFF" }
-                            Text { text: "Receptor 2.4 GHz dual"; font.pixelSize: 10; color: "#8E8E93" }
-                        }
-                    }
-                }
-
-                // Source Item 4: USB 1 Audio
-                Rectangle {
-                    Layout.fillWidth: true
-                    height: 54
-                    radius: 8
-                    color: "#212125"
-                    border.color: "#303036"
-                    border.width: 1
-
-                    RowLayout {
-                        anchors.fill: parent
-                        anchors.margins: 12
-                        spacing: 10
-
-                        Text { text: "💻"; font.pixelSize: 18 }
-                        ColumnLayout {
-                            spacing: 2
-                            Text { text: "USB 1 Audio (Main)"; font.pixelSize: 12; font.bold: true; color: "#FFFFFF" }
-                            Text { text: "Multicanal 24-bit / 48kHz"; font.pixelSize: 10; color: "#8E8E93" }
-                        }
-                    }
-                }
-
-                // Source Item 5: USB 2 Audio (Chat)
-                Rectangle {
-                    Layout.fillWidth: true
-                    height: 54
-                    radius: 8
-                    color: "#212125"
-                    border.color: "#303036"
-                    border.width: 1
-
-                    RowLayout {
-                        anchors.fill: parent
-                        anchors.margins: 12
-                        spacing: 10
-
-                        Text { text: "💬"; font.pixelSize: 18 }
-                        ColumnLayout {
-                            spacing: 2
-                            Text { text: "USB 2 Audio (Chat)"; font.pixelSize: 12; font.bold: true; color: "#FFFFFF" }
-                            Text { text: "Mix-minus automático"; font.pixelSize: 10; color: "#8E8E93" }
-                        }
-                    }
-                }
-
-                // Source Item 6: Bluetooth Audio
-                Rectangle {
-                    Layout.fillWidth: true
-                    height: 54
-                    radius: 8
-                    color: "#212125"
-                    border.color: "#303036"
-                    border.width: 1
-
-                    RowLayout {
-                        anchors.fill: parent
-                        anchors.margins: 12
-                        spacing: 10
-
-                        Text { text: "📶"; font.pixelSize: 18 }
-                        ColumnLayout {
-                            spacing: 2
-                            Text { text: "Bluetooth Stereo"; font.pixelSize: 12; font.bold: true; color: "#FFFFFF" }
-                            Text { text: "A2DP y llamadas de voz"; font.pixelSize: 10; color: "#8E8E93" }
-                        }
-                    }
-                }
-
-                // Source Item 7: SMART Pads
-                Rectangle {
-                    Layout.fillWidth: true
-                    height: 54
-                    radius: 8
-                    color: "#212125"
-                    border.color: "#303036"
-                    border.width: 1
-
-                    RowLayout {
-                        anchors.fill: parent
-                        anchors.margins: 12
-                        spacing: 10
-
-                        Text { text: "🎛️"; font.pixelSize: 18 }
-                        ColumnLayout {
-                            spacing: 2
-                            Text { text: "SMART Pads Audio"; font.pixelSize: 12; font.bold: true; color: "#FFFFFF" }
-                            Text { text: "Reproductor estéreo interno"; font.pixelSize: 10; color: "#8E8E93" }
-                        }
-                    }
-                }
-
-                // Source Item 8: Master Mix
-                Rectangle {
-                    Layout.fillWidth: true
-                    height: 54
-                    radius: 8
-                    color: "#212125"
-                    border.color: "#303036"
-                    border.width: 1
-
-                    RowLayout {
-                        anchors.fill: parent
-                        anchors.margins: 12
-                        spacing: 10
-
-                        Text { text: "🎚️"; font.pixelSize: 18 }
-                        ColumnLayout {
-                            spacing: 2
-                            Text { text: "Main Stereo Mix"; font.pixelSize: 12; font.bold: true; color: "#FFFFFF" }
-                            Text { text: "APHEX Master Compellor"; font.pixelSize: 10; color: "#8E8E93" }
+                        MouseArea {
+                            id: srcArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                if (stateManager) {
+                                    stateManager.assignChannelInputSource(root.selectedChannelIndex, modelData.id);
+                                }
+                            }
                         }
                     }
                 }

@@ -37,48 +37,6 @@ Item {
             }
 
             Item { Layout.fillWidth: true }
-
-            // Live REC Button in Header
-            Rectangle {
-                height: 36
-                width: recRow.width + 24
-                radius: 18
-                color: (stateManager && stateManager.isRecording) ? "#FF3B30" : "#28282E"
-                border.color: (stateManager && stateManager.isRecording) ? "#FF453A" : "#3E3E46"
-                border.width: 1
-
-                Row {
-                    id: recRow
-                    anchors.centerIn: parent
-                    spacing: 8
-
-                    Rectangle {
-                        width: 10
-                        height: 10
-                        radius: 5
-                        color: (stateManager && stateManager.isRecording) ? "#FFFFFF" : "#FF3B30"
-                        anchors.verticalCenter: parent.verticalCenter
-                    }
-
-                    Text {
-                        text: (stateManager && stateManager.isRecording) 
-                              ? ("REC " + stateManager.recordTimeString) 
-                              : (stateManager ? stateManager.strings.rec_start : "Grabar")
-                        font.pixelSize: 12
-                        font.bold: true
-                        color: "#FFFFFF"
-                        anchors.verticalCenter: parent.verticalCenter
-                    }
-                }
-
-                MouseArea {
-                    anchors.fill: parent
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: {
-                        if (stateManager) stateManager.toggleRecord();
-                    }
-                }
-            }
         }
 
         // SD Card Storage Bar Card
@@ -221,11 +179,21 @@ Item {
             Layout.fillHeight: true
             spacing: 12
 
-            Text {
-                text: "Grabaciones en Tarjeta"
-                font.pixelSize: 15
-                font.bold: true
-                color: "#FFFFFF"
+            RowLayout {
+                Layout.fillWidth: true
+                Text {
+                    text: "Grabaciones en Tarjeta"
+                    font.pixelSize: 15
+                    font.bold: true
+                    color: "#FFFFFF"
+                }
+                Item { Layout.fillWidth: true }
+                Text {
+                    visible: Boolean(stateManager && stateManager.recordings && stateManager.recordings.length > 0)
+                    text: (stateManager && stateManager.recordings) ? (stateManager.recordings.length + " tomas encontradas") : ""
+                    font.pixelSize: 12
+                    color: "#CBA158"
+                }
             }
 
             Rectangle {
@@ -235,33 +203,187 @@ Item {
                 color: "#1A1A1D"
                 border.color: "#2C2C32"
                 border.width: 1
+                clip: true
 
+                // When recordings are found
+                ScrollView {
+                    anchors.fill: parent
+                    anchors.margins: 14
+                    visible: Boolean(stateManager && stateManager.recordings && stateManager.recordings.length > 0)
+
+                    ColumnLayout {
+                        width: parent.width - 24
+                        spacing: 10
+
+                        Repeater {
+                            model: stateManager ? stateManager.recordings : []
+
+                            Rectangle {
+                                Layout.fillWidth: true
+                                height: 72
+                                radius: 8
+                                color: takeArea.containsMouse ? "#24242A" : "#202024"
+                                border.color: takeArea.containsMouse ? "#CBA158" : "#2C2C32"
+                                border.width: 1
+
+                                RowLayout {
+                                    anchors.fill: parent
+                                    anchors.margins: 14
+                                    spacing: 14
+
+                                    Text {
+                                        text: "🎙️"
+                                        font.pixelSize: 22
+                                    }
+
+                                    ColumnLayout {
+                                        spacing: 3
+                                        Layout.fillWidth: true
+
+                                        Text {
+                                            text: modelData.name || modelData.folder
+                                            font.pixelSize: 14
+                                            font.bold: true
+                                            color: "#FFFFFF"
+                                        }
+
+                                        Row {
+                                            spacing: 10
+                                            Text {
+                                                text: "📅 " + (modelData.date || "")
+                                                font.pixelSize: 11
+                                                color: "#8E8E93"
+                                            }
+                                            Text {
+                                                text: "⏱️ " + (modelData.duration || "00:00")
+                                                font.pixelSize: 11
+                                                color: "#CBA158"
+                                            }
+                                            Text {
+                                                text: "💾 " + (modelData.size || "")
+                                                font.pixelSize: 11
+                                                color: "#9A9A9E"
+                                            }
+                                        }
+                                    }
+
+                                    // Multitrack badge
+                                    Rectangle {
+                                        height: 24
+                                        width: multiText.implicitWidth + 14
+                                        radius: 4
+                                        color: modelData.multitrack ? "#1E3A28" : "#26262C"
+                                        border.color: modelData.multitrack ? "#34C759" : "#3E3E46"
+                                        border.width: 1
+
+                                        Text {
+                                            id: multiText
+                                            anchors.centerIn: parent
+                                            text: modelData.multitrack ? "Multipista" : "Estéreo"
+                                            font.pixelSize: 10
+                                            font.bold: true
+                                            color: modelData.multitrack ? "#34C759" : "#AAAAAA"
+                                        }
+                                    }
+
+                                    // Open Folder Button
+                                    Rectangle {
+                                        width: 130
+                                        height: 32
+                                        radius: 6
+                                        color: openArea.containsMouse ? "#CBA158" : "#2A2A32"
+                                        border.color: openArea.containsMouse ? "#CBA158" : "#3E3E48"
+                                        border.width: 1
+
+                                        Row {
+                                            anchors.centerIn: parent
+                                            spacing: 6
+                                            Text { text: "📁"; font.pixelSize: 12 }
+                                            Text {
+                                                text: "Abrir Carpeta"
+                                                font.pixelSize: 11
+                                                font.bold: true
+                                                color: openArea.containsMouse ? "#121214" : "#FFFFFF"
+                                            }
+                                        }
+
+                                        MouseArea {
+                                            id: openArea
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: {
+                                                if (stateManager) stateManager.openRecordingFolder(modelData.path);
+                                            }
+                                        }
+                                    }
+                                }
+
+                                MouseArea {
+                                    id: takeArea
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    propagateComposedEvents: true
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Empty state when no recordings or not mounted
                 ColumnLayout {
                     anchors.centerIn: parent
-                    spacing: 10
+                    spacing: 12
+                    visible: !stateManager || !stateManager.recordings || stateManager.recordings.length === 0
 
                     Text {
                         Layout.alignment: Qt.AlignHCenter
                         text: "🎙️"
-                        font.pixelSize: 36
+                        font.pixelSize: 38
                     }
 
                     Text {
                         Layout.alignment: Qt.AlignHCenter
-                        text: stateManager && stateManager.language === "es" 
-                              ? "No hay tomas grabadas recientemente en la tarjeta"
-                              : "No recent recorded takes found on card"
+                        text: (stateManager && stateManager.transferModeActive)
+                              ? "No se encontraron tomas en la MicroSD"
+                              : "Activa el Modo Transferencia para explorar los episodios grabados"
                         font.pixelSize: 14
+                        font.bold: true
+                        color: "#FFFFFF"
+                    }
+
+                    Text {
+                        Layout.alignment: Qt.AlignHCenter
+                        text: (stateManager && stateManager.transferModeActive)
+                              ? "Las grabaciones realizadas con el botón REC aparecerán aquí"
+                              : "Al activar la transferencia, la MicroSD se montará en Linux y CasterManager listará tus tomas"
+                        font.pixelSize: 12
                         color: "#8E8E93"
                     }
 
-                    Text {
+                    Rectangle {
+                        visible: !stateManager || !stateManager.transferModeActive
                         Layout.alignment: Qt.AlignHCenter
-                        text: stateManager && stateManager.language === "es"
-                              ? "Pulsa el botón REC arriba para iniciar una nueva grabación en la Duo"
-                              : "Press REC above to start a new take on the Duo"
-                        font.pixelSize: 12
-                        color: "#666666"
+                        width: 180
+                        height: 36
+                        radius: 8
+                        color: "#CBA158"
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: "Activar Transferencia"
+                            font.pixelSize: 12
+                            font.bold: true
+                            color: "#121214"
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                if (stateManager) stateManager.enterTransferMode();
+                            }
+                        }
                     }
                 }
             }

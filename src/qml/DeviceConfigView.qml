@@ -4,6 +4,7 @@ import QtQuick.Controls
 
 Item {
     id: root
+    objectName: "deviceConfigView"
 
     property int activeTab: 0 // 0: Output, 1: Display, 2: System
 
@@ -532,55 +533,109 @@ Item {
 
                         Rectangle { Layout.fillWidth: true; height: 1; color: "#28282E" }
 
-                        // Broadcast Meters Mode
-                        RowLayout {
+                        // Metering Cards (Default vs Broadcast)
+                        ColumnLayout {
                             Layout.fillWidth: true
-                            ColumnLayout {
-                                spacing: 2
-                                Text {
-                                    text: stateManager ? stateManager.strings.metering : "Vúmetros"
-                                    font.pixelSize: 13
-                                    color: "#E0E0E0"
-                                }
-                                Text {
-                                    text: "Modo Broadcast con escala dBFS precisa"
-                                    font.pixelSize: 11
-                                    color: "#8E8E93"
-                                }
+                            spacing: 12
+
+                            Text {
+                                text: stateManager ? stateManager.strings.metering : "Vúmetros (Metering)"
+                                font.pixelSize: 13
+                                font.bold: true
+                                color: "#E0E0E0"
                             }
-                            Item { Layout.fillWidth: true }
-                            Row {
-                                spacing: 8
+
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 16
+
+                                // Card 1: Default
                                 Rectangle {
-                                    width: 90
-                                    height: 32
-                                    radius: 6
-                                    color: (stateManager && !stateManager.broadcastMeters) ? "#CBA158" : "#28282E"
-                                    Text {
-                                        anchors.centerIn: parent
-                                        text: "Default"
-                                        font.pixelSize: 11
-                                        font.bold: stateManager && !stateManager.broadcastMeters
-                                        color: (stateManager && !stateManager.broadcastMeters) ? "#121214" : "#D0D0D0"
+                                    Layout.fillWidth: true
+                                    height: 130
+                                    radius: 10
+                                    color: (stateManager && !stateManager.broadcastMeters) ? "#25252D" : "#1F1F23"
+                                    border.color: (stateManager && !stateManager.broadcastMeters) ? "#CBA158" : "#2E2E36"
+                                    border.width: (stateManager && !stateManager.broadcastMeters) ? 2 : 1
+
+                                    ColumnLayout {
+                                        anchors.fill: parent
+                                        anchors.margins: 14
+                                        spacing: 8
+
+                                        RowLayout {
+                                            Text {
+                                                text: "Default"
+                                                font.pixelSize: 14
+                                                font.bold: true
+                                                color: (stateManager && !stateManager.broadcastMeters) ? "#CBA158" : "#FFFFFF"
+                                            }
+                                            Item { Layout.fillWidth: true }
+                                            Text {
+                                                visible: Boolean(stateManager && !stateManager.broadcastMeters)
+                                                text: "✓ Activo"
+                                                font.pixelSize: 11
+                                                font.bold: true
+                                                color: "#34C759"
+                                            }
+                                        }
+
+                                        Text {
+                                            text: "Los vúmetros incluyen marcadores a intervalos regulares e indican el nivel de ganancia unitario estándar."
+                                            font.pixelSize: 11
+                                            color: "#9A9A9E"
+                                            wrapMode: Text.WordWrap
+                                            Layout.fillWidth: true
+                                        }
                                     }
+
                                     MouseArea {
                                         anchors.fill: parent
                                         cursorShape: Qt.PointingHandCursor
                                         onClicked: if (stateManager) stateManager.setBroadcastMeters(false);
                                     }
                                 }
+
+                                // Card 2: Broadcast
                                 Rectangle {
-                                    width: 90
-                                    height: 32
-                                    radius: 6
-                                    color: (stateManager && stateManager.broadcastMeters) ? "#CBA158" : "#28282E"
-                                    Text {
-                                        anchors.centerIn: parent
-                                        text: "Broadcast"
-                                        font.pixelSize: 11
-                                        font.bold: stateManager && stateManager.broadcastMeters
-                                        color: (stateManager && stateManager.broadcastMeters) ? "#121214" : "#D0D0D0"
+                                    Layout.fillWidth: true
+                                    height: 130
+                                    radius: 10
+                                    color: (stateManager && stateManager.broadcastMeters) ? "#25252D" : "#1F1F23"
+                                    border.color: (stateManager && stateManager.broadcastMeters) ? "#CBA158" : "#2E2E36"
+                                    border.width: (stateManager && stateManager.broadcastMeters) ? 2 : 1
+
+                                    ColumnLayout {
+                                        anchors.fill: parent
+                                        anchors.margins: 14
+                                        spacing: 8
+
+                                        RowLayout {
+                                            Text {
+                                                text: "Broadcast"
+                                                font.pixelSize: 14
+                                                font.bold: true
+                                                color: (stateManager && stateManager.broadcastMeters) ? "#CBA158" : "#FFFFFF"
+                                            }
+                                            Item { Layout.fillWidth: true }
+                                            Text {
+                                                visible: Boolean(stateManager && stateManager.broadcastMeters)
+                                                text: "✓ Activo"
+                                                font.pixelSize: 11
+                                                font.bold: true
+                                                color: "#34C759"
+                                            }
+                                        }
+
+                                        Text {
+                                            text: "Los vúmetros incluyen marcadores precisos de escala dBFS en cada canal y medidores de reducción de ganancia (compresor)."
+                                            font.pixelSize: 11
+                                            color: "#9A9A9E"
+                                            wrapMode: Text.WordWrap
+                                            Layout.fillWidth: true
+                                        }
                                     }
+
                                     MouseArea {
                                         anchors.fill: parent
                                         cursorShape: Qt.PointingHandCursor

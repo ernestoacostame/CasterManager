@@ -1,7 +1,7 @@
 import os
 import logging
 from concurrent.futures import ThreadPoolExecutor
-from PyQt6.QtCore import QObject, pyqtSignal, pyqtProperty, pyqtSlot, QVariant, QSettings
+from PyQt6.QtCore import QObject, pyqtSignal, pyqtProperty, pyqtSlot, QVariant, QSettings, QTimer
 
 from .device_monitor import DeviceMonitor
 from .rcp_bridge import RcpBridge, PAD_COLORS
@@ -250,6 +250,7 @@ class StateManager(QObject):
     fadersChanged = pyqtSignal()
     recordingChanged = pyqtSignal()
     deviceConfigChanged = pyqtSignal()
+    recordingsChanged = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -277,6 +278,8 @@ class StateManager(QObject):
 
         self._transfer_mode = False
         self._transfer_status = ""
+        self._mount_point = ""
+        self._recordings = []
 
         # Live Recording State
         self._is_recording = False
@@ -301,8 +304,22 @@ class StateManager(QObject):
         self.bridge = RcpBridge()
         self.executor = ThreadPoolExecutor(max_workers=2)
 
+        # Debounced brightness timer
+        self._brightness_timer = QTimer(self)
+        self._brightness_timer.setSingleShot(True)
+        self._brightness_timer.setInterval(180)
+        self._brightness_timer.timeout.connect(self._flush_brightness_hardware)
+        self._pending_screen_brightness = None
+        self._pending_button_brightness = None
+
         # Faders state
         self._faders = self._init_default_faders()
+
+        # Polling timer for live fader & recording status
+        self._live_poll_timer = QTimer(self)
+        self._live_poll_timer.setInterval(1500)
+        self._live_poll_timer.timeout.connect(self._poll_live_hardware)
+        self._live_poll_timer.start()
 
         self.monitor = DeviceMonitor(self)
         self.monitor.device_changed.connect(self._on_device_changed)
@@ -465,7 +482,9 @@ class StateManager(QObject):
                     self._button_brightness = int(gprops["activeButtonsBrightness"])
                 if "autoBrightness" in gprops:
                     self._auto_brightness = bool(gprops["autoBrightness"])
-                if "broadcastMeters" in gprops:
+                if "metering" in gprops:
+                    self._broadcast_meters = (int(gprops["metering"]) == 1)
+                elif "broadcastMeters" in gprops:
                     self._broadcast_meters = bool(gprops["broadcastMeters"])
                 if "screenDimAfterSeconds" in gprops:
                     try:
@@ -1000,17 +1019,164 @@ class StateManager(QObject):
             )
             self.toastMessage.emit(f"Icono de show actualizado")
 
+    @pyqtProperty(QVariant, notify=recordingsChanged)
+    def recordings(self):
+        return self._recordings
+
+    @pyqtProperty(str, notify=transferStateChanged)
+    def mountPoint(self):
+        return self._mount_point
+
+    def _scan_recordings(self, mount_point=None):
+        import glob
+        import xml.etree.ElementTree as ET
+        from datetime import datetime
+
+        recordings = []
+        candidates = []
+        if mount_point and os.path.isdir(mount_point):
+            candidates.append(mount_point)
+
+        candidates.extend(glob.glob("/run/media/*/RodeCaster"))
+        candidates.extend(glob.glob("/media/*/RodeCaster"))
+
+        found_dir = None
+        for c in candidates:
+            rode_dir = os.path.join(c, "RODECaster")
+            if os.path.isdir(rode_dir):
+                found_dir = rode_dir
+                break
+            elif os.path.isdir(c):
+                found_dir = c
+                break
+
+        if not found_dir or not os.path.isdir(found_dir):
+            self._recordings = []
+            self.recordingsChanged.emit()
+            return
+
+        try:
+            for entry in sorted(os.listdir(found_dir), reverse=True):
+                entry_path = os.path.join(found_dir, entry)
+                if not os.path.isdir(entry_path):
+                    continue
+                meta_path = os.path.join(entry_path, "Meta.xml")
+                if os.path.isfile(meta_path):
+                    try:
+                        tree = ET.parse(meta_path)
+                        root = tree.getroot()
+                        val = root.find("value0")
+                        name = val.findtext("name", entry) if val is not None else entry
+                        duration_s = float(val.findtext("duration", "0")) if val is not None else 0.0
+                        multichannel = (val.findtext("multichannel", "false").lower() == "true") if val is not None else False
+                        creation_ms = int(val.findtext("creation", "0")) if val is not None else 0
+
+                        if creation_ms > 0:
+                            dt = datetime.fromtimestamp(creation_ms / 1000.0)
+                            date_str = dt.strftime("%d %b %Y, %H:%M")
+                        else:
+                            mtime = os.path.getmtime(entry_path)
+                            date_str = datetime.fromtimestamp(mtime).strftime("%d %b %Y, %H:%M")
+
+                        mins = int(duration_s) // 60
+                        secs = int(duration_s) % 60
+                        duration_str = f"{mins:02d}:{secs:02d}"
+
+                        # Calculate total take size
+                        total_bytes = sum(os.path.getsize(os.path.join(entry_path, f)) for f in os.listdir(entry_path) if os.path.isfile(os.path.join(entry_path, f)))
+                        size_mb = total_bytes / (1024 * 1024)
+                        size_str = f"{size_mb:.1f} MB" if size_mb < 1000 else f"{(size_mb/1024):.2f} GB"
+
+                        stereo_wav = os.path.join(entry_path, "Stereo Mix.wav")
+                        if not os.path.isfile(stereo_wav):
+                            wavs = [f for f in os.listdir(entry_path) if f.endswith(".wav")]
+                            stereo_wav = os.path.join(entry_path, wavs[0]) if wavs else ""
+
+                        recordings.append({
+                            "name": name,
+                            "folder": entry,
+                            "path": entry_path,
+                            "date": date_str,
+                            "duration": duration_str,
+                            "multitrack": multichannel,
+                            "size": size_str,
+                            "stereo_wav": stereo_wav
+                        })
+                    except Exception as e:
+                        logger.debug(f"Error parsing {meta_path}: {e}")
+        except Exception as e:
+            logger.error(f"Error reading recordings directory: {e}")
+
+        self._recordings = recordings
+        self.recordingsChanged.emit()
+
     @pyqtSlot()
     def enterTransferMode(self):
         self._transfer_mode = True
-        self._transfer_status = "RØDECaster en Modo Transferencia (Almacenamiento masivo USB activo)"
+        self._transfer_status = "Activando modo transferencia..."
         self.transferStateChanged.emit()
+        self.toastMessage.emit("Activando transferencia USB en la consola...")
+
+        def do_enter():
+            import time
+            import subprocess
+            self.bridge.run_cmd(["set-property", "15", "transferModeType", "u32:1"])
+            time.sleep(2)
+
+            mount_path = ""
+            for dev in ["/dev/sda1", "/dev/sdb1", "/dev/sdc1"]:
+                if os.path.exists(dev):
+                    out = subprocess.run(["udisksctl", "mount", "-b", dev], capture_output=True, text=True)
+                    if "Mounted" in out.stdout:
+                        parts = out.stdout.split(" at ")
+                        if len(parts) > 1:
+                            mount_path = parts[1].strip().rstrip(".")
+                            break
+
+            if not mount_path:
+                import glob
+                matches = glob.glob("/run/media/*/RodeCaster") + glob.glob("/media/*/RodeCaster")
+                if matches:
+                    mount_path = matches[0]
+
+            self._mount_point = mount_path
+            self._transfer_status = f"MicroSD montada en {mount_path}" if mount_path else "Modo Transferencia Activo"
+            self._scan_recordings(mount_path)
+            self.transferStateChanged.emit()
+            msg = "¡MicroSD montada en tu sistema!" if mount_path else "Modo Transferencia Activo"
+            self.toastMessage.emit(msg)
+
+        self.executor.submit(do_enter)
 
     @pyqtSlot()
     def exitTransferMode(self):
-        self._transfer_mode = False
-        self._transfer_status = ""
+        self._transfer_status = "Desmontando..."
         self.transferStateChanged.emit()
+        self.toastMessage.emit("Desmontando MicroSD...")
+
+        def do_exit():
+            import subprocess
+            for dev in ["/dev/sda1", "/dev/sdb1", "/dev/sdc1"]:
+                if os.path.exists(dev):
+                    subprocess.run(["udisksctl", "unmount", "-b", dev], capture_output=True, text=True)
+
+            self.bridge.run_cmd(["set-property", "15", "transferModeType", "u32:0"])
+            self.bridge.run_cmd(["set-property", "15", "remountPadStorage", "bool:true"])
+            self._transfer_mode = False
+            self._mount_point = ""
+            self._transfer_status = ""
+            self.transferStateChanged.emit()
+            self.toastMessage.emit("MicroSD desmontada de forma segura")
+
+        self.executor.submit(do_exit)
+
+    @pyqtSlot(str)
+    def openRecordingFolder(self, path):
+        if not path or not os.path.exists(path):
+            self.toastMessage.emit("Carpeta no encontrada o MicroSD desmontada")
+            return
+        import subprocess
+        subprocess.Popen(["xdg-open", path])
 
     # Navigation & Views
     @pyqtProperty(str, notify=viewChanged)
@@ -1137,9 +1303,9 @@ class StateManager(QObject):
     def setScreenBrightness(self, val):
         val = max(0, min(255, val))
         self._screen_brightness = val
+        self._pending_screen_brightness = val
         self.deviceConfigChanged.emit()
-        if self._connected and not self._permission_error:
-            self.executor.submit(self.bridge.run_cmd, ["set-property", "7", "screenBrightness", f"u32:{val}"])
+        self._brightness_timer.start()
 
     @pyqtProperty(int, notify=deviceConfigChanged)
     def buttonBrightness(self):
@@ -1149,9 +1315,21 @@ class StateManager(QObject):
     def setButtonBrightness(self, val):
         val = max(0, min(255, val))
         self._button_brightness = val
+        self._pending_button_brightness = val
         self.deviceConfigChanged.emit()
-        if self._connected and not self._permission_error:
-            self.executor.submit(self.bridge.run_cmd, ["set-property", "7", "activeButtonsBrightness", f"u32:{val}"])
+        self._brightness_timer.start()
+
+    def _flush_brightness_hardware(self):
+        if not self._connected or self._permission_error:
+            return
+        if self._pending_screen_brightness is not None:
+            sb = self._pending_screen_brightness
+            self._pending_screen_brightness = None
+            self.executor.submit(self.bridge.run_cmd, ["set-property", "7", "screenBrightness", f"u32:{sb}"])
+        if self._pending_button_brightness is not None:
+            bb = self._pending_button_brightness
+            self._pending_button_brightness = None
+            self.executor.submit(self.bridge.run_cmd, ["set-property", "7", "activeButtonsBrightness", f"u32:{bb}"])
 
     @pyqtProperty(bool, notify=deviceConfigChanged)
     def autoBrightness(self):
@@ -1184,7 +1362,59 @@ class StateManager(QObject):
         self._broadcast_meters = val
         self.deviceConfigChanged.emit()
         if self._connected and not self._permission_error:
-            self.executor.submit(self.bridge.run_cmd, ["set-property", "7", "broadcastMeters", f"bool:{str(val).lower()}"])
+            def do_set():
+                self.bridge.run_cmd(["set-property", "7", "metering", f"u32:{1 if val else 0}"])
+                self.bridge.run_cmd(["set-property", "7", "broadcastMeters", f"bool:{str(val).lower()}"])
+            self.executor.submit(do_set)
+
+    @pyqtSlot(int, int)
+    def assignChannelInputSource(self, fader_idx, input_source_id):
+        if 0 <= fader_idx < 6:
+            channel_node_idx = 28 + fader_idx
+            if self._connected and not self._permission_error:
+                def do_assign():
+                    self.bridge.run_cmd(["set-property", str(channel_node_idx), "channelInputSource", f"u32:{input_source_id}"])
+                    self._sync_hardware_state()
+                self.executor.submit(do_assign)
+            self.toastMessage.emit(f"Canal {fader_idx + 1} asignado")
+
+    def _poll_live_hardware(self):
+        if not self._connected or self._permission_error or self._transfer_mode:
+            return
+
+        def do_poll():
+            fout, _ = self.bridge.run_cmd(["fader", "list", "--json"], timeout=2)
+            if fout:
+                import json
+                try:
+                    f_list = json.loads(fout)
+                    changed = False
+                    for item in f_list:
+                        idx = item.get("index", 0)
+                        if 0 <= idx < len(self._faders):
+                            new_mute = bool(item.get("mute", False))
+                            new_listen = bool(item.get("listen", False))
+                            new_lvl = int(round(float(item.get("level", 0.7)) * 100))
+                            if (self._faders[idx]["mute"] != new_mute or 
+                                self._faders[idx]["listen"] != new_listen or 
+                                abs(self._faders[idx]["level"] - new_lvl) > 1):
+                                self._faders[idx]["mute"] = new_mute
+                                self._faders[idx]["listen"] = new_listen
+                                self._faders[idx]["level"] = new_lvl
+                                changed = True
+                    if changed:
+                        self.fadersChanged.emit()
+                except Exception:
+                    pass
+
+            rout, _ = self.bridge.run_cmd(["record", "status"], timeout=2)
+            if rout:
+                rec_now = "RECORDING" in rout.upper()
+                if rec_now != self._is_recording:
+                    self._is_recording = rec_now
+                    self.recordingChanged.emit()
+
+        self.executor.submit(do_poll)
 
     @pyqtProperty(int, notify=deviceConfigChanged)
     def headphone1Type(self):
