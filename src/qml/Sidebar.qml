@@ -169,7 +169,7 @@ Rectangle {
 
                             RowLayout {
                                 Text {
-                                    text: "💾 " + (stateManager ? stateManager.strings.microsd : "MicroSD")
+                                    text: "💾 " + (stateManager ? (stateManager.storageLabel || stateManager.strings.microsd) : "MicroSD")
                                     font.pixelSize: 11
                                     color: "#9A9A9E"
                                 }
@@ -243,9 +243,10 @@ Rectangle {
                 }
             }
 
-            // MicroSD Removable Storage Card (matches RØDECaster App)
+            // MicroSD Removable Storage Card (matches RØDECaster App - shown when card is present)
             Rectangle {
                 id: sdCardEntry
+                visible: Boolean(!stateManager || stateManager.hasMicroSD)
                 readonly property bool isSelectedView: (stateManager && stateManager.currentView === "recordings")
                 Layout.fillWidth: true
                 height: 58
@@ -401,7 +402,7 @@ Rectangle {
                 }
                 Item { Layout.fillWidth: true }
                 Text {
-                    text: "v1.0 Linux"
+                    text: "v1.2 Linux"
                     font.pixelSize: 10
                     color: "#555555"
                 }

@@ -88,6 +88,7 @@ Item {
         anchors.fill: parent
         anchors.margins: 16
         spacing: 12
+        visible: Boolean(root.recordingsList && root.recordingsList.length > 0)
 
         // ==========================================
         // TOP SECTION: WAVEFORM AUDIO PLAYER
@@ -946,6 +947,156 @@ Item {
                                     exportTakeDialog.open();
                                 }
                             }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // ==========================================
+    // EMPTY STATE: WHEN NO RECORDINGS OR NO MICROSD
+    // ==========================================
+    ColumnLayout {
+        anchors.fill: parent
+        anchors.margins: 28
+        spacing: 20
+        visible: Boolean(!root.recordingsList || root.recordingsList.length === 0)
+
+        // Storage Bar
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 74
+            radius: 10
+            color: "#18181C"
+            border.color: "#28282E"
+            border.width: 1
+
+            RowLayout {
+                anchors.fill: parent
+                anchors.margins: 18
+                spacing: 14
+
+                Text { text: "💾"; font.pixelSize: 22 }
+
+                ColumnLayout {
+                    spacing: 4
+                    Layout.fillWidth: true
+
+                    RowLayout {
+                        Text {
+                            text: (stateManager ? (stateManager.storageLabel || "Almacenamiento") : "Almacenamiento")
+                            font.pixelSize: 13
+                            font.bold: true
+                            color: "#FFFFFF"
+                        }
+                        Item { Layout.fillWidth: true }
+                        Text {
+                            text: (stateManager ? stateManager.sdCardUsed : "0 GB") + " / " + (stateManager ? stateManager.sdCardTotal : "5 GB")
+                            font.pixelSize: 12
+                            color: "#CBA158"
+                        }
+                    }
+
+                    Rectangle {
+                        Layout.fillWidth: true
+                        height: 6
+                        radius: 3
+                        color: "#282830"
+                        Rectangle {
+                            width: Math.max(4, parent.width * ((stateManager ? stateManager.sdCardPercent : 0) / 100.0))
+                            height: parent.height
+                            radius: 3
+                            color: "#CBA158"
+                        }
+                    }
+                }
+            }
+        }
+
+        // Center Empty State Box
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            radius: 12
+            color: "#141417"
+            border.color: "#24242A"
+            border.width: 1
+
+            ColumnLayout {
+                anchors.centerIn: parent
+                spacing: 14
+                width: Math.min(460, parent.width - 40)
+
+                Rectangle {
+                    Layout.alignment: Qt.AlignHCenter
+                    width: 64
+                    height: 64
+                    radius: 32
+                    color: "#1C1C22"
+                    border.color: "#353540"
+                    border.width: 1
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: (stateManager && stateManager.hasMicroSD) ? "🎙️" : "💾"
+                        font.pixelSize: 28
+                    }
+                }
+
+                Text {
+                    Layout.alignment: Qt.AlignHCenter
+                    text: (stateManager && stateManager.hasMicroSD)
+                          ? (stateManager.transferModeActive 
+                             ? (stateManager.strings ? stateManager.strings.no_recordings_title : "No hay grabaciones en la tarjeta")
+                             : "Modo Transferencia Desactivado")
+                          : (stateManager && stateManager.strings ? stateManager.strings.no_microsd_title : "No hay tarjeta MicroSD instalada")
+                    font.pixelSize: 16
+                    font.bold: true
+                    color: "#FFFFFF"
+                    horizontalAlignment: Text.AlignHCenter
+                }
+
+                Text {
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.fillWidth: true
+                    text: (stateManager && stateManager.hasMicroSD)
+                          ? (stateManager.transferModeActive 
+                             ? (stateManager.strings ? stateManager.strings.no_recordings_desc : "Las grabaciones realizadas con el botón REC en tu RØDECaster aparecerán aquí.")
+                             : "Activa el modo de transferencia para que tu sistema monte la tarjeta MicroSD y puedas explorar tus tomas.")
+                          : (stateManager && stateManager.strings ? stateManager.strings.no_microsd_desc : "La ranura de tarjeta MicroSD de tu RØDECaster está vacía. Inserta una tarjeta MicroSD para grabar tomas y transferirlas a tu PC.")
+                    font.pixelSize: 12
+                    color: "#8E8E93"
+                    wrapMode: Text.WordWrap
+                    horizontalAlignment: Text.AlignHCenter
+                }
+
+                Item { height: 6 }
+
+                // Action button if microSD is present to activate transfer
+                Rectangle {
+                    visible: Boolean(stateManager && stateManager.hasMicroSD && !stateManager.transferModeActive)
+                    Layout.alignment: Qt.AlignHCenter
+                    width: 200
+                    height: 38
+                    radius: 8
+                    color: tBtnMouse.containsMouse ? "#DFB666" : "#CBA158"
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: "Activar Transferencia USB"
+                        font.pixelSize: 12
+                        font.bold: true
+                        color: "#121214"
+                    }
+
+                    MouseArea {
+                        id: tBtnMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            if (stateManager) stateManager.enterTransferMode();
                         }
                     }
                 }

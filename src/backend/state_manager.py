@@ -162,6 +162,10 @@ TRANSLATIONS = {
         "delete_take": "Eliminar",
         "export_take": "Exportar",
         "color": "Color",
+        "no_microsd_title": "No hay tarjeta MicroSD instalada",
+        "no_microsd_desc": "La ranura de tarjeta MicroSD de tu RØDECaster está vacía. Inserta una tarjeta MicroSD para grabar tomas y transferirlas a tu PC.",
+        "no_recordings_title": "No hay grabaciones en la tarjeta",
+        "no_recordings_desc": "Las grabaciones realizadas con el botón REC en tu RØDECaster aparecerán aquí.",
     },
     "en": {
         "settings": "Settings",
@@ -300,6 +304,10 @@ TRANSLATIONS = {
         "delete_take": "Delete",
         "export_take": "Export",
         "color": "Color",
+        "no_microsd_title": "No MicroSD Card Installed",
+        "no_microsd_desc": "The MicroSD card slot on your RØDECaster is empty. Insert a MicroSD card to record takes and transfer them to your PC.",
+        "no_recordings_title": "No recordings on card",
+        "no_recordings_desc": "Recordings made with the REC button on your RØDECaster will appear here.",
     }
 }
 
@@ -346,7 +354,9 @@ class StateManager(QObject):
         self._transfer_mode = False
         self._transfer_status = ""
         self._mount_point = ""
-        self._recordings = self._get_default_recordings()
+        self._recordings = []
+        self._has_sd_card = False
+        self._storage_label = "Memoria Interna"
 
         # Live Recording State
         self._is_recording = False
@@ -583,6 +593,8 @@ class StateManager(QObject):
                                     internal_volume = vol_info
 
                 # Prioritize MicroSD card when inserted; otherwise fallback to internal memory
+                self._has_sd_card = (sd_volume is not None and sd_volume.get("cap", 0) > 0)
+                self._storage_label = "MicroSD" if self._has_sd_card else "Memoria Interna"
                 active_vol = sd_volume if sd_volume else internal_volume
                 if active_vol:
                     cap = active_vol["cap"]
@@ -832,6 +844,14 @@ class StateManager(QObject):
     @pyqtProperty(float, notify=stateChanged)
     def sdCardPercent(self):
         return self._sd_percent
+
+    @pyqtProperty(bool, notify=stateChanged)
+    def hasMicroSD(self):
+        return self._has_sd_card
+
+    @pyqtProperty(str, notify=stateChanged)
+    def storageLabel(self):
+        return self._storage_label
 
     @pyqtProperty(int, notify=stateChanged)
     def padCols(self):
@@ -1424,55 +1444,6 @@ class StateManager(QObject):
             res.append({"name": name, "path": f, "filename": os.path.basename(f)})
         return res
 
-    def _get_default_recordings(self):
-        return [
-            {
-                "id": 1,
-                "name": "Recording 3",
-                "folder": "Recording 3",
-                "path": "",
-                "date": "TODAY, 17:08",
-                "duration": "00:12",
-                "duration_seconds": 12,
-                "multitrack": True,
-                "size": "24.2 MB",
-                "stereo_wav": "",
-                "color": "#FF3B30",
-                "is_new": True,
-                "selected": False
-            },
-            {
-                "id": 2,
-                "name": "Recording 2",
-                "folder": "Recording 2",
-                "path": "",
-                "date": "TODAY, 17:08",
-                "duration": "00:24",
-                "duration_seconds": 24,
-                "multitrack": True,
-                "size": "48.4 MB",
-                "stereo_wav": "",
-                "color": "#3B82F6",
-                "is_new": True,
-                "selected": True
-            },
-            {
-                "id": 3,
-                "name": "Recording 1",
-                "folder": "Recording 1",
-                "path": "",
-                "date": "TODAY, 16:58",
-                "duration": "00:11",
-                "duration_seconds": 11,
-                "multitrack": True,
-                "size": "22.1 MB",
-                "stereo_wav": "",
-                "color": "#10B981",
-                "is_new": True,
-                "selected": False
-            }
-        ]
-
     def _scan_recordings(self, mount_point=None):
         import glob
         import xml.etree.ElementTree as ET
@@ -1497,7 +1468,7 @@ class StateManager(QObject):
                 break
 
         if not found_dir or not os.path.isdir(found_dir):
-            self._recordings = self._get_default_recordings()
+            self._recordings = []
             self.recordingsChanged.emit()
             return
 
@@ -1557,9 +1528,6 @@ class StateManager(QObject):
                         logger.debug(f"Error parsing {meta_path}: {e}")
         except Exception as e:
             logger.error(f"Error reading recordings directory: {e}")
-
-        if not recordings:
-            recordings = self._get_default_recordings()
 
         self._recordings = recordings
         self.recordingsChanged.emit()
