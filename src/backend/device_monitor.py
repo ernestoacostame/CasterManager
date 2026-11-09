@@ -24,6 +24,10 @@ PRO_II_PRODUCT_IDS = {
     "0026": "RØDECaster Pro II (Secondary)",
 }
 
+STREAMER_X_PRODUCT_IDS = {
+    "0038": "RØDE Streamer X",
+}
+
 class HidDrainer(threading.Thread):
     """
     Prevents hardware lockup on Linux: continuously drains reports from
@@ -121,6 +125,16 @@ class DeviceMonitor(QObject):
                             virtual_faders = 5
                             pots = 2
                             physical_order = [0, 3, 1, 4, 2, 5]
+                        elif pid in STREAMER_X_PRODUCT_IDS:
+                            model_type = "StreamerX"
+                            display_name = "RØDE Streamer X"
+                            pads_per_bank = 4
+                            pad_cols = 2
+                            pad_rows = 2
+                            physical_faders = 0
+                            virtual_faders = 0
+                            pots = 2
+                            physical_order = [0, 1, 2, 3]
                         elif pid in PRO_II_PRODUCT_IDS:
                             model_type = "ProII"
                             display_name = "RØDECaster Pro II"
@@ -143,6 +157,16 @@ class DeviceMonitor(QObject):
                                 virtual_faders = 5
                                 pots = 2
                                 physical_order = [0, 3, 1, 4, 2, 5]
+                            elif "streamer" in product_name.lower():
+                                model_type = "StreamerX"
+                                display_name = "RØDE Streamer X"
+                                pads_per_bank = 4
+                                pad_cols = 2
+                                pad_rows = 2
+                                physical_faders = 0
+                                virtual_faders = 0
+                                pots = 2
+                                physical_order = [0, 1, 2, 3]
                             else:
                                 model_type = "ProII"
                                 display_name = "RØDECaster Pro II"
@@ -155,7 +179,7 @@ class DeviceMonitor(QObject):
                                 physical_order = [0, 4, 1, 5, 2, 6, 3, 7]
 
                         # Find corresponding hidraw node
-                        hidraw_node = self._find_hidraw_for_device(dev_path)
+                        hidraw_node = self._find_hidraw_for_device(dev_path, model_type == "StreamerX")
                         has_permission = False
                         if hidraw_node and os.path.exists(hidraw_node):
                             has_permission = os.access(hidraw_node, os.R_OK | os.W_OK)
@@ -227,17 +251,27 @@ class DeviceMonitor(QObject):
                 pass
         return fallback
 
-    def _find_hidraw_for_device(self, usb_dev_path):
-        # Look for interface 9 (hidraw) inside the usb device path
+    def _find_hidraw_for_device(self, usb_dev_path, is_streamer_x=False):
+        # Look for interface (interface 6 for Streamer X, interface 9 for RCP2) inside the usb device path
+        candidates = []
         for root, dirs, files in os.walk(usb_dev_path):
             if "hidraw" in dirs:
                 hidraw_dir = os.path.join(root, "hidraw")
                 for item in os.listdir(hidraw_dir):
                     if item.startswith("hidraw"):
-                        return f"/dev/{item}"
+                        candidates.append((root, f"/dev/{item}"))
             for item in dirs:
                 if item.startswith("hidraw"):
-                    return f"/dev/{item}"
+                    candidates.append((root, f"/dev/{item}"))
+
+        if candidates:
+            if is_streamer_x:
+                # Interface 6 is the vendor RCP HID interface on Streamer X
+                for r, node in candidates:
+                    if ":1.6" in r:
+                        return node
+            return candidates[0][1]
+
         # Fallback check via /sys/class/hidraw
         for h in glob.glob("/sys/class/hidraw/hidraw*"):
             try:

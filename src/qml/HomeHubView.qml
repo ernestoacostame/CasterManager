@@ -280,7 +280,7 @@ Item {
 
                         Text {
                             anchors.centerIn: parent
-                            text: "🎙️"
+                            text: (stateManager && stateManager.isStreamerX) ? "🎛️" : "🎙️"
                             font.pixelSize: 28
                         }
                     }
@@ -290,14 +290,18 @@ Item {
                         spacing: 6
 
                         Text {
-                            text: stateManager ? stateManager.strings.hub_recordings : "Transferir Grabaciones"
+                            text: (stateManager && stateManager.isStreamerX)
+                                  ? "Arquitectura Multipista UNIFY"
+                                  : (stateManager ? stateManager.strings.hub_recordings : "Transferir Grabaciones")
                             font.pixelSize: 18
                             font.bold: true
                             color: "#FFFFFF"
                         }
 
                         Text {
-                            text: stateManager ? stateManager.strings.hub_recordings_desc : "Gestiona podcasts y tomas grabadas en la MicroSD"
+                            text: (stateManager && stateManager.isStreamerX)
+                                  ? "Enrutamiento PipeWire virtual para Game, Chat, Música y OBS"
+                                  : (stateManager ? stateManager.strings.hub_recordings_desc : "Gestiona podcasts y tomas grabadas en la MicroSD")
                             font.pixelSize: 13
                             color: "#9A9A9E"
                             wrapMode: Text.WordWrap
@@ -319,7 +323,13 @@ Item {
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
                     onClicked: {
-                        if (stateManager) stateManager.navigateTo("recordings");
+                        if (stateManager) {
+                            if (stateManager.isStreamerX) {
+                                stateManager.navigateTo("config");
+                            } else {
+                                stateManager.navigateTo("recordings");
+                            }
+                        }
                     }
                 }
             }

@@ -78,6 +78,7 @@ Rectangle {
                                 clip: true
 
                                 Image {
+                                    visible: !(devCard.hasRealDevice && modelData.model_type === "StreamerX")
                                     anchors.centerIn: parent
                                     width: 32
                                     height: 32
@@ -87,6 +88,15 @@ Rectangle {
                                     smooth: true
                                     sourceSize.width: 64
                                     sourceSize.height: 64
+                                }
+
+                                FlatIcon {
+                                    visible: Boolean(devCard.hasRealDevice && modelData.model_type === "StreamerX")
+                                    anchors.centerIn: parent
+                                    name: "video"
+                                    implicitWidth: 22
+                                    implicitHeight: 22
+                                    color: devCard.isSelectedDevice ? "#CBA158" : "#A0A0A5"
                                 }
                             }
 
@@ -161,10 +171,9 @@ Rectangle {
                             }
                         }
 
-                        // SD Card Storage Meter (Shown for active device)
-                        // SD Card / Internal Storage Meter (Shown for active device)
+                        // SD Card / Internal Storage Meter (Shown for active device if device has storage)
                         Item {
-                            visible: devCard.isSelectedDevice || !devCard.hasRealDevice
+                            visible: (devCard.isSelectedDevice || !devCard.hasRealDevice) && !(devCard.hasRealDevice && modelData.model_type === "StreamerX")
                             Layout.fillWidth: true
                             height: 38
                             z: 20
@@ -266,9 +275,10 @@ Rectangle {
                 }
             }
 
-            // MicroSD Removable Storage Card (matches RØDECaster App - active only when MicroSD is present)
+            // MicroSD Removable Storage Card (matches RØDECaster App - active only when MicroSD is present and not Streamer X)
             Rectangle {
                 id: sdCardEntry
+                visible: Boolean(stateManager && !stateManager.isStreamerX)
                 readonly property bool hasCard: Boolean(stateManager && stateManager.hasMicroSD)
                 readonly property bool isSelectedView: (stateManager && stateManager.currentView === "recordings")
                 Layout.fillWidth: true

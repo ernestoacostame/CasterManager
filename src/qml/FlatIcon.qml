@@ -68,6 +68,9 @@ Item {
         case "speaker":
             // Clean speaker / volume
             return "M 11 5 L 6 9 H 2 V 15 H 6 L 11 19 V 5 Z M 15 9 A 4.5 4.5 0 0 1 15 15 M 18 6 A 8.5 8.5 0 0 1 18 18";
+        case "video":
+            // Clean capture / video camera icon
+            return "M 23 7 L 16 12 L 23 17 V 7 Z M 3 5 A 2 2 0 0 0 1 7 V 17 A 2 2 0 0 0 3 19 H 15 A 2 2 0 0 0 17 17 V 7 A 2 2 0 0 0 15 5 Z";
         default:
             return "";
         }

@@ -7,6 +7,7 @@ from PyQt6.QtCore import QObject, pyqtSignal, pyqtProperty, pyqtSlot, QVariant, 
 
 from .device_monitor import DeviceMonitor
 from .rcp_bridge import RcpBridge, PAD_COLORS
+from .streamerx_audio import StreamerXAudioRouter
 
 logger = logging.getLogger("CasterManager.state")
 
@@ -337,6 +338,8 @@ class StateManager(QObject):
         self._permission_path = ""
         self._model_name = "RØDECaster Duo"
         self._is_duo = True
+        self._is_streamer_x = False
+        self._model_type = "Duo"
         self._firmware = "1.7.7"
         self._serial = ""
         self._show_name = "TuPodcast"
@@ -418,7 +421,16 @@ class StateManager(QObject):
         self.monitor.start()
 
     def _init_default_faders(self):
-        if self._is_duo:
+        if getattr(self, "_is_streamer_x", False):
+            return [
+                {"index": 0, "name": "Mic / Line", "color": "#FF3C3C", "icon": "mic", "level": 70, "mute": False, "listen": False, "is_virtual": False},
+                {"index": 1, "name": "Headset", "color": "#28C850", "icon": "mic", "level": 70, "mute": False, "listen": False, "is_virtual": False},
+                {"index": 2, "name": "USB 1", "color": "#FF8C28", "icon": "usb", "level": 70, "mute": False, "listen": False, "is_virtual": False},
+                {"index": 3, "name": "USB 2 / Chat", "color": "#00C8C8", "icon": "chat", "level": 70, "mute": False, "listen": False, "is_virtual": False},
+                {"index": 4, "name": "SMART Pads", "color": "#E63C78", "icon": "pads", "level": 70, "mute": False, "listen": False, "is_virtual": True},
+                {"index": 5, "name": "HDMI Audio", "color": "#3C96FF", "icon": "usb", "level": 70, "mute": False, "listen": False, "is_virtual": True},
+            ]
+        elif self._is_duo:
             return [
                 {"index": 0, "name": "Mic 1", "color": "#FF3C3C", "icon": "mic", "level": 70, "mute": False, "listen": False, "is_virtual": False},
                 {"index": 1, "name": "Mic 2 / Chat", "color": "#28C850", "icon": "chat", "level": 70, "mute": False, "listen": False, "is_virtual": False},
@@ -486,7 +498,11 @@ class StateManager(QObject):
         logger.info(f"Applying config for active device: {info['display_name']} ({info['product_id']})")
         self._connected = True
         self._model_name = info["display_name"]
-        self._is_duo = (info["model_type"] == "Duo")
+        self._model_type = info.get("model_type", "Duo")
+        self._is_duo = (self._model_type == "Duo")
+        self._is_streamer_x = (self._model_type == "StreamerX")
+        if self._is_streamer_x:
+            self._has_sd_card = False
         self._pads_per_bank = info["pads_per_bank"]
         self._pad_cols = info["pad_cols"]
         self._pad_rows = info["pad_rows"]
@@ -702,7 +718,7 @@ class StateManager(QObject):
             # Populate Pads from SOUNDPADS
             soundpads_node = find_node(dump, "SOUNDPADS")
             if soundpads_node:
-                pads_per_bank = 6 if self._is_duo else 8
+                pads_per_bank = self._pads_per_bank
                 self._banks = self._init_empty_banks()
 
                 for c in soundpads_node.get("children", []):
@@ -714,7 +730,7 @@ class StateManager(QObject):
                     bank = idx // pads_per_bank
                     pos = idx % pads_per_bank
 
-                    if bank < 8:
+                    if bank < len(self._banks) and pos < len(self._banks[bank]):
                         color_idx = int(p.get("padColourIndex", 0)) % 12
                         pad_type_raw = p.get("padType", 0)
                         if pad_type_raw in (0, 1):
@@ -806,6 +822,9 @@ class StateManager(QObject):
             if index != self._selected_device_index:
                 self._selected_device_index = index
                 self._apply_device_config(self._devices[index])
+                if getattr(self, "_is_streamer_x", False) and self._current_view == "recordings":
+                    self._current_view = "home"
+                    self.currentViewChanged.emit()
                 self.devicesChanged.emit()
                 self.toastMessage.emit(f"Cambiado a {self._devices[index].get('display_name', 'RØDECaster')}")
 
@@ -816,6 +835,14 @@ class StateManager(QObject):
     @pyqtProperty(bool, notify=stateChanged)
     def isDuo(self):
         return self._is_duo
+
+    @pyqtProperty(bool, notify=stateChanged)
+    def isStreamerX(self):
+        return getattr(self, "_is_streamer_x", False)
+
+    @pyqtProperty(str, notify=stateChanged)
+    def modelType(self):
+        return getattr(self, "_model_type", "Duo")
 
     @pyqtProperty(str, notify=stateChanged)
     def firmwareVersion(self):
@@ -2170,3 +2197,18 @@ class StateManager(QObject):
         if self._connected and not self._permission_error:
             self.executor.submit(self._sync_hardware_state)
         self.toastMessage.emit("Sincronizando...")
+
+    @pyqtProperty(bool, notify=deviceConfigChanged)
+    def streamerXUnifyInstalled(self):
+        return StreamerXAudioRouter.is_unify_profile_installed()
+
+    @pyqtSlot(result=bool)
+    def toggleStreamerXUnifyProfile(self):
+        if StreamerXAudioRouter.is_unify_profile_installed():
+            res = StreamerXAudioRouter.remove_unify_profile()
+            self.toastMessage.emit("Perfil UNIFY (PipeWire) desactivado")
+        else:
+            res = StreamerXAudioRouter.install_unify_profile()
+            self.toastMessage.emit("Perfil UNIFY (Multipista PipeWire) activado")
+        self.deviceConfigChanged.emit()
+        return res

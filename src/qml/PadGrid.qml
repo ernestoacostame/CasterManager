@@ -15,7 +15,6 @@ Item {
     Grid {
         id: grid
         columns: root.cols
-        rows: root.rows
         spacing: 12
 
         Repeater {

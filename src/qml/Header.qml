@@ -86,8 +86,9 @@ Rectangle {
 
         Item { Layout.fillWidth: true }
 
-        // Live REC Control Button
+        // Live REC Control Button (Only on devices with onboard recorder)
         Rectangle {
+            visible: Boolean(stateManager && !stateManager.isStreamerX)
             Layout.preferredHeight: 32
             Layout.preferredWidth: recHeaderRow.width + 24
             Layout.alignment: Qt.AlignVCenter
