@@ -44,7 +44,7 @@ Item {
         // Live Fader Channels Strip (Top Card)
         Rectangle {
             Layout.fillWidth: true
-            Layout.preferredHeight: 330
+            Layout.preferredHeight: (stateManager && stateManager.faders.length > 6) ? 385 : 350
             radius: 12
             color: "#1A1A1D"
             border.color: "#2C2C32"
@@ -52,14 +52,14 @@ Item {
 
             ColumnLayout {
                 anchors.fill: parent
-                anchors.margins: 18
-                spacing: 12
+                anchors.margins: (stateManager && stateManager.faders.length > 6) ? 12 : 16
+                spacing: 8
 
                 // Row of Fader Channel Strips
                 RowLayout {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
-                    spacing: 14
+                    spacing: (stateManager && stateManager.faders.length > 6) ? 8 : 14
 
                     Repeater {
                         model: stateManager ? stateManager.faders : []
@@ -75,24 +75,24 @@ Item {
 
                             ColumnLayout {
                                 anchors.fill: parent
-                                anchors.margins: 12
-                                spacing: 10
+                                anchors.margins: (stateManager && stateManager.faders.length > 6) ? 8 : 10
+                                spacing: 6
 
                                 // Channel Label & Color Pill (Clickable to select channel)
                                 RowLayout {
                                     Layout.fillWidth: true
-                                    spacing: 8
+                                    spacing: 6
 
                                     Rectangle {
-                                        width: 10
-                                        height: 10
-                                        radius: 5
+                                        width: 8
+                                        height: 8
+                                        radius: 4
                                         color: modelData.color || "#CBA158"
                                     }
 
                                     Text {
                                         text: modelData.name || ("Canal " + (index + 1))
-                                        font.pixelSize: 12
+                                        font.pixelSize: (stateManager && stateManager.faders.length > 6) ? 10 : 12
                                         font.bold: true
                                         color: root.selectedChannelIndex === modelData.index ? "#CBA158" : "#FFFFFF"
                                         elide: Text.ElideRight
@@ -103,18 +103,18 @@ Item {
                                 // Level readout (dB / %) & Type Badge (FÍSICO vs VIRTUAL)
                                 RowLayout {
                                     Layout.alignment: Qt.AlignHCenter
-                                    spacing: 6
+                                    spacing: 4
 
                                     Text {
                                         text: Math.round(modelData.level) + "%"
-                                        font.pixelSize: 13
+                                        font.pixelSize: (stateManager && stateManager.faders.length > 6) ? 11 : 12
                                         font.bold: true
                                         color: "#CBA158"
                                     }
 
                                     Rectangle {
-                                        width: modelData.is_virtual ? 48 : 42
-                                        height: 15
+                                        width: modelData.is_virtual ? 38 : 34
+                                        height: 14
                                         radius: 3
                                         color: modelData.is_virtual ? "#2D2616" : "#242428"
                                         border.color: modelData.is_virtual ? "#CBA158" : "#44444C"
@@ -122,7 +122,7 @@ Item {
 
                                         Text {
                                             anchors.centerIn: parent
-                                            text: modelData.is_virtual ? "VIRTUAL" : "FÍSICO"
+                                            text: modelData.is_virtual ? "VIRT" : "FÍS"
                                             font.pixelSize: 8
                                             font.bold: true
                                             color: modelData.is_virtual ? "#CBA158" : "#8E8E93"
@@ -138,7 +138,7 @@ Item {
                                     Slider {
                                         id: faderSlider
                                         anchors.centerIn: parent
-                                        height: parent.height - 10
+                                        height: parent.height - 4
                                         orientation: Qt.Vertical
                                         from: 0
                                         to: 100
@@ -153,7 +153,7 @@ Item {
                                             x: faderSlider.leftPadding + faderSlider.availableWidth / 2 - width / 2
                                             y: faderSlider.topPadding
                                             implicitWidth: 6
-                                            implicitHeight: 140
+                                            implicitHeight: 120
                                             width: 6
                                             height: faderSlider.availableHeight
                                             radius: 3
@@ -171,7 +171,7 @@ Item {
                                         handle: Rectangle {
                                             x: faderSlider.leftPadding + faderSlider.availableWidth / 2 - width / 2
                                             y: faderSlider.topPadding + faderSlider.visualPosition * (faderSlider.availableHeight - height)
-                                            implicitWidth: 26
+                                            implicitWidth: (stateManager && stateManager.faders.length > 6) ? 22 : 26
                                             implicitHeight: 14
                                             radius: 3
                                             color: "#E5E5EA"
@@ -181,12 +181,68 @@ Item {
                                     }
                                 }
 
-                                // Mute & Listen Buttons
+                                // Mute & Listen Buttons (Vertical stack for 9 faders, row for 6)
+                                ColumnLayout {
+                                    visible: stateManager && stateManager.faders.length > 6
+                                    Layout.fillWidth: true
+                                    spacing: 4
+
+                                    Rectangle {
+                                        Layout.fillWidth: true
+                                        height: 22
+                                        radius: 5
+                                        color: modelData.mute ? "#FF3B30" : "#26262B"
+                                        border.color: modelData.mute ? "#FF453A" : "#36363E"
+                                        border.width: 1
+
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: "MUTE"
+                                            font.pixelSize: 9
+                                            font.bold: true
+                                            color: modelData.mute ? "#FFFFFF" : "#AAAAAA"
+                                        }
+
+                                        MouseArea {
+                                            anchors.fill: parent
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: {
+                                                if (stateManager) stateManager.toggleFaderMute(modelData.index);
+                                            }
+                                        }
+                                    }
+
+                                    Rectangle {
+                                        Layout.fillWidth: true
+                                        height: 22
+                                        radius: 5
+                                        color: modelData.listen ? "#34C759" : "#26262B"
+                                        border.color: modelData.listen ? "#30D158" : "#36363E"
+                                        border.width: 1
+
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: "LISTEN"
+                                            font.pixelSize: 9
+                                            font.bold: true
+                                            color: modelData.listen ? "#FFFFFF" : "#AAAAAA"
+                                        }
+
+                                        MouseArea {
+                                            anchors.fill: parent
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: {
+                                                if (stateManager) stateManager.toggleFaderListen(modelData.index);
+                                            }
+                                        }
+                                    }
+                                }
+
                                 RowLayout {
+                                    visible: !stateManager || stateManager.faders.length <= 6
                                     Layout.fillWidth: true
                                     spacing: 6
 
-                                    // Mute Button
                                     Rectangle {
                                         Layout.fillWidth: true
                                         height: 28
@@ -212,7 +268,6 @@ Item {
                                         }
                                     }
 
-                                    // Listen (Solo) Button
                                     Rectangle {
                                         Layout.fillWidth: true
                                         height: 28

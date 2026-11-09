@@ -61,16 +61,18 @@ class HidDrainer(threading.Thread):
 class DeviceMonitor(QObject):
     """
     Actively monitors USB and hidraw devices to dynamically detect
-    when a RØDECaster Duo or Pro II is connected or disconnected.
+    when one or multiple RØDECaster devices (Duo and/or Pro II) are connected or disconnected.
     """
-    device_changed = pyqtSignal(dict)  # Emits device info dict when connected/changed
+    devices_changed = pyqtSignal(list) # Emits full list of all connected device dicts
+    device_changed = pyqtSignal(dict)  # Emits primary/active device info dict
     device_disconnected = pyqtSignal()
     permission_issue = pyqtSignal(str) # Emits hidraw path when permission is denied
 
     def __init__(self, parent=None, poll_interval_ms=1500):
         super().__init__(parent)
+        self._current_devices = []
         self._current_device = None
-        self._drainer = None
+        self._drainers = {}  # hidraw_path -> HidDrainer
         self._timer = QTimer(self)
         self._timer.timeout.connect(self.scan_devices)
         self._poll_interval = poll_interval_ms
@@ -81,15 +83,15 @@ class DeviceMonitor(QObject):
 
     def stop(self):
         self._timer.stop()
-        if self._drainer:
-            self._drainer.stop()
-            self._drainer = None
+        for d in self._drainers.values():
+            d.stop()
+        self._drainers.clear()
 
     def scan_devices(self):
-        found = None
+        found_devices = []
 
-        # 1. Scan sysfs for USB devices with vendor 19f7
-        for dev_path in glob.glob("/sys/bus/usb/devices/*"):
+        # 1. Scan sysfs for all USB devices with vendor 19f7
+        for dev_path in sorted(glob.glob("/sys/bus/usb/devices/*")):
             vendor_file = os.path.join(dev_path, "idVendor")
             if os.path.isfile(vendor_file):
                 try:
@@ -158,7 +160,7 @@ class DeviceMonitor(QObject):
                         if hidraw_node and os.path.exists(hidraw_node):
                             has_permission = os.access(hidraw_node, os.R_OK | os.W_OK)
 
-                        found = {
+                        dev_info = {
                             "vendor_id": vid,
                             "product_id": pid,
                             "model_type": model_type,
@@ -178,29 +180,41 @@ class DeviceMonitor(QObject):
                             "physical_order": physical_order,
                             "max_banks": 8
                         }
-                        break
+                        found_devices.append(dev_info)
                 except Exception:
                     continue
 
-        if found:
-            if not found["has_permission"] and found.get("hidraw_node"):
-                self.permission_issue.emit(found["hidraw_node"])
-            elif found["has_permission"] and found.get("hidraw_node"):
-                # Start or update background drainer to prevent hardware button freeze
-                if not self._drainer or self._drainer.hidraw_path != found["hidraw_node"]:
-                    if self._drainer:
-                        self._drainer.stop()
-                    self._drainer = HidDrainer(found["hidraw_node"])
-                    self._drainer.start()
+        # Maintain background HID drainers on all connected devices
+        active_nodes = {d["hidraw_node"] for d in found_devices if d.get("has_permission") and d.get("hidraw_node")}
+        # Remove drainers for disconnected devices
+        for node in list(self._drainers.keys()):
+            if node not in active_nodes:
+                self._drainers[node].stop()
+                del self._drainers[node]
+        # Start drainers for newly connected devices
+        for node in active_nodes:
+            if node not in self._drainers:
+                drainer = HidDrainer(node)
+                drainer.start()
+                self._drainers[node] = drainer
 
-            if not self._current_device or self._current_device.get("product_id") != found["product_id"] or self._current_device.get("has_permission") != found["has_permission"]:
-                self._current_device = found
-                self.device_changed.emit(found)
-        else:
-            if self._drainer:
-                self._drainer.stop()
-                self._drainer = None
-            if self._current_device is not None:
+        # Report permission issues if any
+        for d in found_devices:
+            if not d.get("has_permission") and d.get("hidraw_node"):
+                self.permission_issue.emit(d["hidraw_node"])
+
+        # Detect changes in devices list
+        dev_ids_current = [(d.get("sysfs_path"), d.get("product_id"), d.get("serial"), d.get("has_permission")) for d in self._current_devices]
+        dev_ids_new = [(d.get("sysfs_path"), d.get("product_id"), d.get("serial"), d.get("has_permission")) for d in found_devices]
+
+        if dev_ids_current != dev_ids_new:
+            self._current_devices = found_devices
+            self.devices_changed.emit(found_devices)
+
+            if found_devices:
+                self._current_device = found_devices[0]
+                self.device_changed.emit(found_devices[0])
+            else:
                 self._current_device = None
                 self.device_disconnected.emit()
 

@@ -22,6 +22,8 @@ PAD_COLORS = [
 
 class RcpBridge:
     def __init__(self, cli_path=None):
+        self.target_pid = None
+        self.target_serial = None
         base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         if not cli_path:
             # Check local bin/ first, then Resources target
@@ -41,12 +43,19 @@ class RcpBridge:
             return None, "Binary not found"
 
         cmd = [self.cli_path, "--i-know-what-i-do"] + args
+        env = os.environ.copy()
+        if self.target_pid:
+            env["RCP_DEVICE_PID"] = str(self.target_pid)
+        if self.target_serial:
+            env["RCP_DEVICE_SERIAL"] = str(self.target_serial)
+
         try:
             res = subprocess.run(
                 cmd,
                 capture_output=True,
                 text=True,
-                timeout=timeout
+                timeout=timeout,
+                env=env
             )
             if res.returncode == 0:
                 return res.stdout, None

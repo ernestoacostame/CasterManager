@@ -21,142 +21,223 @@ Rectangle {
         anchors.margins: 18
         spacing: 20
 
-        // Device Info Card
-        Rectangle {
+        // Device List Section (Supports Single or Multiple Devices)
+        ColumnLayout {
             Layout.fillWidth: true
-            Layout.preferredHeight: 140
-            radius: 10
-            color: "#212124"
-            border.color: stateManager && stateManager.connected ? "#303035" : "#442222"
-            border.width: 1
+            spacing: 10
 
-            ColumnLayout {
-                anchors.fill: parent
-                anchors.margins: 14
-                spacing: 12
+            // Header when multiple devices are connected
+            RowLayout {
+                visible: Boolean(stateManager && stateManager.connectedDevices && stateManager.connectedDevices.length > 1)
+                Layout.fillWidth: true
 
-                RowLayout {
-                    spacing: 12
+                Text {
+                    text: (stateManager && stateManager.language === "es" ? "Dispositivos RØDE (" : "RØDE Devices (") + (stateManager && stateManager.connectedDevices ? stateManager.connectedDevices.length : 0) + ")"
+                    font.pixelSize: 11
+                    font.bold: true
+                    color: "#A0A0A5"
+                }
+            }
 
-                    // Device Hardware Illustration Icon
-                    Rectangle {
-                        width: 44
-                        height: 44
-                        radius: 8
-                        color: "#161618"
-                        border.color: "#2C2C30"
-                        border.width: 1
-                        clip: true
+            // Multiple Devices Repeater
+            Repeater {
+                model: (stateManager && stateManager.connectedDevices && stateManager.connectedDevices.length > 0) 
+                       ? stateManager.connectedDevices 
+                       : [null]
 
-                        Image {
-                            anchors.centerIn: parent
-                            width: 36
-                            height: 36
-                            source: "../../assets/rodecaster.svg"
-                            fillMode: Image.PreserveAspectFit
-                            mipmap: true
-                            smooth: true
-                            sourceSize.width: 72
-                            sourceSize.height: 72
-                        }
-                    }
+                // Device Card Item
+                Rectangle {
+                    id: devCard
+                    readonly property bool hasRealDevice: modelData !== null
+                    readonly property bool isSelectedDevice: hasRealDevice && (index === (stateManager ? stateManager.selectedDeviceIndex : 0))
+
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: (!hasRealDevice || isSelectedDevice) ? 140 : 74
+                    radius: 10
+                    color: isSelectedDevice ? "#212124" : (devArea.containsMouse ? "#27272C" : "#1B1B1E")
+                    border.color: isSelectedDevice ? "#CBA158" : (devArea.containsMouse ? "#44444C" : "#2C2C30")
+                    border.width: isSelectedDevice ? 1.5 : 1
 
                     ColumnLayout {
-                        spacing: 2
-                        Layout.fillWidth: true
+                        anchors.fill: parent
+                        anchors.margins: 12
+                        spacing: 10
 
-                        Text {
-                            text: stateManager ? stateManager.modelName : "RØDECaster"
-                            font.pixelSize: 13
-                            font.bold: true
-                            color: "#FFFFFF"
-                        }
+                        // Device Header Row (Icon + Name + Status + Switch Badge)
+                        RowLayout {
+                            spacing: 10
 
-                        Text {
-                            text: (stateManager ? stateManager.strings.firmware : "Firmware") + " " + (stateManager ? stateManager.firmwareVersion : "1.7.7")
-                            font.pixelSize: 11
-                            color: "#8E8E93"
-                        }
-
-                        Row {
-                            spacing: 6
+                            // Device Hardware Icon
                             Rectangle {
-                                width: 7
-                                height: 7
-                                radius: 3.5
-                                anchors.verticalCenter: parent.verticalCenter
-                                color: stateManager && stateManager.connected ? "#34C759" : "#FF3B30"
-                            }
-                            Text {
-                                text: stateManager && stateManager.connected ? (stateManager.strings.connected) : (stateManager ? stateManager.strings.disconnected : "Desconectada")
-                                font.pixelSize: 10
-                                color: stateManager && stateManager.connected ? "#34C759" : "#FF453A"
-                            }
-                        }
-                    }
-                }
+                                width: 40
+                                height: 40
+                                radius: 8
+                                color: "#161618"
+                                border.color: isSelectedDevice ? "#CBA158" : "#2C2C30"
+                                border.width: 1
+                                clip: true
 
-                // SD Card Storage Meter
-                ColumnLayout {
-                    Layout.fillWidth: true
-                    spacing: 6
-
-                    RowLayout {
-                        Text {
-                            text: "💾 " + (stateManager ? stateManager.strings.microsd : "MicroSD")
-                            font.pixelSize: 11
-                            color: "#9A9A9E"
-                        }
-
-                        // Eject / Unmount Button when Transfer Mode is active
-                        Rectangle {
-                            visible: Boolean(stateManager && stateManager.transferModeActive)
-                            width: 22
-                            height: 22
-                            radius: 4
-                            color: ejectArea.containsMouse ? "#442A2A" : "#282830"
-                            border.color: "#CBA158"
-                            border.width: 1
-
-                            Text {
-                                anchors.centerIn: parent
-                                text: "⏏"
-                                font.pixelSize: 12
-                                font.bold: true
-                                color: "#CBA158"
+                                Image {
+                                    anchors.centerIn: parent
+                                    width: 32
+                                    height: 32
+                                    source: "../../assets/rodecaster.svg"
+                                    fillMode: Image.PreserveAspectFit
+                                    mipmap: true
+                                    smooth: true
+                                    sourceSize.width: 64
+                                    sourceSize.height: 64
+                                }
                             }
 
-                            MouseArea {
-                                id: ejectArea
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: {
-                                    if (stateManager) stateManager.exitTransferMode();
+                            ColumnLayout {
+                                spacing: 4
+                                Layout.fillWidth: true
+
+                                Text {
+                                    text: devCard.hasRealDevice ? modelData.display_name : (stateManager ? stateManager.modelName : "RØDECaster")
+                                    font.pixelSize: 12
+                                    font.bold: true
+                                    color: "#FFFFFF"
+                                    elide: Text.ElideRight
+                                    Layout.fillWidth: true
+                                }
+
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 6
+
+                                    Row {
+                                        spacing: 5
+                                        Layout.alignment: Qt.AlignVCenter
+                                        Rectangle {
+                                            width: 6
+                                            height: 6
+                                            radius: 3
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            color: (stateManager && stateManager.connected && devCard.hasRealDevice) ? "#34C759" : "#FF3B30"
+                                        }
+                                        Text {
+                                            text: (stateManager && stateManager.connected && devCard.hasRealDevice)
+                                                  ? (devCard.isSelectedDevice 
+                                                     ? (stateManager ? stateManager.strings.connected : "Conectada") 
+                                                     : (stateManager && stateManager.language === "es" ? "Disponible" : "Available"))
+                                                  : (stateManager ? stateManager.strings.disconnected : "Desconectada")
+                                            font.pixelSize: 10
+                                            color: (stateManager && stateManager.connected && devCard.hasRealDevice) ? "#34C759" : "#FF453A"
+                                        }
+                                    }
+
+                                    Item { Layout.fillWidth: true }
+
+                                    // Active / Switch Badge
+                                    Rectangle {
+                                        visible: Boolean(stateManager && stateManager.connectedDevices && stateManager.connectedDevices.length > 1)
+                                        width: devCard.isSelectedDevice ? 46 : 54
+                                        height: 16
+                                        radius: 4
+                                        color: devCard.isSelectedDevice ? "#3A2E16" : "#25252A"
+                                        border.color: devCard.isSelectedDevice ? "#CBA158" : "#3E3E48"
+                                        border.width: 1
+
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: devCard.isSelectedDevice 
+                                                  ? (stateManager && stateManager.language === "es" ? "ACTIVA" : "ACTIVE")
+                                                  : (stateManager && stateManager.language === "es" ? "CAMBIAR" : "SWITCH")
+                                            font.pixelSize: 8
+                                            font.bold: true
+                                            color: devCard.isSelectedDevice ? "#CBA158" : "#A0A0A5"
+                                        }
+                                    }
+                                }
+
+                                Text {
+                                    visible: devCard.isSelectedDevice || !devCard.hasRealDevice
+                                    text: (stateManager ? stateManager.strings.firmware : "Firmware") + " " + (stateManager ? stateManager.firmwareVersion : "1.7.7")
+                                    font.pixelSize: 10
+                                    color: "#8E8E93"
                                 }
                             }
                         }
 
-                        Item { Layout.fillWidth: true }
-                        Text {
-                            text: (stateManager ? stateManager.sdCardUsed : "0 GB") + " / " + (stateManager ? stateManager.sdCardTotal : "119 GB")
-                            font.pixelSize: 11
-                            color: "#8E8E93"
+                        // SD Card Storage Meter (Shown for active device)
+                        ColumnLayout {
+                            visible: devCard.isSelectedDevice || !devCard.hasRealDevice
+                            Layout.fillWidth: true
+                            spacing: 6
+
+                            RowLayout {
+                                Text {
+                                    text: "💾 " + (stateManager ? stateManager.strings.microsd : "MicroSD")
+                                    font.pixelSize: 11
+                                    color: "#9A9A9E"
+                                }
+
+                                // Eject / Unmount Button when Transfer Mode is active
+                                Rectangle {
+                                    visible: Boolean(stateManager && stateManager.transferModeActive && devCard.isSelectedDevice)
+                                    width: 20
+                                    height: 20
+                                    radius: 4
+                                    color: ejectArea.containsMouse ? "#442A2A" : "#282830"
+                                    border.color: "#CBA158"
+                                    border.width: 1
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: "⏏"
+                                        font.pixelSize: 11
+                                        font.bold: true
+                                        color: "#CBA158"
+                                    }
+
+                                    MouseArea {
+                                        id: ejectArea
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: {
+                                            if (stateManager) stateManager.exitTransferMode();
+                                        }
+                                    }
+                                }
+
+                                Item { Layout.fillWidth: true }
+                                Text {
+                                    text: (stateManager ? stateManager.sdCardUsed : "0 GB") + " / " + (stateManager ? stateManager.sdCardTotal : "119 GB")
+                                    font.pixelSize: 10
+                                    color: "#8E8E93"
+                                }
+                            }
+
+                            // Progress Bar
+                            Rectangle {
+                                Layout.fillWidth: true
+                                height: 4
+                                radius: 2
+                                color: "#323236"
+
+                                Rectangle {
+                                    width: Math.max(4, parent.width * ((stateManager ? stateManager.sdCardPercent : 0) / 100.0))
+                                    height: parent.height
+                                    radius: 2
+                                    color: "#CBA158"
+                                }
+                            }
                         }
                     }
 
-                    // Progress Bar
-                    Rectangle {
-                        Layout.fillWidth: true
-                        height: 4
-                        radius: 2
-                        color: "#323236"
-
-                        Rectangle {
-                            width: Math.max(4, parent.width * ((stateManager ? stateManager.sdCardPercent : 0) / 100.0))
-                            height: parent.height
-                            radius: 2
-                            color: "#CBA158"
+                    // Click area to switch active device if not already selected
+                    MouseArea {
+                        id: devArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: (!devCard.isSelectedDevice && devCard.hasRealDevice) ? Qt.PointingHandCursor : Qt.ArrowCursor
+                        onClicked: {
+                            if (!devCard.isSelectedDevice && devCard.hasRealDevice && stateManager) {
+                                stateManager.selectDevice(index);
+                            }
                         }
                     }
                 }

@@ -251,12 +251,15 @@ class StateManager(QObject):
     recordingChanged = pyqtSignal()
     deviceConfigChanged = pyqtSignal()
     recordingsChanged = pyqtSignal()
+    devicesChanged = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.settings = QSettings("CasterManager", "CasterManager")
         self._language = self.settings.value("language", "es")
         self._current_view = "home"
+        self._devices = []
+        self._selected_device_index = 0
         self._connected = False
         self._permission_error = False
         self._permission_path = ""
@@ -329,6 +332,7 @@ class StateManager(QObject):
         self._live_poll_timer.start()
 
         self.monitor = DeviceMonitor(self)
+        self.monitor.devices_changed.connect(self._on_devices_changed)
         self.monitor.device_changed.connect(self._on_device_changed)
         self.monitor.device_disconnected.connect(self._on_device_disconnected)
         self.monitor.permission_issue.connect(self._on_permission_issue)
@@ -355,9 +359,9 @@ class StateManager(QObject):
                 {"index": 1, "name": "Mic 2", "color": "#28C850", "icon": "mic", "level": 70, "mute": False, "listen": False, "is_virtual": False},
                 {"index": 2, "name": "Mic 3", "color": "#FF9600", "icon": "mic", "level": 70, "mute": False, "listen": False, "is_virtual": False},
                 {"index": 3, "name": "Mic 4", "color": "#E6DC00", "icon": "mic", "level": 70, "mute": False, "listen": False, "is_virtual": False},
-                {"index": 4, "name": "USB 1 (Main)", "color": "#FF8C28", "icon": "usb", "level": 70, "mute": False, "listen": False, "is_virtual": False},
-                {"index": 5, "name": "USB 2 (Chat)", "color": "#00C8C8", "icon": "chat", "level": 70, "mute": False, "listen": False, "is_virtual": False},
-                {"index": 6, "name": "SMART Pads", "color": "#FF3C3C", "icon": "pads", "level": 70, "mute": False, "listen": False, "is_virtual": True},
+                {"index": 4, "name": "USB 1", "color": "#FF8C28", "icon": "usb", "level": 70, "mute": False, "listen": False, "is_virtual": False},
+                {"index": 5, "name": "USB 2", "color": "#00C8C8", "icon": "chat", "level": 70, "mute": False, "listen": False, "is_virtual": False},
+                {"index": 6, "name": "Pads", "color": "#FF3C3C", "icon": "pads", "level": 70, "mute": False, "listen": False, "is_virtual": True},
                 {"index": 7, "name": "Bluetooth", "color": "#3C96FF", "icon": "bluetooth", "level": 70, "mute": False, "listen": False, "is_virtual": True},
                 {"index": 8, "name": "Virtual", "color": "#A050E6", "icon": "usb", "level": 70, "mute": False, "listen": False, "is_virtual": True},
             ]
@@ -385,8 +389,27 @@ class StateManager(QObject):
             banks.append(bank_pads)
         return banks
 
-    def _on_device_changed(self, info):
-        logger.info(f"RØDECaster connected: {info['display_name']} ({info['product_id']})")
+    def _on_devices_changed(self, device_list):
+        self._devices = device_list
+        if not device_list:
+            self._connected = False
+            self._selected_device_index = 0
+            self.stateChanged.emit()
+            self.devicesChanged.emit()
+            return
+
+        current_serial = self._serial
+        matching_idx = next((i for i, d in enumerate(device_list) if d.get("serial") and d.get("serial") == current_serial), None)
+        if matching_idx is not None:
+            self._selected_device_index = matching_idx
+        elif self._selected_device_index >= len(device_list):
+            self._selected_device_index = 0
+
+        self._apply_device_config(device_list[self._selected_device_index])
+        self.devicesChanged.emit()
+
+    def _apply_device_config(self, info):
+        logger.info(f"Applying config for active device: {info['display_name']} ({info['product_id']})")
         self._connected = True
         self._model_name = info["display_name"]
         self._is_duo = (info["model_type"] == "Duo")
@@ -397,7 +420,11 @@ class StateManager(QObject):
         self._permission_error = not info.get("has_permission", False)
         self._permission_path = info.get("hidraw_node", "")
 
-        # Re-initialize banks and faders immediately so model geometry matches connected hardware
+        # Direct bridge to target this specific device
+        self.bridge.target_pid = info.get("product_id")
+        self.bridge.target_serial = info.get("serial")
+
+        # Re-initialize banks and faders for the active model geometry
         self._banks = self._init_empty_banks()
         self._faders = self._init_default_faders()
 
@@ -409,10 +436,21 @@ class StateManager(QObject):
         if info.get("has_permission"):
             self.executor.submit(self._sync_hardware_state)
 
+    def _on_device_changed(self, info):
+        # Fallback single device handler
+        if not self._devices:
+            self._devices = [info]
+            self._selected_device_index = 0
+            self.devicesChanged.emit()
+        self._apply_device_config(info)
+
     def _on_device_disconnected(self):
         logger.info("RØDECaster disconnected")
         self._connected = False
         self._permission_error = False
+        self._devices = []
+        self.stateChanged.emit()
+        self.devicesChanged.emit()
         self.stateChanged.emit()
 
     def _on_permission_issue(self, hidpath):
@@ -677,6 +715,23 @@ class StateManager(QObject):
             self.languageChanged.emit()
             msg = "Idioma cambiado a Español" if lang == "es" else "Language changed to English"
             self.toastMessage.emit(msg)
+
+    @pyqtProperty(QVariant, notify=devicesChanged)
+    def connectedDevices(self):
+        return self._devices
+
+    @pyqtProperty(int, notify=devicesChanged)
+    def selectedDeviceIndex(self):
+        return self._selected_device_index
+
+    @pyqtSlot(int)
+    def selectDevice(self, index):
+        if 0 <= index < len(self._devices):
+            if index != self._selected_device_index:
+                self._selected_device_index = index
+                self._apply_device_config(self._devices[index])
+                self.devicesChanged.emit()
+                self.toastMessage.emit(f"Cambiado a {self._devices[index].get('display_name', 'RØDECaster')}")
 
     @pyqtProperty(str, notify=stateChanged)
     def modelName(self):
