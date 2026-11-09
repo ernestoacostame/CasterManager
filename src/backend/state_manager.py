@@ -1,4 +1,5 @@
 import os
+import tempfile
 import json
 import logging
 from datetime import datetime
@@ -797,6 +798,7 @@ class StateManager(QObject):
         self.stateChanged.emit()
 
     def _sync_hardware_state(self):
+        self.bridge.invalidate_pad_cache()
         if getattr(self, "_is_syncing", False):
             logger.info("Hardware sync already in progress, skipping duplicate call")
             return
@@ -1485,11 +1487,15 @@ class StateManager(QObject):
 
         if self._connected and not self._permission_error:
             self.toastMessage.emit(f"Subiendo a la {self._model_name}: {name}...")
+            b_idx, p_idx = self._current_bank, self._selected_pad_index
             def do_upload():
+                # Upload always creates a new PAD node: remove whatever is in the
+                # slot first, otherwise the old pad (e.g. an FX) survives underneath.
+                self.bridge.clear_pad(b_idx, p_idx)
                 out, err = self.bridge.run_cmd([
                     "pad", "upload",
-                    str(self._current_bank),
-                    str(self._selected_pad_index),
+                    str(b_idx),
+                    str(p_idx),
                     clean_path,
                     "--name", name
                 ], timeout=45)
@@ -1517,10 +1523,9 @@ class StateManager(QObject):
         self.selectedPadChanged.emit()
 
         if self._connected and not self._permission_error:
+            b_idx, p_idx = self._current_bank, self._selected_pad_index
             def do_clear():
-                out, err = self.bridge.run_cmd(
-                    ["pad", "clear", str(self._current_bank), str(self._selected_pad_index)]
-                )
+                removed, err = self.bridge.clear_pad(b_idx, p_idx)
                 if err:
                     logger.error(f"Error clearing pad: {err}")
                     self.toastMessage.emit(f"Error al limpiar: {err}")
@@ -1589,8 +1594,13 @@ class StateManager(QObject):
             ptype = target.get("type")
             b_str = str(self._current_bank)
             p_str = str(dst_display_idx)
+            src_idx_chk = pad_data.get("idx")
+            dst_idx_chk = self._current_bank * self._pads_per_bank + dst_logical
+            if src_idx_chk is not None and int(src_idx_chk) == dst_idx_chk:
+                return  # pasting a pad onto itself: nothing to do on hardware
             def do_sync():
                 if ptype == "fx":
+                    self.bridge.clear_pad(b_str, p_str)
                     fx_id = target.get("fx_id", 8)
                     fx_channel = target.get("fx_channel", 0)
                     fx_mode = target.get("fx_mode", 1)
@@ -1610,13 +1620,37 @@ class StateManager(QObject):
                     self.bridge.run_cmd(["pad", "set-prop", b_str, p_str, "padActive", "bool:false"])
                 elif ptype == "sound":
                     sound_p = target.get("file_path") or ""
+                    tmp_path = None
+                    if not (sound_p and os.path.exists(sound_p)):
+                        # Audio only lives on the device: export it from the source pad first.
+                        src_idx = pad_data.get("idx")
+                        if src_idx is not None:
+                            ppb = self._pads_per_bank
+                            src_bank, src_pos = int(src_idx) // ppb, int(src_idx) % ppb
+                            src_disp = order.index(src_pos) if src_pos in order else src_pos
+                            ext = os.path.splitext(target.get("file") or "")[1] or ".wav"
+                            fd, tmp_path = tempfile.mkstemp(prefix="cm_pad_", suffix=ext)
+                            os.close(fd)
+                            _, exp_err = self.bridge.run_cmd(
+                                ["pad", "export", str(src_bank), str(src_disp), tmp_path], timeout=90)
+                            if exp_err or os.path.getsize(tmp_path) == 0:
+                                logger.error(f"Could not export source pad audio: {exp_err}")
+                                self.toastMessage.emit("No se pudo leer el audio del pad de origen")
+                                os.unlink(tmp_path)
+                                tmp_path = None
+                            else:
+                                sound_p = tmp_path
                     if sound_p and os.path.exists(sound_p):
-                        self.bridge.run_cmd([
+                        self.bridge.clear_pad(b_str, p_str)
+                        _, up_err = self.bridge.run_cmd([
                             "pad", "upload", b_str, p_str, sound_p, "--name", target.get("name", "Sound")
-                        ], timeout=45)
-                    else:
-                        self.bridge.run_cmd(["pad", "set-prop", b_str, p_str, "padName", f"str:{target.get('name', '')}"])
-                        self.bridge.run_cmd(["pad", "set-prop", b_str, p_str, "padColourIndex", f"u32:{target.get('color_idx', 0)}"])
+                        ], timeout=60)
+                        if up_err:
+                            logger.error(f"Paste upload error: {up_err}")
+                        else:
+                            self.bridge.run_cmd(["pad", "set-prop", b_str, p_str, "padColourIndex", f"u32:{target.get('color_idx', 0)}"])
+                    if tmp_path and os.path.exists(tmp_path):
+                        os.unlink(tmp_path)
                 self._sync_hardware_state()
             self.executor.submit(do_sync)
 

@@ -51,3 +51,4 @@ ColumnLayout {
         onMoved: if (stateManager) stateManager.setDspParameter(ds.prop, value)
     }
 }
+
