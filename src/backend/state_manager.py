@@ -181,6 +181,30 @@ TRANSLATIONS = {
         "hub_audio_processing_desc": "Efectos APHEX®, Puerta de Ruido, Compresor, HPF, De-Esser y EQ",
         "audio_processing": "Procesamiento",
         "audio_processing_title": "Procesamiento de Audio en Vivo",
+        "voxlab_mode": "VoxLab™",
+        "advanced_mode": "Canal Avanzado",
+        "voxlab_subtitle": "Controles macro intuitivos y perfiles de voz para una calidad de estudio instantánea",
+        "depth": "Depth (Profundidad)",
+        "depth_desc": "Graves cálidos y ricos del APHEX Big Bottom",
+        "sparkle": "Sparkle (Brillo)",
+        "sparkle_desc": "Claridad, presencia y aire del APHEX Aural Exciter",
+        "punch": "Punch (Pegada)",
+        "punch_desc": "Consistencia dinámica e impacto con el Compresor",
+        "voice_presets": "Perfiles de Voz",
+        "preset_broadcast": "Broadcast",
+        "preset_broadcast_desc": "Presencia clásica de radio y estudio con graves profundos",
+        "preset_podcast": "Podcast Studio",
+        "preset_podcast_desc": "Tono vocal cálido, natural y equilibrado",
+        "preset_gaming": "Streaming / Gaming",
+        "preset_gaming_desc": "Voz nítida con supresión agresiva de teclado y clic",
+        "preset_neutral": "Neutro / Plano",
+        "preset_neutral_desc": "Señal pura sin procesamiento dinámico adicional",
+        "signal_chain": "Cadena de Señal de Audio",
+        "voxlab_macros": "Controles Maestros VoxLab™",
+        "advanced_subtitle": "Control completo de cada procesador de la cadena",
+        "processing_subtitle": "APHEX®, procesamiento dinámico, filtros y VoxLab™ por canal",
+        "macro_studio": "Estudio",
+        "macro_max": "Máx",
         "aphex_title": "Procesamiento APHEX®",
         "aphex_desc": "Mejora psicoacústica profesional para dar brillo y presencia a la voz.",
         "aural_exciter": "Aural Exciter™",
@@ -368,6 +392,30 @@ TRANSLATIONS = {
         "hub_audio_processing_desc": "APHEX® effects, Noise Gate, Compressor, HPF, De-Esser and EQ",
         "audio_processing": "Processing",
         "audio_processing_title": "Live Audio Processing",
+        "voxlab_mode": "VoxLab™",
+        "advanced_mode": "Advanced Channel",
+        "voxlab_subtitle": "Intuitive macro controls and voice profiles for instant broadcast quality",
+        "depth": "Depth",
+        "depth_desc": "Warm low-end richness powered by APHEX Big Bottom",
+        "sparkle": "Sparkle",
+        "sparkle_desc": "High-end presence and vocal air from APHEX Aural Exciter",
+        "punch": "Punch",
+        "punch_desc": "Dynamic consistency and vocal punch from Compressor",
+        "voice_presets": "Voice Profiles",
+        "preset_broadcast": "Broadcast",
+        "preset_broadcast_desc": "Classic radio studio presence with rich proximity",
+        "preset_podcast": "Podcast Studio",
+        "preset_podcast_desc": "Warm, balanced, and natural spoken-word delivery",
+        "preset_gaming": "Streaming / Gaming",
+        "preset_gaming_desc": "Crisp voice cut with aggressive keyboard noise rejection",
+        "preset_neutral": "Neutral / Flat",
+        "preset_neutral_desc": "Clean, uncolored preamp signal with zero dynamic processing",
+        "signal_chain": "Audio Signal Chain",
+        "voxlab_macros": "VoxLab™ Master Controls",
+        "advanced_subtitle": "Full control over every processor in the chain",
+        "processing_subtitle": "APHEX®, dynamics, filters and VoxLab™ per channel",
+        "macro_studio": "Studio",
+        "macro_max": "Max",
         "aphex_title": "APHEX® Processing",
         "aphex_desc": "Professional psychoacoustic enhancement for clarity and presence.",
         "aural_exciter": "Aural Exciter™",
@@ -572,6 +620,10 @@ class StateManager(QObject):
                 "eq_low": 0.5,
                 "eq_mid": 0.5,
                 "eq_high": 0.5,
+                "voxlab_depth": 50,
+                "voxlab_sparkle": 50,
+                "voxlab_punch": 50,
+                "active_preset": "",
             })
         return channels
 
@@ -1010,6 +1062,10 @@ class StateManager(QObject):
                     if "eqLowGain" in cp: dsp["eq_low"] = float(cp["eqLowGain"])
                     if "eqMidGain" in cp: dsp["eq_mid"] = float(cp["eqMidGain"])
                     if "eqHighGain" in cp: dsp["eq_high"] = float(cp["eqHighGain"])
+                    dsp["voxlab_depth"] = int(dsp.get("aphex_bb_drive", 0.5) * 100)
+                    dsp["voxlab_sparkle"] = int(dsp.get("aphex_ae_mix", 0.5) * 100)
+                    comp_t = dsp.get("compressor_threshold", 0.65)
+                    dsp["voxlab_punch"] = max(0, min(100, int((1.0 - comp_t) / 0.55 * 100)))
 
                 in_node = input_nodes[i] if i < len(input_nodes) else None
                 if in_node:
@@ -2784,6 +2840,110 @@ class StateManager(QObject):
                 logger.info(f"Setting DSP hardware: node {node_idx} {prop_name} = {val_str}")
                 self.bridge.run_cmd(["set-property", str(node_idx), prop_name, str(val_str)])
         self.executor.submit(do_send)
+
+    @pyqtSlot(str, int)
+    def setVoxlabMacro(self, macro_name, value):
+        """
+        Adjusts VoxLab macro controls (depth, sparkle, punch) and synchronizes with hardware DSP.
+        """
+        if not (0 <= self._active_dsp_channel < len(self._dsp_channels)):
+            return
+        ch = self._dsp_channels[self._active_dsp_channel]
+        val = max(0, min(100, int(value)))
+        norm_val = val / 100.0
+
+        if macro_name == "depth":
+            ch["voxlab_depth"] = val
+            if val > 0 and not ch.get("aphex_on", False):
+                self.setDspParameter("aphex_on", True)
+            self.setDspParameter("aphex_bb_drive", norm_val)
+        elif macro_name == "sparkle":
+            ch["voxlab_sparkle"] = val
+            if val > 0 and not ch.get("aphex_on", False):
+                self.setDspParameter("aphex_on", True)
+            self.setDspParameter("aphex_ae_mix", norm_val)
+        elif macro_name == "punch":
+            ch["voxlab_punch"] = val
+            comp_thresh = 1.0 - (norm_val * 0.55)
+            comp_ratio = 0.25 + (norm_val * 0.55)
+            comp_gain = norm_val * 0.35
+            if val > 0 and not ch.get("compressor_on", False):
+                self.setDspParameter("compressor_on", True)
+            self.setDspParameter("compressor_threshold", comp_thresh)
+            self.setDspParameter("compressor_ratio", comp_ratio)
+            self.setDspParameter("compressor_gain", comp_gain)
+
+        ch["active_preset"] = "custom"
+        self.dspChanged.emit()
+
+    @pyqtSlot(str)
+    def applyDspPreset(self, preset_name):
+        """
+        Applies standard studio voice presets to active DSP channel.
+        Presets: 'broadcast', 'podcast', 'gaming', 'neutral'
+        """
+        if not (0 <= self._active_dsp_channel < len(self._dsp_channels)):
+            return
+        ch = self._dsp_channels[self._active_dsp_channel]
+
+        presets = {
+            "broadcast": {
+                "hpf_on": True, "hpf_frequency": 0.4,
+                "noise_gate_on": True, "noise_gate_threshold": 0.35, "noise_gate_range": 0.75,
+                "noise_gate_attack": 0.4, "noise_gate_release": 0.45,
+                "deesser_on": True, "deesser_threshold": 0.6, "deesser_ratio": 0.5,
+                "compressor_on": True, "compressor_threshold": 0.6, "compressor_ratio": 0.5, "compressor_gain": 0.25,
+                "eq_on": True, "eq_low": 0.65, "eq_mid": 0.45, "eq_high": 0.65,
+                "aphex_on": True, "aphex_ae_mix": 0.55, "aphex_ae_tune": 0.5, "aphex_bb_drive": 0.6, "aphex_bb_tune": 0.4,
+                "voxlab_depth": 60, "voxlab_sparkle": 55, "voxlab_punch": 55
+            },
+            "podcast": {
+                "hpf_on": True, "hpf_frequency": 0.35,
+                "noise_gate_on": True, "noise_gate_threshold": 0.25, "noise_gate_range": 0.6,
+                "noise_gate_attack": 0.5, "noise_gate_release": 0.4,
+                "deesser_on": True, "deesser_threshold": 0.65, "deesser_ratio": 0.45,
+                "compressor_on": True, "compressor_threshold": 0.7, "compressor_ratio": 0.38, "compressor_gain": 0.15,
+                "eq_on": True, "eq_low": 0.55, "eq_mid": 0.5, "eq_high": 0.55,
+                "aphex_on": True, "aphex_ae_mix": 0.4, "aphex_ae_tune": 0.5, "aphex_bb_drive": 0.45, "aphex_bb_tune": 0.35,
+                "voxlab_depth": 45, "voxlab_sparkle": 40, "voxlab_punch": 40
+            },
+            "gaming": {
+                "hpf_on": True, "hpf_frequency": 0.5,
+                "noise_gate_on": True, "noise_gate_threshold": 0.48, "noise_gate_range": 0.85,
+                "noise_gate_attack": 0.3, "noise_gate_release": 0.35,
+                "deesser_on": True, "deesser_threshold": 0.55, "deesser_ratio": 0.55,
+                "compressor_on": True, "compressor_threshold": 0.52, "compressor_ratio": 0.65, "compressor_gain": 0.32,
+                "eq_on": True, "eq_low": 0.45, "eq_mid": 0.55, "eq_high": 0.7,
+                "aphex_on": True, "aphex_ae_mix": 0.7, "aphex_ae_tune": 0.6, "aphex_bb_drive": 0.35, "aphex_bb_tune": 0.3,
+                "voxlab_depth": 35, "voxlab_sparkle": 70, "voxlab_punch": 65
+            },
+            "neutral": {
+                "hpf_on": False,
+                "noise_gate_on": False,
+                "deesser_on": False,
+                "compressor_on": False,
+                "eq_on": False,
+                "aphex_on": False,
+                "voxlab_depth": 0, "voxlab_sparkle": 0, "voxlab_punch": 0
+            }
+        }
+
+        if preset_name in presets:
+            p_data = presets[preset_name]
+            for k, v in p_data.items():
+                ch[k] = v
+                self.setDspParameter(k, v)
+            ch["active_preset"] = preset_name
+            self.dspChanged.emit()
+            preset_labels = {
+                "broadcast": "Broadcast",
+                "podcast": "Podcast Studio",
+                "gaming": "Streaming / Gaming",
+                "neutral": "Neutro / Plano"
+            }
+            label = preset_labels.get(preset_name, preset_name)
+            msg = f"Perfil de voz '{label}' aplicado" if self._language == "es" else f"Voice profile '{label}' applied"
+            self.toastMessage.emit(msg)
 
     @pyqtSlot()
     def openAudioProcessing(self):

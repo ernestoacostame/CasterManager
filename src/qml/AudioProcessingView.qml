@@ -6,6 +6,8 @@ Item {
     id: root
 
     readonly property var dsp: (stateManager && stateManager.currentDsp) ? stateManager.currentDsp : ({})
+    property int activeTab: 0            // 0: VoxLab™, 1: Canal Avanzado
+    property string focusedEffect: ""
 
     function getVal(prop, defVal) {
         if (root.dsp && root.dsp[prop] !== undefined && root.dsp[prop] !== null) {
@@ -14,12 +16,16 @@ Item {
         return defVal;
     }
 
+    function s(key, fallback) {
+        return (stateManager && stateManager.strings && stateManager.strings[key]) ? stateManager.strings[key] : fallback;
+    }
+
     ColumnLayout {
         anchors.fill: parent
-        anchors.margins: 28
-        spacing: 20
+        anchors.margins: 24
+        spacing: 14
 
-        // Header Title & Channel Tabs Row
+        // ───────────── 1. Header + channel selector ─────────────
         RowLayout {
             Layout.fillWidth: true
             spacing: 16
@@ -27,13 +33,13 @@ Item {
             ColumnLayout {
                 spacing: 3
                 Text {
-                    text: stateManager ? stateManager.strings.audio_processing_title : "Procesamiento de Audio en Vivo"
-                    font.pixelSize: 22
+                    text: root.s("audio_processing_title", "Procesamiento de Audio en Vivo")
+                    font.pixelSize: 20
                     font.bold: true
                     color: "#FFFFFF"
                 }
                 Text {
-                    text: "APHEX®, Procesamiento Dinámico, Filtros y Ecualización por Canal"
+                    text: root.s("processing_subtitle", "APHEX®, procesamiento dinámico, filtros y VoxLab™ por canal")
                     font.pixelSize: 12
                     color: "#8E8E93"
                 }
@@ -41,13 +47,11 @@ Item {
 
             Item { Layout.fillWidth: true }
 
-            // Channel Selector Segmented Bar
             Rectangle {
-                height: 38
-                radius: 19
+                height: 36
+                radius: 18
                 color: "#16161A"
                 border.color: "#2C2C32"
-                border.width: 1
                 implicitWidth: channelRow.implicitWidth + 8
 
                 RowLayout {
@@ -59,808 +63,583 @@ Item {
                         model: stateManager ? stateManager.dspChannels : []
 
                         Rectangle {
-                            height: 30
-                            radius: 15
-                            implicitWidth: Math.max(90, chText.implicitWidth + 24)
-                            color: (stateManager && stateManager.activeDspChannel === modelData.id) ? "#CBA158" : "transparent"
+                            readonly property bool sel: stateManager && stateManager.activeDspChannel === modelData.id
+                            height: 28
+                            radius: 14
+                            implicitWidth: Math.max(86, chText.implicitWidth + 22)
+                            color: sel ? "#CBA158" : "transparent"
 
                             Text {
                                 id: chText
                                 anchors.centerIn: parent
                                 text: modelData.name
-                                font.pixelSize: 12
-                                font.bold: (stateManager && stateManager.activeDspChannel === modelData.id)
-                                color: (stateManager && stateManager.activeDspChannel === modelData.id) ? "#121214" : "#AAAAAA"
+                                font.pixelSize: 11
+                                font.bold: parent.sel
+                                color: parent.sel ? "#121214" : "#AAAAAA"
+                            }
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: if (stateManager) stateManager.setActiveDspChannel(modelData.id)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // ───────────── 2. Signal chain strip ─────────────
+        Rectangle {
+            Layout.fillWidth: true
+            implicitHeight: chainFlow.implicitHeight + 20
+            radius: 10
+            color: "#18181C"
+            border.color: "#282830"
+
+            Flow {
+                id: chainFlow
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                anchors.leftMargin: 12
+                anchors.rightMargin: 12
+                spacing: 4
+
+                Repeater {
+                    model: [
+                        {"id": "preamp",     "name": "Preamp",     "icon": "🎙️", "active": true},
+                        {"id": "hpf",        "name": "HPF",        "icon": "📉", "active": root.getVal("hpf_on", true)},
+                        {"id": "gate",       "name": "Gate",       "icon": "🚪", "active": root.getVal("noise_gate_on", true)},
+                        {"id": "deesser",    "name": "De-Esser",   "icon": "🔕", "active": root.getVal("deesser_on", true)},
+                        {"id": "compressor", "name": root.s("compressor", "Compresor"), "icon": "🗜️", "active": root.getVal("compressor_on", true)},
+                        {"id": "eq",         "name": "EQ",         "icon": "🎚️", "active": root.getVal("eq_on", true)},
+                        {"id": "exciter",    "name": "Exciter",    "icon": "✨", "active": root.getVal("aphex_on", true) && root.getVal("aphex_ae_mix", 0.5) > 0},
+                        {"id": "big_bottom", "name": "Big Bottom", "icon": "🔊", "active": root.getVal("aphex_on", true) && root.getVal("aphex_bb_drive", 0.5) > 0}
+                    ]
+
+                    Row {
+                        spacing: 4
+
+                        Text {
+                            visible: index > 0
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: "›"
+                            font.pixelSize: 16
+                            color: "#55555E"
+                        }
+
+                        Rectangle {
+                            readonly property bool sel: root.focusedEffect === modelData.id && root.activeTab === 1
+                            width: blockRow.implicitWidth + 20
+                            height: 34
+                            radius: 6
+                            color: modelData.active
+                                ? (cArea.containsMouse ? "#2E2A20" : "#24221C")
+                                : (cArea.containsMouse ? "#25252A" : "#1C1C20")
+                            border.color: sel ? "#FFFFFF" : (modelData.active ? "#CBA158" : "#2E2E36")
+                            border.width: sel ? 2 : 1
+
+                            Row {
+                                id: blockRow
+                                anchors.centerIn: parent
+                                spacing: 5
+                                Text { text: modelData.icon; font.pixelSize: 12; anchors.verticalCenter: parent.verticalCenter }
+                                Text {
+                                    text: modelData.name
+                                    font.pixelSize: 10
+                                    font.bold: modelData.active
+                                    color: modelData.active ? "#FFFFFF" : "#8E8E93"
+                                    anchors.verticalCenter: parent.verticalCenter
+                                }
+                                Rectangle {
+                                    width: 6; height: 6; radius: 3
+                                    color: modelData.active ? "#28C850" : "#55555C"
+                                    anchors.verticalCenter: parent.verticalCenter
+                                }
                             }
 
+                            MouseArea {
+                                id: cArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    root.activeTab = 1;
+                                    root.focusedEffect = modelData.id;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // ───────────── 3. Mode switcher ─────────────
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 14
+
+            Rectangle {
+                height: 36
+                radius: 8
+                color: "#18181C"
+                border.color: "#282830"
+                implicitWidth: 320
+
+                RowLayout {
+                    anchors.fill: parent
+                    anchors.margins: 3
+                    spacing: 3
+
+                    Repeater {
+                        model: [
+                            {"icon": "⚡", "label": root.s("voxlab_mode", "VoxLab™")},
+                            {"icon": "🎛️", "label": root.s("advanced_mode", "Canal Avanzado")}
+                        ]
+                        Rectangle {
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
+                            radius: 5
+                            color: root.activeTab === index ? "#CBA158" : "transparent"
+                            Row {
+                                anchors.centerIn: parent
+                                spacing: 6
+                                Text { text: modelData.icon; font.pixelSize: 12 }
+                                Text {
+                                    text: modelData.label
+                                    font.pixelSize: 12
+                                    font.bold: root.activeTab === index
+                                    color: root.activeTab === index ? "#121214" : "#D0D0D0"
+                                }
+                            }
                             MouseArea {
                                 anchors.fill: parent
                                 cursorShape: Qt.PointingHandCursor
                                 onClicked: {
-                                    if (stateManager) stateManager.setActiveDspChannel(modelData.id);
+                                    root.activeTab = index;
+                                    if (index === 0) root.focusedEffect = "";
                                 }
                             }
                         }
                     }
                 }
             }
-        }
 
-        // Preamplifier / Input Gain Top Strip
-        Rectangle {
-            Layout.fillWidth: true
-            height: 72
-            radius: 12
-            color: "#18181C"
-            border.color: "#282830"
-            border.width: 1
-
-            RowLayout {
-                anchors.fill: parent
-                anchors.leftMargin: 20
-                anchors.rightMargin: 20
-                spacing: 20
-
-                // Preamp Icon Badge
-                Rectangle {
-                    width: 40
-                    height: 40
-                    radius: 8
-                    color: "#24242C"
-                    border.color: "#353540"
-                    border.width: 1
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: "🎙️"
-                        font.pixelSize: 18
-                    }
-                }
-
-                // Preamp Label
-                ColumnLayout {
-                    spacing: 2
-                    Text {
-                        text: stateManager ? stateManager.strings.preamp : "Preamplificador / Entrada"
-                        font.pixelSize: 13
-                        font.bold: true
-                        color: "#FFFFFF"
-                    }
-                    Text {
-                        text: "Revolution Preamp™ Ultra-bajo ruido"
-                        font.pixelSize: 11
-                        color: "#8E8E93"
-                    }
-                }
-
-                // Gain Slider
-                RowLayout {
-                    Layout.fillWidth: true
-                    spacing: 12
-
-                    Text {
-                        text: stateManager ? stateManager.strings.preamp_gain : "Ganancia"
-                        font.pixelSize: 12
-                        color: "#AAAAAA"
-                    }
-
-                    Slider {
-                        id: preampGainSlider
-                        Layout.fillWidth: true
-                        from: 0
-                        to: 76
-                        stepSize: 1
-                        value: root.getVal("preamp_gain", 45)
-                        onMoved: {
-                            if (stateManager) stateManager.setDspParameter("preamp_gain", Math.round(value));
-                        }
-                    }
-
-                    Rectangle {
-                        width: 60
-                        height: 28
-                        radius: 6
-                        color: "#24242C"
-                        border.color: "#383844"
-                        border.width: 1
-
-                        Text {
-                            anchors.centerIn: parent
-                            text: "+" + Math.round(preampGainSlider.value) + " dB"
-                            font.pixelSize: 12
-                            font.bold: true
-                            color: "#CBA158"
-                        }
-                    }
-                }
-
-                Rectangle { width: 1; height: 36; color: "#2E2E36" }
-
-                // Phantom Power (+48V) Button
-                Rectangle {
-                    width: 72
-                    height: 32
-                    radius: 6
-                    color: root.getVal("phantom_power", false) ? "#3D2418" : (p48Area.containsMouse ? "#2A2A32" : "#202026")
-                    border.color: root.getVal("phantom_power", false) ? "#FF9500" : "#32323C"
-                    border.width: root.getVal("phantom_power", false) ? 1.5 : 1
-
-                    RowLayout {
-                        anchors.centerIn: parent
-                        spacing: 4
-                        Text {
-                            text: "+48V"
-                            font.pixelSize: 12
-                            font.bold: true
-                            color: root.getVal("phantom_power", false) ? "#FF9500" : "#8E8E93"
-                        }
-                    }
-
-                    MouseArea {
-                        id: p48Area
-                        anchors.fill: parent
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: {
-                            if (stateManager) {
-                                let cur = Boolean(root.getVal("phantom_power", false));
-                                stateManager.setDspParameter("phantom_power", !cur);
-                            }
-                        }
-                    }
-                }
-
-                // Phase Invert (Ø) Button
-                Rectangle {
-                    width: 44
-                    height: 32
-                    radius: 6
-                    color: root.getVal("phase_flip", false) ? "#2C2618" : (phaseArea.containsMouse ? "#2A2A32" : "#202026")
-                    border.color: root.getVal("phase_flip", false) ? "#CBA158" : "#32323C"
-                    border.width: root.getVal("phase_flip", false) ? 1.5 : 1
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: "Ø"
-                        font.pixelSize: 14
-                        font.bold: true
-                        color: root.getVal("phase_flip", false) ? "#CBA158" : "#8E8E93"
-                    }
-
-                    MouseArea {
-                        id: phaseArea
-                        anchors.fill: parent
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: {
-                            if (stateManager) {
-                                let cur = Boolean(root.getVal("phase_flip", false));
-                                stateManager.setDspParameter("phase_flip", !cur);
-                            }
-                        }
-                    }
-                }
+            Text {
+                Layout.fillWidth: true
+                text: root.activeTab === 0
+                    ? root.s("voxlab_subtitle", "Controles macro intuitivos y perfiles de voz")
+                    : root.s("advanced_subtitle", "Control completo de cada procesador de la cadena")
+                font.pixelSize: 11
+                color: "#8E8E93"
+                elide: Text.ElideRight
             }
         }
 
-        // Main Scroll Area for Processing Cards
+        // ───────────── 4. Body ─────────────
         ScrollView {
-            id: procScroll
+            id: mainScroll
             Layout.fillWidth: true
             Layout.fillHeight: true
             contentWidth: availableWidth
             clip: true
-            ScrollBar.vertical.policy: ScrollBar.AsNeeded
 
             ColumnLayout {
-                width: procScroll.availableWidth
+                width: mainScroll.availableWidth
                 spacing: 16
 
-                // Row 1: APHEX® & Noise Gate Cards
-                RowLayout {
+                // ================= TAB 0: VoxLab™ =================
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: 18
+                    visible: root.activeTab === 0
+
+                    Text {
+                        text: root.s("voice_presets", "Perfiles de Voz")
+                        font.pixelSize: 13
+                        font.bold: true
+                        color: "#FFFFFF"
+                    }
+
+                    GridLayout {
+                        Layout.fillWidth: true
+                        columns: mainScroll.availableWidth > 760 ? 4 : 2
+                        rowSpacing: 12
+                        columnSpacing: 12
+
+                        Repeater {
+                            model: [
+                                {"id": "broadcast", "icon": "🎙️", "name": root.s("preset_broadcast", "Broadcast"),          "desc": root.s("preset_broadcast_desc", "")},
+                                {"id": "podcast",   "icon": "🎧", "name": root.s("preset_podcast", "Podcast Studio"),      "desc": root.s("preset_podcast_desc", "")},
+                                {"id": "gaming",    "icon": "🎮", "name": root.s("preset_gaming", "Streaming / Gaming"),   "desc": root.s("preset_gaming_desc", "")},
+                                {"id": "neutral",   "icon": "🎛️", "name": root.s("preset_neutral", "Neutro / Plano"),      "desc": root.s("preset_neutral_desc", "")}
+                            ]
+
+                            Rectangle {
+                                readonly property bool isSelected: root.getVal("active_preset", "") === modelData.id
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 84
+                                radius: 10
+                                color: isSelected ? "#2E281C" : (pArea.containsMouse ? "#222228" : "#1A1A1E")
+                                border.color: isSelected ? "#CBA158" : (pArea.containsMouse ? "#3E3E48" : "#282830")
+                                border.width: isSelected ? 2 : 1
+
+                                ColumnLayout {
+                                    anchors.fill: parent
+                                    anchors.margins: 12
+                                    spacing: 4
+
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        spacing: 8
+                                        Text { text: modelData.icon; font.pixelSize: 15 }
+                                        Text {
+                                            Layout.fillWidth: true
+                                            text: modelData.name
+                                            font.pixelSize: 13
+                                            font.bold: true
+                                            color: parent.parent.parent.isSelected ? "#CBA158" : "#FFFFFF"
+                                            elide: Text.ElideRight
+                                        }
+                                        Text {
+                                            visible: parent.parent.parent.isSelected
+                                            text: "✓"
+                                            font.pixelSize: 13
+                                            font.bold: true
+                                            color: "#CBA158"
+                                        }
+                                    }
+                                    Text {
+                                        Layout.fillWidth: true
+                                        Layout.fillHeight: true
+                                        text: modelData.desc
+                                        font.pixelSize: 10
+                                        color: "#8E8E93"
+                                        wrapMode: Text.WordWrap
+                                        elide: Text.ElideRight
+                                    }
+                                }
+
+                                MouseArea {
+                                    id: pArea
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: if (stateManager) stateManager.applyDspPreset(modelData.id)
+                                }
+                            }
+                        }
+                    }
+
+                    Text {
+                        text: root.s("voxlab_macros", "Controles Maestros VoxLab™")
+                        font.pixelSize: 13
+                        font.bold: true
+                        color: "#FFFFFF"
+                    }
+
+                    GridLayout {
+                        Layout.fillWidth: true
+                        columns: mainScroll.availableWidth > 760 ? 3 : 1
+                        rowSpacing: 14
+                        columnSpacing: 14
+
+                        Repeater {
+                            model: [
+                                {"key": "depth",   "prop": "voxlab_depth",   "icon": "🔊", "accent": "#FF8C28",
+                                 "title": root.s("depth", "Depth"),     "desc": root.s("depth_desc", "")},
+                                {"key": "sparkle", "prop": "voxlab_sparkle", "icon": "✨", "accent": "#CBA158",
+                                 "title": root.s("sparkle", "Sparkle"), "desc": root.s("sparkle_desc", "")},
+                                {"key": "punch",   "prop": "voxlab_punch",   "icon": "🗜️", "accent": "#3C96FF",
+                                 "title": root.s("punch", "Punch"),     "desc": root.s("punch_desc", "")}
+                            ]
+
+                            Rectangle {
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 150
+                                radius: 12
+                                color: "#18181C"
+                                border.color: "#282830"
+
+                                ColumnLayout {
+                                    anchors.fill: parent
+                                    anchors.margins: 16
+                                    spacing: 8
+
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        spacing: 10
+                                        Text { text: modelData.icon; font.pixelSize: 20 }
+                                        ColumnLayout {
+                                            Layout.fillWidth: true
+                                            spacing: 1
+                                            Text { text: modelData.title; font.pixelSize: 14; font.bold: true; color: "#FFFFFF" }
+                                            Text {
+                                                Layout.fillWidth: true
+                                                text: modelData.desc
+                                                font.pixelSize: 10
+                                                color: "#8E8E93"
+                                                wrapMode: Text.WordWrap
+                                            }
+                                        }
+                                        Rectangle {
+                                            width: 50; height: 24; radius: 6
+                                            color: "#141418"
+                                            border.color: modelData.accent
+                                            Text {
+                                                anchors.centerIn: parent
+                                                text: Math.round(macroSlider.value) + "%"
+                                                font.pixelSize: 12
+                                                font.bold: true
+                                                color: modelData.accent
+                                            }
+                                        }
+                                    }
+
+                                    Item { Layout.fillHeight: true }
+
+                                    Slider {
+                                        id: macroSlider
+                                        Layout.fillWidth: true
+                                        from: 0; to: 100; stepSize: 1
+                                        value: root.getVal(modelData.prop, 50)
+                                        onMoved: if (stateManager) stateManager.setVoxlabMacro(modelData.key, Math.round(value))
+                                    }
+
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        Text { text: "Off"; font.pixelSize: 10; color: "#66666E" }
+                                        Item { Layout.fillWidth: true }
+                                        Text { text: root.s("macro_studio", "Estudio"); font.pixelSize: 10; color: "#66666E" }
+                                        Item { Layout.fillWidth: true }
+                                        Text { text: root.s("macro_max", "Máx"); font.pixelSize: 10; color: "#66666E" }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // ================= TAB 1: Canal Avanzado =================
+                ColumnLayout {
                     Layout.fillWidth: true
                     spacing: 16
+                    visible: root.activeTab === 1
 
-                    // CARD 1: APHEX® PROCESSING
-                    Rectangle {
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: 330
-                        radius: 14
-                        color: "#18181C"
-                        border.color: root.getVal("aphex_on", true) ? "#4A3B18" : "#282830"
-                        border.width: 1
+                    // Preamp strip
+                    DspCard {
+                        icon: "🎙️"
+                        title: root.s("preamp", "Preamplificador / Entrada")
+                        description: "Revolution Preamp™ ultra-bajo ruido"
+                        focused: root.focusedEffect === "preamp"
 
-                        ColumnLayout {
-                            anchors.fill: parent
-                            anchors.margins: 18
-                            spacing: 12
-
-                            // Card Header
-                            RowLayout {
-                                Layout.fillWidth: true
-
-                                RowLayout {
-                                    spacing: 8
-                                    Text {
-                                        text: "✨"
-                                        font.pixelSize: 16
-                                    }
-                                    Text {
-                                        text: "APHEX® Processing"
-                                        font.pixelSize: 16
-                                        font.bold: true
-                                        color: root.getVal("aphex_on", true) ? "#CBA158" : "#FFFFFF"
-                                    }
-                                }
-
-                                Item { Layout.fillWidth: true }
-
-                                Switch {
-                                    checked: root.getVal("aphex_on", true)
-                                    onToggled: {
-                                        if (stateManager) stateManager.setDspParameter("aphex_on", checked);
-                                    }
-                                }
-                            }
-
-                            Rectangle { Layout.fillWidth: true; height: 1; color: "#25252D" }
-
-                            // Sliders Body (dimmed if bypassed)
-                            ColumnLayout {
-                                Layout.fillWidth: true
-                                spacing: 14
-                                opacity: root.getVal("aphex_on", true) ? 1.0 : 0.4
-                                enabled: root.getVal("aphex_on", true)
-
-                                // Section 1: Aural Exciter™
-                                Text {
-                                    text: "Aural Exciter™ (Brillo y Armónicos)"
-                                    font.pixelSize: 12
-                                    font.bold: true
-                                    color: "#E0E0E0"
-                                }
-
-                                RowLayout {
-                                    Layout.fillWidth: true
-                                    spacing: 12
-                                    Text { text: "Mix:"; font.pixelSize: 12; color: "#8E8E93"; Layout.preferredWidth: 40 }
-                                    Slider {
-                                        id: aeMixSlider
-                                        Layout.fillWidth: true
-                                        from: 0.0; to: 1.0; stepSize: 0.01
-                                        value: root.getVal("aphex_ae_mix", 0.5)
-                                        onMoved: if (stateManager) stateManager.setDspParameter("aphex_ae_mix", value)
-                                    }
-                                    Text { text: Math.round(aeMixSlider.value * 100) + "%"; font.pixelSize: 12; font.bold: true; color: "#CBA158"; Layout.preferredWidth: 40 }
-                                }
-
-                                RowLayout {
-                                    Layout.fillWidth: true
-                                    spacing: 12
-                                    Text { text: "Tune:"; font.pixelSize: 12; color: "#8E8E93"; Layout.preferredWidth: 40 }
-                                    Slider {
-                                        id: aeTuneSlider
-                                        Layout.fillWidth: true
-                                        from: 0.0; to: 1.0; stepSize: 0.01
-                                        value: root.getVal("aphex_ae_tune", 0.5)
-                                        onMoved: if (stateManager) stateManager.setDspParameter("aphex_ae_tune", value)
-                                    }
-                                    Text { text: Math.round(aeTuneSlider.value * 100) + "%"; font.pixelSize: 12; font.bold: true; color: "#CBA158"; Layout.preferredWidth: 40 }
-                                }
-
-                                Rectangle { Layout.fillWidth: true; height: 1; color: "#25252D" }
-
-                                // Section 2: Big Bottom™
-                                Text {
-                                    text: "Big Bottom™ (Graves y Resonancia Profunda)"
-                                    font.pixelSize: 12
-                                    font.bold: true
-                                    color: "#E0E0E0"
-                                }
-
-                                RowLayout {
-                                    Layout.fillWidth: true
-                                    spacing: 12
-                                    Text { text: "Drive:"; font.pixelSize: 12; color: "#8E8E93"; Layout.preferredWidth: 40 }
-                                    Slider {
-                                        id: bbDriveSlider
-                                        Layout.fillWidth: true
-                                        from: 0.0; to: 1.0; stepSize: 0.01
-                                        value: root.getVal("aphex_bb_drive", 0.5)
-                                        onMoved: if (stateManager) stateManager.setDspParameter("aphex_bb_drive", value)
-                                    }
-                                    Text { text: Math.round(bbDriveSlider.value * 100) + "%"; font.pixelSize: 12; font.bold: true; color: "#CBA158"; Layout.preferredWidth: 40 }
-                                }
-
-                                RowLayout {
-                                    Layout.fillWidth: true
-                                    spacing: 12
-                                    Text { text: "Tune:"; font.pixelSize: 12; color: "#8E8E93"; Layout.preferredWidth: 40 }
-                                    Slider {
-                                        id: bbTuneSlider
-                                        Layout.fillWidth: true
-                                        from: 0.0; to: 1.0; stepSize: 0.01
-                                        value: root.getVal("aphex_bb_tune", 0.35)
-                                        onMoved: if (stateManager) stateManager.setDspParameter("aphex_bb_tune", value)
-                                    }
-                                    Text { text: Math.round(bbTuneSlider.value * 100) + "%"; font.pixelSize: 12; font.bold: true; color: "#CBA158"; Layout.preferredWidth: 40 }
-                                }
-                            }
-                        }
-                    }
-
-                    // CARD 2: NOISE GATE
-                    Rectangle {
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: 330
-                        radius: 14
-                        color: "#18181C"
-                        border.color: root.getVal("noise_gate_on", true) ? "#4A3B18" : "#282830"
-                        border.width: 1
-
-                        ColumnLayout {
-                            anchors.fill: parent
-                            anchors.margins: 18
-                            spacing: 12
-
-                            // Card Header
-                            RowLayout {
-                                Layout.fillWidth: true
-
-                                RowLayout {
-                                    spacing: 8
-                                    Text { text: "🚪"; font.pixelSize: 16 }
-                                    Text {
-                                        text: stateManager ? stateManager.strings.noise_gate : "Puerta de Ruido"
-                                        font.pixelSize: 16
-                                        font.bold: true
-                                        color: root.getVal("noise_gate_on", true) ? "#CBA158" : "#FFFFFF"
-                                    }
-                                }
-
-                                Item { Layout.fillWidth: true }
-
-                                Switch {
-                                    checked: root.getVal("noise_gate_on", true)
-                                    onToggled: {
-                                        if (stateManager) stateManager.setDspParameter("noise_gate_on", checked);
-                                    }
-                                }
-                            }
-
-                            Rectangle { Layout.fillWidth: true; height: 1; color: "#25252D" }
-
-                            // Sliders Body
-                            ColumnLayout {
-                                Layout.fillWidth: true
-                                spacing: 14
-                                opacity: root.getVal("noise_gate_on", true) ? 1.0 : 0.4
-                                enabled: root.getVal("noise_gate_on", true)
-
-                                RowLayout {
-                                    Layout.fillWidth: true
-                                    spacing: 12
-                                    Text { text: stateManager ? stateManager.strings.threshold : "Umbral:"; font.pixelSize: 12; color: "#8E8E93"; Layout.preferredWidth: 80 }
-                                    Slider {
-                                        id: ngThreshSlider
-                                        Layout.fillWidth: true
-                                        from: 0.0; to: 1.0; stepSize: 0.01
-                                        value: root.getVal("noise_gate_threshold", 0.28)
-                                        onMoved: if (stateManager) stateManager.setDspParameter("noise_gate_threshold", value)
-                                    }
-                                    Text { text: Math.round(ngThreshSlider.value * 100) + "%"; font.pixelSize: 12; font.bold: true; color: "#CBA158"; Layout.preferredWidth: 40 }
-                                }
-
-                                RowLayout {
-                                    Layout.fillWidth: true
-                                    spacing: 12
-                                    Text { text: stateManager ? stateManager.strings.range : "Rango:"; font.pixelSize: 12; color: "#8E8E93"; Layout.preferredWidth: 80 }
-                                    Slider {
-                                        id: ngRangeSlider
-                                        Layout.fillWidth: true
-                                        from: 0.0; to: 1.0; stepSize: 0.01
-                                        value: root.getVal("noise_gate_range", 0.7)
-                                        onMoved: if (stateManager) stateManager.setDspParameter("noise_gate_range", value)
-                                    }
-                                    Text { text: Math.round(ngRangeSlider.value * 100) + "%"; font.pixelSize: 12; font.bold: true; color: "#CBA158"; Layout.preferredWidth: 40 }
-                                }
-
-                                RowLayout {
-                                    Layout.fillWidth: true
-                                    spacing: 12
-                                    Text { text: stateManager ? stateManager.strings.attack : "Ataque:"; font.pixelSize: 12; color: "#8E8E93"; Layout.preferredWidth: 80 }
-                                    Slider {
-                                        id: ngAttackSlider
-                                        Layout.fillWidth: true
-                                        from: 0.0; to: 1.0; stepSize: 0.01
-                                        value: root.getVal("noise_gate_attack", 0.5)
-                                        onMoved: if (stateManager) stateManager.setDspParameter("noise_gate_attack", value)
-                                    }
-                                    Text { text: Math.round(ngAttackSlider.value * 100) + "%"; font.pixelSize: 12; font.bold: true; color: "#CBA158"; Layout.preferredWidth: 40 }
-                                }
-
-                                RowLayout {
-                                    Layout.fillWidth: true
-                                    spacing: 12
-                                    Text { text: stateManager ? stateManager.strings.release : "Liberación:"; font.pixelSize: 12; color: "#8E8E93"; Layout.preferredWidth: 80 }
-                                    Slider {
-                                        id: ngReleaseSlider
-                                        Layout.fillWidth: true
-                                        from: 0.0; to: 1.0; stepSize: 0.01
-                                        value: root.getVal("noise_gate_release", 0.4)
-                                        onMoved: if (stateManager) stateManager.setDspParameter("noise_gate_release", value)
-                                    }
-                                    Text { text: Math.round(ngReleaseSlider.value * 100) + "%"; font.pixelSize: 12; font.bold: true; color: "#CBA158"; Layout.preferredWidth: 40 }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // Row 2: Compressor & (HPF + De-Esser) Cards
-                RowLayout {
-                    Layout.fillWidth: true
-                    spacing: 16
-
-                    // CARD 3: COMPRESSOR
-                    Rectangle {
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: 340
-                        radius: 14
-                        color: "#18181C"
-                        border.color: root.getVal("compressor_on", true) ? "#4A3B18" : "#282830"
-                        border.width: 1
-
-                        ColumnLayout {
-                            anchors.fill: parent
-                            anchors.margins: 18
-                            spacing: 12
-
-                            // Card Header
-                            RowLayout {
-                                Layout.fillWidth: true
-
-                                RowLayout {
-                                    spacing: 8
-                                    Text { text: "🎛️"; font.pixelSize: 16 }
-                                    Text {
-                                        text: stateManager ? stateManager.strings.compressor : "Compresor"
-                                        font.pixelSize: 16
-                                        font.bold: true
-                                        color: root.getVal("compressor_on", true) ? "#CBA158" : "#FFFFFF"
-                                    }
-                                }
-
-                                Item { Layout.fillWidth: true }
-
-                                Switch {
-                                    checked: root.getVal("compressor_on", true)
-                                    onToggled: {
-                                        if (stateManager) stateManager.setDspParameter("compressor_on", checked);
-                                    }
-                                }
-                            }
-
-                            Rectangle { Layout.fillWidth: true; height: 1; color: "#25252D" }
-
-                            // Sliders Body
-                            ColumnLayout {
-                                Layout.fillWidth: true
-                                spacing: 14
-                                opacity: root.getVal("compressor_on", true) ? 1.0 : 0.4
-                                enabled: root.getVal("compressor_on", true)
-
-                                RowLayout {
-                                    Layout.fillWidth: true
-                                    spacing: 12
-                                    Text { text: stateManager ? stateManager.strings.threshold : "Umbral:"; font.pixelSize: 12; color: "#8E8E93"; Layout.preferredWidth: 80 }
-                                    Slider {
-                                        id: compThreshSlider
-                                        Layout.fillWidth: true
-                                        from: 0.0; to: 1.0; stepSize: 0.01
-                                        value: root.getVal("compressor_threshold", 0.65)
-                                        onMoved: if (stateManager) stateManager.setDspParameter("compressor_threshold", value)
-                                    }
-                                    Text { text: Math.round(compThreshSlider.value * 100) + "%"; font.pixelSize: 12; font.bold: true; color: "#CBA158"; Layout.preferredWidth: 40 }
-                                }
-
-                                RowLayout {
-                                    Layout.fillWidth: true
-                                    spacing: 12
-                                    Text { text: stateManager ? stateManager.strings.ratio : "Relación:"; font.pixelSize: 12; color: "#8E8E93"; Layout.preferredWidth: 80 }
-                                    Slider {
-                                        id: compRatioSlider
-                                        Layout.fillWidth: true
-                                        from: 0.0; to: 1.0; stepSize: 0.01
-                                        value: root.getVal("compressor_ratio", 0.4)
-                                        onMoved: if (stateManager) stateManager.setDspParameter("compressor_ratio", value)
-                                    }
-                                    Text { text: (1.0 + compRatioSlider.value * 7.0).toFixed(1) + ":1"; font.pixelSize: 12; font.bold: true; color: "#CBA158"; Layout.preferredWidth: 40 }
-                                }
-
-                                RowLayout {
-                                    Layout.fillWidth: true
-                                    spacing: 12
-                                    Text { text: stateManager ? stateManager.strings.makeup_gain : "Ganancia:"; font.pixelSize: 12; color: "#8E8E93"; Layout.preferredWidth: 80 }
-                                    Slider {
-                                        id: compGainSlider
-                                        Layout.fillWidth: true
-                                        from: 0.0; to: 1.0; stepSize: 0.01
-                                        value: root.getVal("compressor_gain", 0.2)
-                                        onMoved: if (stateManager) stateManager.setDspParameter("compressor_gain", value)
-                                    }
-                                    Text { text: "+" + Math.round(compGainSlider.value * 24) + " dB"; font.pixelSize: 12; font.bold: true; color: "#CBA158"; Layout.preferredWidth: 40 }
-                                }
-
-                                RowLayout {
-                                    Layout.fillWidth: true
-                                    spacing: 12
-                                    Text { text: stateManager ? stateManager.strings.attack : "Ataque:"; font.pixelSize: 12; color: "#8E8E93"; Layout.preferredWidth: 80 }
-                                    Slider {
-                                        id: compAttackSlider
-                                        Layout.fillWidth: true
-                                        from: 0.0; to: 1.0; stepSize: 0.01
-                                        value: root.getVal("compressor_attack", 0.4)
-                                        onMoved: if (stateManager) stateManager.setDspParameter("compressor_attack", value)
-                                    }
-                                    Text { text: Math.round(compAttackSlider.value * 100) + "%"; font.pixelSize: 12; font.bold: true; color: "#CBA158"; Layout.preferredWidth: 40 }
-                                }
-
-                                RowLayout {
-                                    Layout.fillWidth: true
-                                    spacing: 12
-                                    Text { text: stateManager ? stateManager.strings.release : "Liberación:"; font.pixelSize: 12; color: "#8E8E93"; Layout.preferredWidth: 80 }
-                                    Slider {
-                                        id: compReleaseSlider
-                                        Layout.fillWidth: true
-                                        from: 0.0; to: 1.0; stepSize: 0.01
-                                        value: root.getVal("compressor_release", 0.4)
-                                        onMoved: if (stateManager) stateManager.setDspParameter("compressor_release", value)
-                                    }
-                                    Text { text: Math.round(compReleaseSlider.value * 100) + "%"; font.pixelSize: 12; font.bold: true; color: "#CBA158"; Layout.preferredWidth: 40 }
-                                }
-                            }
-                        }
-                    }
-
-                    // CARD 4: HPF (HIGH PASS FILTER) & DE-ESSER
-                    Rectangle {
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: 340
-                        radius: 14
-                        color: "#18181C"
-                        border.color: (root.getVal("hpf_on", true) || root.getVal("deesser_on", true)) ? "#4A3B18" : "#282830"
-                        border.width: 1
-
-                        ColumnLayout {
-                            anchors.fill: parent
-                            anchors.margins: 18
-                            spacing: 14
-
-                            // Section 1: HPF (High Pass Filter)
-                            RowLayout {
-                                Layout.fillWidth: true
-                                RowLayout {
-                                    spacing: 8
-                                    Text { text: "📈"; font.pixelSize: 16 }
-                                    Text {
-                                        text: stateManager ? stateManager.strings.hpf : "Filtro Paso Alto (HPF)"
-                                        font.pixelSize: 15
-                                        font.bold: true
-                                        color: root.getVal("hpf_on", true) ? "#CBA158" : "#FFFFFF"
-                                    }
-                                }
-                                Item { Layout.fillWidth: true }
-                                Switch {
-                                    checked: root.getVal("hpf_on", true)
-                                    onToggled: {
-                                        if (stateManager) stateManager.setDspParameter("hpf_on", checked);
-                                    }
-                                }
-                            }
-
-                            ColumnLayout {
-                                Layout.fillWidth: true
-                                spacing: 8
-                                opacity: root.getVal("hpf_on", true) ? 1.0 : 0.4
-                                enabled: root.getVal("hpf_on", true)
-
-                                RowLayout {
-                                    Layout.fillWidth: true
-                                    spacing: 12
-                                    Text { text: stateManager ? stateManager.strings.frequency : "Frecuencia:"; font.pixelSize: 12; color: "#8E8E93"; Layout.preferredWidth: 80 }
-                                    Slider {
-                                        id: hpfFreqSlider
-                                        Layout.fillWidth: true
-                                        from: 0.0; to: 1.0; stepSize: 0.01
-                                        value: root.getVal("hpf_frequency", 0.5)
-                                        onMoved: if (stateManager) stateManager.setDspParameter("hpf_frequency", value)
-                                    }
-                                    Text { text: Math.round(20 + hpfFreqSlider.value * 180) + " Hz"; font.pixelSize: 12; font.bold: true; color: "#CBA158"; Layout.preferredWidth: 60 }
-                                }
-                            }
-
-                            Rectangle { Layout.fillWidth: true; height: 1; color: "#25252D" }
-
-                            // Section 2: De-Esser
-                            RowLayout {
-                                Layout.fillWidth: true
-                                RowLayout {
-                                    spacing: 8
-                                    Text { text: "🎯"; font.pixelSize: 16 }
-                                    Text {
-                                        text: stateManager ? stateManager.strings.deesser : "De-Esser (Atenuar 'S')"
-                                        font.pixelSize: 15
-                                        font.bold: true
-                                        color: root.getVal("deesser_on", true) ? "#CBA158" : "#FFFFFF"
-                                    }
-                                }
-                                Item { Layout.fillWidth: true }
-                                Switch {
-                                    checked: root.getVal("deesser_on", true)
-                                    onToggled: {
-                                        if (stateManager) stateManager.setDspParameter("deesser_on", checked);
-                                    }
-                                }
-                            }
-
-                            ColumnLayout {
-                                Layout.fillWidth: true
-                                spacing: 10
-                                opacity: root.getVal("deesser_on", true) ? 1.0 : 0.4
-                                enabled: root.getVal("deesser_on", true)
-
-                                RowLayout {
-                                    Layout.fillWidth: true
-                                    spacing: 12
-                                    Text { text: stateManager ? stateManager.strings.threshold : "Umbral:"; font.pixelSize: 12; color: "#8E8E93"; Layout.preferredWidth: 80 }
-                                    Slider {
-                                        id: deessThreshSlider
-                                        Layout.fillWidth: true
-                                        from: 0.0; to: 1.0; stepSize: 0.01
-                                        value: root.getVal("deesser_threshold", 0.65)
-                                        onMoved: if (stateManager) stateManager.setDspParameter("deesser_threshold", value)
-                                    }
-                                    Text { text: Math.round(deessThreshSlider.value * 100) + "%"; font.pixelSize: 12; font.bold: true; color: "#CBA158"; Layout.preferredWidth: 60 }
-                                }
-
-                                RowLayout {
-                                    Layout.fillWidth: true
-                                    spacing: 12
-                                    Text { text: stateManager ? stateManager.strings.ratio : "Relación:"; font.pixelSize: 12; color: "#8E8E93"; Layout.preferredWidth: 80 }
-                                    Slider {
-                                        id: deessRatioSlider
-                                        Layout.fillWidth: true
-                                        from: 0.0; to: 1.0; stepSize: 0.01
-                                        value: root.getVal("deesser_ratio", 0.5)
-                                        onMoved: if (stateManager) stateManager.setDspParameter("deesser_ratio", value)
-                                    }
-                                    Text { text: Math.round(deessRatioSlider.value * 100) + "%"; font.pixelSize: 12; font.bold: true; color: "#CBA158"; Layout.preferredWidth: 60 }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // Row 3: 3-Band Parametric Equalizer (EQ) Card
-                Rectangle {
-                    Layout.fillWidth: true
-                    height: 180
-                    radius: 14
-                    color: "#18181C"
-                    border.color: root.getVal("eq_on", true) ? "#4A3B18" : "#282830"
-                    border.width: 1
-
-                    ColumnLayout {
-                        anchors.fill: parent
-                        anchors.margins: 18
-                        spacing: 14
-
-                        // Card Header
                         RowLayout {
                             Layout.fillWidth: true
+                            spacing: 16
 
-                            RowLayout {
-                                spacing: 8
-                                Text { text: "🎚️"; font.pixelSize: 16 }
+                            DspSlider {
+                                label: root.s("preamp_gain", "Ganancia")
+                                prop: "preamp_gain"
+                                defVal: 45; from: 0; to: 76; stepSize: 1
+                                format: function(v) { return Math.round(v) + " dB"; }
+                            }
+
+                            Rectangle {
+                                readonly property bool on: root.getVal("phantom_power", false)
+                                width: 72; height: 32; radius: 6
+                                color: on ? "#3D2418" : (p48Area.containsMouse ? "#2A2A32" : "#202026")
+                                border.color: on ? "#FF9500" : "#32323C"
                                 Text {
-                                    text: stateManager ? stateManager.strings.equalizer : "Ecualizador (EQ 3 Bandas)"
-                                    font.pixelSize: 16
+                                    anchors.centerIn: parent
+                                    text: "+48V"
+                                    font.pixelSize: 12
                                     font.bold: true
-                                    color: root.getVal("eq_on", true) ? "#CBA158" : "#FFFFFF"
+                                    color: parent.on ? "#FF9500" : "#8E8E93"
+                                }
+                                MouseArea {
+                                    id: p48Area
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: if (stateManager) stateManager.setDspParameter("phantom_power", !parent.on)
                                 }
                             }
 
-                            Item { Layout.fillWidth: true }
+                            Rectangle {
+                                readonly property bool on: root.getVal("phase_flip", false)
+                                width: 44; height: 32; radius: 6
+                                color: on ? "#2C2618" : (phaseArea.containsMouse ? "#2A2A32" : "#202026")
+                                border.color: on ? "#CBA158" : "#32323C"
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: "Ø"
+                                    font.pixelSize: 14
+                                    font.bold: true
+                                    color: parent.on ? "#CBA158" : "#8E8E93"
+                                }
+                                MouseArea {
+                                    id: phaseArea
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: if (stateManager) stateManager.setDspParameter("phase_flip", !parent.on)
+                                }
+                            }
+                        }
+                    }
 
-                            Switch {
-                                checked: root.getVal("eq_on", true)
-                                onToggled: {
-                                    if (stateManager) stateManager.setDspParameter("eq_on", checked);
+                    // Processors in signal-chain order (2 columns)
+                    GridLayout {
+                        Layout.fillWidth: true
+                        columns: mainScroll.availableWidth > 760 ? 2 : 1
+                        rowSpacing: 16
+                        columnSpacing: 16
+
+                        DspCard {
+                            Layout.alignment: Qt.AlignTop
+                            icon: "📉"
+                            title: root.s("hpf", "Filtro Paso Alto (HPF)")
+                            description: root.s("hpf_desc", "")
+                            onProp: "hpf_on"
+                            focused: root.focusedEffect === "hpf"
+
+                            DspSlider {
+                                label: root.s("frequency", "Frecuencia")
+                                prop: "hpf_frequency"
+                                format: function(v) { return Math.round(20 + v * 180) + " Hz"; }
+                            }
+                        }
+
+                        DspCard {
+                            Layout.alignment: Qt.AlignTop
+                            icon: "🚪"
+                            title: root.s("noise_gate", "Puerta de Ruido")
+                            description: root.s("noise_gate_desc", "")
+                            onProp: "noise_gate_on"
+                            focused: root.focusedEffect === "gate"
+
+                            DspSlider {
+                                label: root.s("threshold", "Umbral")
+                                prop: "noise_gate_threshold"; defVal: 0.28
+                                format: function(v) { return (-60 + v * 50).toFixed(1) + " dB"; }
+                            }
+                            DspSlider {
+                                label: root.s("range", "Rango")
+                                prop: "noise_gate_range"; defVal: 0.7
+                                format: function(v) { return (-80 + v * 60).toFixed(1) + " dB"; }
+                            }
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 12
+                                DspSlider { compact: true; label: root.s("attack", "Ataque");      prop: "noise_gate_attack";  defVal: 0.5 }
+                                DspSlider { compact: true; label: root.s("release", "Liberación"); prop: "noise_gate_release"; defVal: 0.4 }
+                            }
+                        }
+
+                        DspCard {
+                            Layout.alignment: Qt.AlignTop
+                            icon: "🔕"
+                            title: root.s("deesser", "De-Esser")
+                            description: root.s("deesser_desc", "")
+                            onProp: "deesser_on"
+                            focused: root.focusedEffect === "deesser"
+
+                            DspSlider {
+                                label: root.s("threshold", "Umbral")
+                                prop: "deesser_threshold"; defVal: 0.65
+                                format: function(v) { return (-50 + v * 40).toFixed(1) + " dB"; }
+                            }
+                            DspSlider {
+                                label: root.s("ratio", "Intensidad")
+                                prop: "deesser_ratio"; defVal: 0.5
+                            }
+                        }
+
+                        DspCard {
+                            Layout.alignment: Qt.AlignTop
+                            icon: "🗜️"
+                            title: root.s("compressor", "Compresor")
+                            description: root.s("compressor_desc", "")
+                            onProp: "compressor_on"
+                            focused: root.focusedEffect === "compressor"
+
+                            DspSlider {
+                                label: root.s("threshold", "Umbral")
+                                prop: "compressor_threshold"; defVal: 0.65
+                                format: function(v) { return (-40 + v * 40).toFixed(1) + " dB"; }
+                            }
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 12
+                                DspSlider {
+                                    compact: true; label: root.s("ratio", "Ratio")
+                                    prop: "compressor_ratio"; defVal: 0.4; stepSize: 0.05
+                                    format: function(v) { return (1.0 + v * 7.0).toFixed(1) + ":1"; }
+                                }
+                                DspSlider {
+                                    compact: true; label: root.s("makeup_gain", "Ganancia")
+                                    prop: "compressor_gain"; defVal: 0.2
+                                    format: function(v) { return "+" + (v * 24.0).toFixed(1) + " dB"; }
+                                }
+                            }
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 12
+                                DspSlider { compact: true; label: root.s("attack", "Ataque");      prop: "compressor_attack";  defVal: 0.4 }
+                                DspSlider { compact: true; label: root.s("release", "Liberación"); prop: "compressor_release"; defVal: 0.4 }
+                            }
+                        }
+
+                        DspCard {
+                            Layout.alignment: Qt.AlignTop
+                            icon: "🎚️"
+                            title: root.s("equalizer", "Ecualizador (EQ)")
+                            description: root.s("equalizer_desc", "")
+                            onProp: "eq_on"
+                            focused: root.focusedEffect === "eq"
+
+                            Repeater {
+                                model: [
+                                    {"prop": "eq_low",  "label": root.s("low", "Graves")},
+                                    {"prop": "eq_mid",  "label": root.s("mid", "Medios")},
+                                    {"prop": "eq_high", "label": root.s("high", "Agudos")}
+                                ]
+                                DspSlider {
+                                    label: modelData.label
+                                    prop: modelData.prop
+                                    stepSize: 0.02
+                                    format: function(v) { let db = (v - 0.5) * 24.0; return (db > 0 ? "+" : "") + db.toFixed(1) + " dB"; }
                                 }
                             }
                         }
 
-                        Rectangle { Layout.fillWidth: true; height: 1; color: "#25252D" }
+                        DspCard {
+                            Layout.alignment: Qt.AlignTop
+                            icon: "✨"
+                            title: root.s("aphex_title", "Procesamiento APHEX®")
+                            description: root.s("aphex_desc", "")
+                            onProp: "aphex_on"
+                            focused: root.focusedEffect === "exciter" || root.focusedEffect === "big_bottom"
 
-                        // 3 EQ Sliders in a Horizontal Row
-                        RowLayout {
-                            Layout.fillWidth: true
-                            spacing: 24
-                            opacity: root.getVal("eq_on", true) ? 1.0 : 0.4
-                            enabled: root.getVal("eq_on", true)
-
-                            // Low Band (Graves)
-                            ColumnLayout {
+                            Text { text: root.s("aural_exciter", "Aural Exciter™"); font.pixelSize: 11; font.bold: true; color: "#E0E0E0" }
+                            RowLayout {
                                 Layout.fillWidth: true
-                                spacing: 4
-                                RowLayout {
-                                    Layout.fillWidth: true
-                                    Text { text: stateManager ? stateManager.strings.low : "Graves (Low)"; font.pixelSize: 12; font.bold: true; color: "#E0E0E0" }
-                                    Item { Layout.fillWidth: true }
-                                    Text {
-                                        property real db: (eqLowSlider.value - 0.5) * 24.0
-                                        text: (db > 0 ? "+" : "") + db.toFixed(1) + " dB"
-                                        font.pixelSize: 12; font.bold: true; color: "#CBA158"
-                                    }
-                                }
-                                Slider {
-                                    id: eqLowSlider
-                                    Layout.fillWidth: true
-                                    from: 0.0; to: 1.0; stepSize: 0.02
-                                    value: root.getVal("eq_low", 0.5)
-                                    onMoved: if (stateManager) stateManager.setDspParameter("eq_low", value)
-                                }
+                                spacing: 12
+                                DspSlider { compact: true; label: "Mix";  prop: "aphex_ae_mix";  defVal: 0.5 }
+                                DspSlider { compact: true; label: "Tune"; prop: "aphex_ae_tune"; defVal: 0.5 }
                             }
-
-                            // Mid Band (Medios)
-                            ColumnLayout {
+                            Text { text: root.s("big_bottom", "Big Bottom™"); font.pixelSize: 11; font.bold: true; color: "#E0E0E0" }
+                            RowLayout {
                                 Layout.fillWidth: true
-                                spacing: 4
-                                RowLayout {
-                                    Layout.fillWidth: true
-                                    Text { text: stateManager ? stateManager.strings.mid : "Medios (Mid)"; font.pixelSize: 12; font.bold: true; color: "#E0E0E0" }
-                                    Item { Layout.fillWidth: true }
-                                    Text {
-                                        property real db: (eqMidSlider.value - 0.5) * 24.0
-                                        text: (db > 0 ? "+" : "") + db.toFixed(1) + " dB"
-                                        font.pixelSize: 12; font.bold: true; color: "#CBA158"
-                                    }
-                                }
-                                Slider {
-                                    id: eqMidSlider
-                                    Layout.fillWidth: true
-                                    from: 0.0; to: 1.0; stepSize: 0.02
-                                    value: root.getVal("eq_mid", 0.5)
-                                    onMoved: if (stateManager) stateManager.setDspParameter("eq_mid", value)
-                                }
-                            }
-
-                            // High Band (Agudos)
-                            ColumnLayout {
-                                Layout.fillWidth: true
-                                spacing: 4
-                                RowLayout {
-                                    Layout.fillWidth: true
-                                    Text { text: stateManager ? stateManager.strings.high : "Agudos (High)"; font.pixelSize: 12; font.bold: true; color: "#E0E0E0" }
-                                    Item { Layout.fillWidth: true }
-                                    Text {
-                                        property real db: (eqHighSlider.value - 0.5) * 24.0
-                                        text: (db > 0 ? "+" : "") + db.toFixed(1) + " dB"
-                                        font.pixelSize: 12; font.bold: true; color: "#CBA158"
-                                    }
-                                }
-                                Slider {
-                                    id: eqHighSlider
-                                    Layout.fillWidth: true
-                                    from: 0.0; to: 1.0; stepSize: 0.02
-                                    value: root.getVal("eq_high", 0.5)
-                                    onMoved: if (stateManager) stateManager.setDspParameter("eq_high", value)
-                                }
+                                spacing: 12
+                                DspSlider { compact: true; accent: "#FF8C28"; label: "Drive"; prop: "aphex_bb_drive"; defVal: 0.5 }
+                                DspSlider { compact: true; accent: "#FF8C28"; label: "Tune";  prop: "aphex_bb_tune";  defVal: 0.35 }
                             }
                         }
                     }
                 }
 
-                Item { height: 20 }
+                Item { height: 16 }
             }
         }
     }
