@@ -340,15 +340,27 @@ class StateManager(QObject):
         self.monitor.start()
 
     def _init_default_faders(self):
-        phys_limit = 4 if self._is_duo else 6
-        return [
-            {"index": 0, "name": "Mic 1", "color": "#FF3C3C", "icon": "mic", "level": 70, "mute": False, "listen": False, "is_virtual": False},
-            {"index": 1, "name": "Mic 2 / Chat", "color": "#28C850", "icon": "chat", "level": 70, "mute": False, "listen": False, "is_virtual": False},
-            {"index": 2, "name": "USB 1", "color": "#FF8C28", "icon": "usb", "level": 70, "mute": False, "listen": False, "is_virtual": False},
-            {"index": 3, "name": "USB 2", "color": "#A050E6", "icon": "usb", "level": 70, "mute": False, "listen": False, "is_virtual": False},
-            {"index": 4, "name": "SMART Pads", "color": "#FF3C3C", "icon": "pads", "level": 70, "mute": False, "listen": False, "is_virtual": True},
-            {"index": 5, "name": "Bluetooth", "color": "#3C96FF", "icon": "bluetooth", "level": 70, "mute": False, "listen": False, "is_virtual": True},
-        ]
+        if self._is_duo:
+            return [
+                {"index": 0, "name": "Mic 1", "color": "#FF3C3C", "icon": "mic", "level": 70, "mute": False, "listen": False, "is_virtual": False},
+                {"index": 1, "name": "Mic 2 / Chat", "color": "#28C850", "icon": "chat", "level": 70, "mute": False, "listen": False, "is_virtual": False},
+                {"index": 2, "name": "USB 1", "color": "#FF8C28", "icon": "usb", "level": 70, "mute": False, "listen": False, "is_virtual": False},
+                {"index": 3, "name": "USB 2", "color": "#A050E6", "icon": "usb", "level": 70, "mute": False, "listen": False, "is_virtual": False},
+                {"index": 4, "name": "SMART Pads", "color": "#FF3C3C", "icon": "pads", "level": 70, "mute": False, "listen": False, "is_virtual": True},
+                {"index": 5, "name": "Bluetooth", "color": "#3C96FF", "icon": "bluetooth", "level": 70, "mute": False, "listen": False, "is_virtual": True},
+            ]
+        else:
+            return [
+                {"index": 0, "name": "Mic 1", "color": "#FF3C3C", "icon": "mic", "level": 70, "mute": False, "listen": False, "is_virtual": False},
+                {"index": 1, "name": "Mic 2", "color": "#28C850", "icon": "mic", "level": 70, "mute": False, "listen": False, "is_virtual": False},
+                {"index": 2, "name": "Mic 3", "color": "#FF9600", "icon": "mic", "level": 70, "mute": False, "listen": False, "is_virtual": False},
+                {"index": 3, "name": "Mic 4", "color": "#E6DC00", "icon": "mic", "level": 70, "mute": False, "listen": False, "is_virtual": False},
+                {"index": 4, "name": "USB 1 (Main)", "color": "#FF8C28", "icon": "usb", "level": 70, "mute": False, "listen": False, "is_virtual": False},
+                {"index": 5, "name": "USB 2 (Chat)", "color": "#00C8C8", "icon": "chat", "level": 70, "mute": False, "listen": False, "is_virtual": False},
+                {"index": 6, "name": "SMART Pads", "color": "#FF3C3C", "icon": "pads", "level": 70, "mute": False, "listen": False, "is_virtual": True},
+                {"index": 7, "name": "Bluetooth", "color": "#3C96FF", "icon": "bluetooth", "level": 70, "mute": False, "listen": False, "is_virtual": True},
+                {"index": 8, "name": "Virtual", "color": "#A050E6", "icon": "usb", "level": 70, "mute": False, "listen": False, "is_virtual": True},
+            ]
 
     def _init_empty_banks(self):
         banks = []
@@ -385,9 +397,14 @@ class StateManager(QObject):
         self._permission_error = not info.get("has_permission", False)
         self._permission_path = info.get("hidraw_node", "")
 
+        # Re-initialize banks and faders immediately so model geometry matches connected hardware
+        self._banks = self._init_empty_banks()
+        self._faders = self._init_default_faders()
+
         self.stateChanged.emit()
         self.padsChanged.emit()
         self.selectedPadChanged.emit()
+        self.fadersChanged.emit()
 
         if info.get("has_permission"):
             self.executor.submit(self._sync_hardware_state)
@@ -721,22 +738,61 @@ class StateManager(QObject):
     def selectedPadIndex(self):
         return self._selected_pad_index
 
+    def _get_current_pad(self):
+        order = DUO_PHYSICAL_ORDER if self._is_duo else PRO_II_PHYSICAL_ORDER
+        logical_pos = order[self._selected_pad_index] if self._selected_pad_index < len(order) else self._selected_pad_index
+        if 0 <= self._current_bank < len(self._banks):
+            bank = self._banks[self._current_bank]
+            if 0 <= logical_pos < len(bank):
+                return bank[logical_pos]
+        return None
+
     @pyqtProperty(QVariant, notify=padsChanged)
     def currentPads(self):
         order = DUO_PHYSICAL_ORDER if self._is_duo else PRO_II_PHYSICAL_ORDER
+        if not (0 <= self._current_bank < len(self._banks)):
+            return []
         bank = self._banks[self._current_bank]
 
         ordered_pads = []
         for display_idx in range(self._pads_per_bank):
             logical_pos = order[display_idx] if display_idx < len(order) else display_idx
-            ordered_pads.append(dict(bank[logical_pos]))
+            if 0 <= logical_pos < len(bank):
+                ordered_pads.append(dict(bank[logical_pos]))
+            else:
+                ordered_pads.append({
+                    "idx": self._current_bank * self._pads_per_bank + display_idx,
+                    "pos": display_idx,
+                    "name": "",
+                    "color_idx": 0,
+                    "color_hex": "#505055",
+                    "type": "empty",
+                    "mode": "toggle",
+                    "loop": False,
+                    "replay": False,
+                    "gain": 0.0,
+                    "file": ""
+                })
         return ordered_pads
 
     @pyqtProperty(QVariant, notify=selectedPadChanged)
     def selectedPad(self):
-        order = DUO_PHYSICAL_ORDER if self._is_duo else PRO_II_PHYSICAL_ORDER
-        logical_pos = order[self._selected_pad_index] if self._selected_pad_index < len(order) else self._selected_pad_index
-        return dict(self._banks[self._current_bank][logical_pos])
+        pad = self._get_current_pad()
+        if pad:
+            return dict(pad)
+        return {
+            "idx": self._current_bank * self._pads_per_bank + self._selected_pad_index,
+            "pos": self._selected_pad_index,
+            "name": "",
+            "color_idx": 0,
+            "color_hex": "#505055",
+            "type": "empty",
+            "mode": "toggle",
+            "loop": False,
+            "replay": False,
+            "gain": 0.0,
+            "file": ""
+        }
 
     @pyqtProperty(bool, notify=transferStateChanged)
     def transferModeActive(self):
@@ -777,7 +833,8 @@ class StateManager(QObject):
             self.selectPad(display_index)
             order = DUO_PHYSICAL_ORDER if self._is_duo else PRO_II_PHYSICAL_ORDER
             logical_pos = order[display_index] if display_index < len(order) else display_index
-            pad = self._banks[self._current_bank][logical_pos]
+            bank = self._banks[self._current_bank] if (0 <= self._current_bank < len(self._banks)) else []
+            pad = bank[logical_pos] if (0 <= logical_pos < len(bank)) else {}
 
             logger.info(f"Triggering Pad {display_index} (name: '{pad.get('name')}') on Bank {self._current_bank + 1}")
             if self._connected and not self._permission_error:
@@ -786,9 +843,9 @@ class StateManager(QObject):
 
     @pyqtSlot(str)
     def updatePadName(self, name):
-        order = DUO_PHYSICAL_ORDER if self._is_duo else PRO_II_PHYSICAL_ORDER
-        logical_pos = order[self._selected_pad_index] if self._selected_pad_index < len(order) else self._selected_pad_index
-        pad = self._banks[self._current_bank][logical_pos]
+        pad = self._get_current_pad()
+        if not pad:
+            return
         pad["name"] = name
         if pad["type"] == "empty" and name:
             pad["type"] = "sound"
@@ -805,9 +862,9 @@ class StateManager(QObject):
     @pyqtSlot(int)
     def updatePadColor(self, color_idx):
         if 0 <= color_idx < len(PAD_COLORS):
-            order = DUO_PHYSICAL_ORDER if self._is_duo else PRO_II_PHYSICAL_ORDER
-            logical_pos = order[self._selected_pad_index] if self._selected_pad_index < len(order) else self._selected_pad_index
-            pad = self._banks[self._current_bank][logical_pos]
+            pad = self._get_current_pad()
+            if not pad:
+                return
             pad["color_idx"] = color_idx
             pad["color_hex"] = PAD_COLORS[color_idx]["hex"]
             self.padsChanged.emit()
@@ -821,9 +878,9 @@ class StateManager(QObject):
 
     @pyqtSlot(str)
     def updatePadPlayMode(self, mode):
-        order = DUO_PHYSICAL_ORDER if self._is_duo else PRO_II_PHYSICAL_ORDER
-        logical_pos = order[self._selected_pad_index] if self._selected_pad_index < len(order) else self._selected_pad_index
-        pad = self._banks[self._current_bank][logical_pos]
+        pad = self._get_current_pad()
+        if not pad:
+            return
         pad["mode"] = mode
         self.padsChanged.emit()
         self.selectedPadChanged.emit()
@@ -842,9 +899,9 @@ class StateManager(QObject):
 
     @pyqtSlot(bool)
     def updatePadLoop(self, loop):
-        order = DUO_PHYSICAL_ORDER if self._is_duo else PRO_II_PHYSICAL_ORDER
-        logical_pos = order[self._selected_pad_index] if self._selected_pad_index < len(order) else self._selected_pad_index
-        pad = self._banks[self._current_bank][logical_pos]
+        pad = self._get_current_pad()
+        if not pad:
+            return
         pad["loop"] = loop
         self.padsChanged.emit()
         self.selectedPadChanged.emit()
@@ -862,9 +919,9 @@ class StateManager(QObject):
 
     @pyqtSlot(bool)
     def updatePadReplay(self, replay):
-        order = DUO_PHYSICAL_ORDER if self._is_duo else PRO_II_PHYSICAL_ORDER
-        logical_pos = order[self._selected_pad_index] if self._selected_pad_index < len(order) else self._selected_pad_index
-        pad = self._banks[self._current_bank][logical_pos]
+        pad = self._get_current_pad()
+        if not pad:
+            return
         pad["replay"] = replay
         self.padsChanged.emit()
         self.selectedPadChanged.emit()
@@ -882,9 +939,9 @@ class StateManager(QObject):
 
     @pyqtSlot(float)
     def updatePadGain(self, gain):
-        order = DUO_PHYSICAL_ORDER if self._is_duo else PRO_II_PHYSICAL_ORDER
-        logical_pos = order[self._selected_pad_index] if self._selected_pad_index < len(order) else self._selected_pad_index
-        pad = self._banks[self._current_bank][logical_pos]
+        pad = self._get_current_pad()
+        if not pad:
+            return
         pad["gain"] = gain
         self.padsChanged.emit()
         self.selectedPadChanged.emit()
@@ -903,9 +960,9 @@ class StateManager(QObject):
             self.toastMessage.emit("Archivo no encontrado")
             return
 
-        order = DUO_PHYSICAL_ORDER if self._is_duo else PRO_II_PHYSICAL_ORDER
-        logical_pos = order[self._selected_pad_index] if self._selected_pad_index < len(order) else self._selected_pad_index
-        pad = self._banks[self._current_bank][logical_pos]
+        pad = self._get_current_pad()
+        if not pad:
+            return
 
         name = pad_name or os.path.splitext(os.path.basename(clean_path))[0]
         pad["name"] = name
@@ -936,9 +993,9 @@ class StateManager(QObject):
 
     @pyqtSlot()
     def clearCurrentPad(self):
-        order = DUO_PHYSICAL_ORDER if self._is_duo else PRO_II_PHYSICAL_ORDER
-        logical_pos = order[self._selected_pad_index] if self._selected_pad_index < len(order) else self._selected_pad_index
-        pad = self._banks[self._current_bank][logical_pos]
+        pad = self._get_current_pad()
+        if not pad:
+            return
         pad["name"] = ""
         pad["file"] = ""
         pad["type"] = "empty"
@@ -962,9 +1019,9 @@ class StateManager(QObject):
 
     @pyqtSlot(str)
     def exportCurrentPad(self, target_filepath):
-        order = DUO_PHYSICAL_ORDER if self._is_duo else PRO_II_PHYSICAL_ORDER
-        logical_pos = order[self._selected_pad_index] if self._selected_pad_index < len(order) else self._selected_pad_index
-        pad = self._banks[self._current_bank][logical_pos]
+        pad = self._get_current_pad()
+        if not pad:
+            return
 
         if not pad.get("file") or pad.get("type") == "empty":
             self.toastMessage.emit("El pad seleccionado no tiene ningún archivo asignado para exportar.")
@@ -1553,9 +1610,9 @@ class StateManager(QObject):
         input_ch: 0=Mic 1, 1=Mic 2
         trigger_mode: 1=Latching, 0=Momentary
         """
-        order = DUO_PHYSICAL_ORDER if self._is_duo else PRO_II_PHYSICAL_ORDER
-        logical_pos = order[self._selected_pad_index] if self._selected_pad_index < len(order) else self._selected_pad_index
-        pad = self._banks[self._current_bank][logical_pos]
+        pad = self._get_current_pad()
+        if not pad:
+            return
 
         pad["type"] = "fx"
         pad["name"] = fx_name
@@ -1595,9 +1652,9 @@ class StateManager(QObject):
 
     @pyqtSlot(str)
     def updatePadType(self, ptype):
-        order = DUO_PHYSICAL_ORDER if self._is_duo else PRO_II_PHYSICAL_ORDER
-        logical_pos = order[self._selected_pad_index] if self._selected_pad_index < len(order) else self._selected_pad_index
-        pad = self._banks[self._current_bank][logical_pos]
+        pad = self._get_current_pad()
+        if not pad:
+            return
         pad["type"] = ptype
         if ptype == "fx":
             if not pad.get("name"):
