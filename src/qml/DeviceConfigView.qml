@@ -112,27 +112,222 @@ Item {
 
         // Tab Content Area with Flickable Scroll
         ScrollView {
+            id: configScroll
             Layout.fillWidth: true
             Layout.fillHeight: true
+            contentWidth: availableWidth
             clip: true
+            ScrollBar.vertical.policy: ScrollBar.AsNeeded
 
-            // TAB 0: OUTPUT
-            ColumnLayout {
-                width: root.width - 56
-                spacing: 18
-                visible: root.activeTab === 0
+            Item {
+                id: scrollContent
+                width: configScroll.availableWidth
+                implicitHeight: {
+                    if (root.activeTab === 0) return tab0Col.implicitHeight + 40;
+                    if (root.activeTab === 1) return tab1Col.implicitHeight + 40;
+                    return tab2Col.implicitHeight + 40;
+                }
 
-                // 1. Headphones Card
-                Rectangle {
-                    Layout.fillWidth: true
-                    height: hpCol.height + 36
-                    radius: 12
-                    color: "#1A1A1D"
-                    border.color: "#2C2C32"
-                    border.width: 1
+                // TAB 0: OUTPUT
+                ColumnLayout {
+                    id: tab0Col
+                    anchors.top: parent.top
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    spacing: 20
+                    visible: root.activeTab === 0
 
-                    ColumnLayout {
-                        id: hpCol
+                    // 1. Streamer X UNIFY Multitrack Architecture Card (Prominently at the top when Streamer X is connected)
+                    Rectangle {
+                        visible: Boolean(stateManager && stateManager.isStreamerX)
+                        Layout.fillWidth: true
+                        height: unifyCol.height + 40
+                        radius: 14
+                        color: (stateManager && stateManager.streamerXUnifyInstalled) ? "#151B17" : "#1B1B20"
+                        border.color: (stateManager && stateManager.streamerXUnifyInstalled) ? "#28C850" : "#CBA158"
+                        border.width: (stateManager && stateManager.streamerXUnifyInstalled) ? 1.5 : 1
+
+                        ColumnLayout {
+                            id: unifyCol
+                            anchors.top: parent.top
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.margins: 20
+                            spacing: 16
+
+                            // Header with icon badge, title, status and action button
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 16
+
+                                // Unify Icon Badge
+                                Rectangle {
+                                    width: 48
+                                    height: 48
+                                    radius: 10
+                                    color: (stateManager && stateManager.streamerXUnifyInstalled) ? "#1A3824" : "#2A2318"
+                                    border.color: (stateManager && stateManager.streamerXUnifyInstalled) ? "#28C850" : "#CBA158"
+                                    border.width: 1.5
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: "🎛️"
+                                        font.pixelSize: 24
+                                    }
+                                }
+
+                                ColumnLayout {
+                                    spacing: 4
+                                    Layout.fillWidth: true
+
+                                    RowLayout {
+                                        spacing: 10
+                                        Text {
+                                            text: "Arquitectura Multipista PipeWire (UNIFY para Linux)"
+                                            font.pixelSize: 16
+                                            font.bold: true
+                                            color: "#FFFFFF"
+                                        }
+                                        Rectangle {
+                                            width: 76
+                                            height: 20
+                                            radius: 10
+                                            color: (stateManager && stateManager.streamerXUnifyInstalled) ? "#163820" : "#2C2C34"
+                                            border.color: (stateManager && stateManager.streamerXUnifyInstalled) ? "#28C850" : "#4A4A56"
+                                            border.width: 1
+                                            Text {
+                                                anchors.centerIn: parent
+                                                text: (stateManager && stateManager.streamerXUnifyInstalled) ? "● ACTIVO" : "○ INACTIVO"
+                                                font.pixelSize: 9
+                                                font.bold: true
+                                                color: (stateManager && stateManager.streamerXUnifyInstalled) ? "#28C850" : "#9A9A9E"
+                                            }
+                                        }
+                                    }
+
+                                    Text {
+                                        text: "Crea dispositivos de audio virtuales nativos independientes en PipeWire con enrutamiento automático de baja latencia hacia los auriculares del Streamer X y OBS Studio."
+                                        font.pixelSize: 11
+                                        color: "#9A9A9E"
+                                        Layout.preferredWidth: root.width - 320
+                                        wrapMode: Text.WordWrap
+                                    }
+                                }
+
+                                Button {
+                                    text: (stateManager && stateManager.streamerXUnifyInstalled) ? "Desactivar UNIFY" : "Activar UNIFY en Linux"
+                                    HoverHandler { cursorShape: Qt.PointingHandCursor }
+                                    contentItem: Text {
+                                        text: parent.text
+                                        font.pixelSize: 12
+                                        font.bold: true
+                                        color: "#FFFFFF"
+                                        horizontalAlignment: Text.AlignHCenter
+                                        verticalAlignment: Text.AlignVCenter
+                                    }
+                                    background: Rectangle {
+                                        implicitWidth: 170
+                                        implicitHeight: 38
+                                        radius: 8
+                                        color: (stateManager && stateManager.streamerXUnifyInstalled) ? "#8A2A2A" : "#24733F"
+                                        border.color: (stateManager && stateManager.streamerXUnifyInstalled) ? "#C93B3B" : "#32A056"
+                                        border.width: 1
+                                    }
+                                    onClicked: {
+                                        if (stateManager) stateManager.toggleStreamerXUnifyProfile();
+                                    }
+                                }
+                            }
+
+                            // Grid of Virtual Channels Cards
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 10
+
+                                Repeater {
+                                    model: [
+                                        {"icon": "🎮", "name": "Game", "desc": "Juegos (Steam, etc.)", "color": "#3C96FF"},
+                                        {"icon": "💬", "name": "Chat", "desc": "Discord / Teams / Meet", "color": "#28C850"},
+                                        {"icon": "🎵", "name": "Music", "desc": "Spotify / Navegador", "color": "#FF9600"},
+                                        {"icon": "🔔", "name": "System", "desc": "Alertas y SO", "color": "#A050E6"},
+                                        {"icon": "🎙️", "name": "Stream Mix", "desc": "Salida OBS Broadcast", "color": "#FF3C3C"}
+                                    ]
+
+                                    Rectangle {
+                                        Layout.fillWidth: true
+                                        height: 58
+                                        radius: 8
+                                        color: "#212128"
+                                        border.color: (stateManager && stateManager.streamerXUnifyInstalled) ? modelData.color : "#2F2F38"
+                                        border.width: (stateManager && stateManager.streamerXUnifyInstalled) ? 1.5 : 1
+
+                                        RowLayout {
+                                            anchors.fill: parent
+                                            anchors.margins: 10
+                                            spacing: 10
+
+                                            Text { text: modelData.icon; font.pixelSize: 18 }
+                                            ColumnLayout {
+                                                spacing: 2
+                                                Layout.fillWidth: true
+                                                Text {
+                                                    text: modelData.name
+                                                    font.pixelSize: 12
+                                                    font.bold: true
+                                                    color: (stateManager && stateManager.streamerXUnifyInstalled) ? modelData.color : "#FFFFFF"
+                                                }
+                                                Text {
+                                                    text: modelData.desc
+                                                    font.pixelSize: 10
+                                                    color: "#8E8E93"
+                                                    elide: Text.ElideRight
+                                                    Layout.fillWidth: true
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Bottom Info Tip
+                            Rectangle {
+                                Layout.fillWidth: true
+                                height: 34
+                                radius: 6
+                                color: "#18181E"
+                                border.color: "#282834"
+                                border.width: 1
+
+                                RowLayout {
+                                    anchors.fill: parent
+                                    anchors.leftMargin: 12
+                                    anchors.rightMargin: 12
+                                    spacing: 8
+
+                                    Text { text: "💡"; font.pixelSize: 12 }
+                                    Text {
+                                        text: "Al activar esta opción, en OBS Studio o tu DAW podrás capturar cada canal por separado en pistas 1 a 6 para mezclar y editar audio multicanal."
+                                        font.pixelSize: 11
+                                        color: "#CBA158"
+                                        elide: Text.ElideRight
+                                        Layout.fillWidth: true
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // 2. Headphones Card
+                    Rectangle {
+                        Layout.fillWidth: true
+                        height: hpCol.height + 36
+                        radius: 12
+                        color: "#1A1A1D"
+                        border.color: "#2C2C32"
+                        border.width: 1
+
+                        ColumnLayout {
+                            id: hpCol
                         anchors.top: parent.top
                         anchors.left: parent.left
                         anchors.right: parent.right
@@ -412,112 +607,6 @@ Item {
                                             anchors.fill: parent
                                             cursorShape: Qt.PointingHandCursor
                                             onClicked: if (stateManager) stateManager.setMultitrackMode(index);
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        // Streamer X PipeWire UNIFY Multitrack Architecture
-                        ColumnLayout {
-                            visible: Boolean(stateManager && stateManager.isStreamerX)
-                            Layout.fillWidth: true
-                            spacing: 12
-
-                            RowLayout {
-                                Layout.fillWidth: true
-                                ColumnLayout {
-                                    spacing: 3
-                                    RowLayout {
-                                        spacing: 8
-                                        Text {
-                                            text: "🎛️ Arquitectura Multipista PipeWire (UNIFY para Linux)"
-                                            font.pixelSize: 14
-                                            font.bold: true
-                                            color: "#FFFFFF"
-                                        }
-                                        Rectangle {
-                                            width: 65
-                                            height: 20
-                                            radius: 10
-                                            color: (stateManager && stateManager.streamerXUnifyInstalled) ? "#1B3B24" : "#303036"
-                                            border.color: (stateManager && stateManager.streamerXUnifyInstalled) ? "#34C759" : "#4A4A52"
-                                            border.width: 1
-                                            Text {
-                                                anchors.centerIn: parent
-                                                text: (stateManager && stateManager.streamerXUnifyInstalled) ? "ACTIVO" : "INACTIVO"
-                                                font.pixelSize: 9
-                                                font.bold: true
-                                                color: (stateManager && stateManager.streamerXUnifyInstalled) ? "#34C759" : "#9A9A9E"
-                                            }
-                                        }
-                                    }
-                                    Text {
-                                        text: "Crea dispositivos de audio virtuales nativos en PipeWire: Game, Chat, Music, System y Stream Mix con enrutamiento automático hacia los auriculares del Streamer X y OBS."
-                                        font.pixelSize: 11
-                                        color: "#8E8E93"
-                                        Layout.preferredWidth: root.width - 260
-                                        wrapMode: Text.WordWrap
-                                    }
-                                }
-
-                                Item { Layout.fillWidth: true }
-
-                                Button {
-                                    text: (stateManager && stateManager.streamerXUnifyInstalled) ? "Desactivar UNIFY" : "Activar UNIFY en Linux"
-                                    HoverHandler { cursorShape: Qt.PointingHandCursor }
-                                    contentItem: Text {
-                                        text: parent.text
-                                        font.pixelSize: 11
-                                        font.bold: true
-                                        color: "#FFFFFF"
-                                        horizontalAlignment: Text.AlignHCenter
-                                        verticalAlignment: Text.AlignVCenter
-                                    }
-                                    background: Rectangle {
-                                        implicitWidth: 160
-                                        implicitHeight: 34
-                                        radius: 6
-                                        color: (stateManager && stateManager.streamerXUnifyInstalled) ? "#8A2A2A" : "#24733F"
-                                    }
-                                    onClicked: {
-                                        if (stateManager) stateManager.toggleStreamerXUnifyProfile();
-                                    }
-                                }
-                            }
-
-                            // Matrix of virtual channels
-                            RowLayout {
-                                Layout.fillWidth: true
-                                spacing: 10
-
-                                Repeater {
-                                    model: [
-                                        {"icon": "🎮", "name": "Game", "desc": "Juegos (Steam, etc.)"},
-                                        {"icon": "💬", "name": "Chat", "desc": "Discord / Teams / Meet"},
-                                        {"icon": "🎵", "name": "Music", "desc": "Spotify / Navegador"},
-                                        {"icon": "🔔", "name": "System", "desc": "Alertas y SO"},
-                                        {"icon": "🎙️", "name": "Stream Mix", "desc": "Salida OBS Broadcast"}
-                                    ]
-
-                                    Rectangle {
-                                        Layout.fillWidth: true
-                                        height: 52
-                                        radius: 6
-                                        color: "#202025"
-                                        border.color: (stateManager && stateManager.streamerXUnifyInstalled) ? "#CBA158" : "#2C2C32"
-                                        border.width: 1
-
-                                        RowLayout {
-                                            anchors.fill: parent
-                                            anchors.margins: 8
-                                            spacing: 8
-                                            Text { text: modelData.icon; font.pixelSize: 16 }
-                                            ColumnLayout {
-                                                spacing: 1
-                                                Text { text: modelData.name; font.pixelSize: 11; font.bold: true; color: "#FFFFFF" }
-                                                Text { text: modelData.desc; font.pixelSize: 9; color: "#8E8E93"; elide: Text.ElideRight; Layout.fillWidth: true }
-                                            }
                                         }
                                     }
                                 }
@@ -879,5 +968,6 @@ Item {
             }
         }
     }
+}
 }
 

@@ -194,3 +194,4 @@ context.modules = [
         except Exception as e:
             logger.error(f"Failed to remove PipeWire profile: {e}")
             return False
+

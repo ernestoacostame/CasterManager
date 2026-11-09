@@ -78,25 +78,20 @@ Rectangle {
                                 clip: true
 
                                 Image {
-                                    visible: !(devCard.hasRealDevice && modelData.model_type === "StreamerX")
                                     anchors.centerIn: parent
                                     width: 32
                                     height: 32
-                                    source: "../../assets/rodecaster.svg"
+                                    source: {
+                                        var m = devCard.hasRealDevice ? modelData.model_type : (stateManager ? stateManager.modelType : "Duo");
+                                        if (m === "ProII") return "../../assets/rodecasterproii.svg";
+                                        if (m === "StreamerX") return "../../assets/streamerx.svg";
+                                        return "../../assets/rodecaster.svg";
+                                    }
                                     fillMode: Image.PreserveAspectFit
                                     mipmap: true
                                     smooth: true
                                     sourceSize.width: 64
                                     sourceSize.height: 64
-                                }
-
-                                FlatIcon {
-                                    visible: Boolean(devCard.hasRealDevice && modelData.model_type === "StreamerX")
-                                    anchors.centerIn: parent
-                                    name: "video"
-                                    implicitWidth: 22
-                                    implicitHeight: 22
-                                    color: devCard.isSelectedDevice ? "#CBA158" : "#A0A0A5"
                                 }
                             }
 

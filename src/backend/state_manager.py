@@ -580,7 +580,7 @@ class StateManager(QObject):
                 props = {k: list(v.values())[0] for k, v in sys_node.get("properties", {}).items()}
                 if "systemFirmwareVersion" in props:
                     self._firmware = props["systemFirmwareVersion"]
-                if "systemName" in props and props["systemName"]:
+                if "systemName" in props and props["systemName"] and props["systemName"] not in ("Rodecaster", "RODECaster"):
                     self._model_name = props["systemName"]
 
                 # Storage Volumes (MicroSD card, external USB, internal eMMC)

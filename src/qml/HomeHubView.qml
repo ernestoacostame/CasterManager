@@ -201,16 +201,16 @@ Item {
 
                         Grid {
                             anchors.centerIn: parent
-                            columns: 3
+                            columns: (stateManager && stateManager.isStreamerX) ? 2 : (stateManager && stateManager.isDuo ? 3 : 4)
                             spacing: 3
 
                             Repeater {
-                                model: 6
+                                model: stateManager ? stateManager.padsPerBank : 6
                                 Rectangle {
                                     width: 11
                                     height: 11
                                     radius: 2
-                                    color: ["#FF3C3C", "#FF8C28", "#FFDC28", "#28C850", "#3C96FF", "#A050E6"][index]
+                                    color: ["#FF3C3C", "#FF8C28", "#FFDC28", "#28C850", "#3C96FF", "#A050E6", "#E650B4", "#28C8DC"][index % 8]
                                 }
                             }
                         }
