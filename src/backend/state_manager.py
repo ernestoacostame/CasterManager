@@ -342,8 +342,11 @@ class StateManager(QObject):
         self._model_type = "Duo"
         self._firmware = "1.7.7"
         self._serial = ""
-        self._show_name = "TuPodcast"
-        self._show_icon = 5
+        self._show_name = self.settings.value("show_name", "TuPodcast")
+        try:
+            self._show_icon = int(self.settings.value("show_icon", 5))
+        except (TypeError, ValueError):
+            self._show_icon = 5
         self._sd_used = "0 GB"
         self._sd_total = "119 GB"
         self._sd_percent = 0.0
@@ -512,6 +515,17 @@ class StateManager(QObject):
         self._permission_error = not info.get("has_permission", False)
         self._permission_path = info.get("hidraw_node", "")
 
+        # Load profile name & icon persisted for this specific device model
+        saved_name = self.settings.value(f"show_name_{self._model_type}", self.settings.value("show_name", None))
+        if saved_name:
+            self._show_name = str(saved_name)
+        saved_icon = self.settings.value(f"show_icon_{self._model_type}", self.settings.value("show_icon", None))
+        if saved_icon is not None:
+            try:
+                self._show_icon = int(saved_icon)
+            except (TypeError, ValueError):
+                pass
+
         # Direct bridge to target this specific device
         self.bridge.target_pid = info.get("product_id")
         self.bridge.target_serial = info.get("serial")
@@ -571,10 +585,15 @@ class StateManager(QObject):
             show_node = find_node(dump, "CURRENTSHOW")
             if show_node:
                 props = {k: list(v.values())[0] for k, v in show_node.get("properties", {}).items()}
-                if "currentShowName" in props:
+                saved_name = self.settings.value(f"show_name_{self._model_type}", None)
+                if not saved_name and "currentShowName" in props and props["currentShowName"]:
                     self._show_name = props["currentShowName"]
-                if "currentShowIcon" in props:
-                    self._show_icon = int(props["currentShowIcon"])
+                saved_icon = self.settings.value(f"show_icon_{self._model_type}", None)
+                if saved_icon is None and "currentShowIcon" in props:
+                    try:
+                        self._show_icon = int(props["currentShowIcon"])
+                    except (TypeError, ValueError):
+                        pass
 
             # System & Firmware & SD Card
             sys_node = find_node(dump, "SYSTEM")
@@ -1235,25 +1254,33 @@ class StateManager(QObject):
 
     @pyqtSlot(str)
     def updateShowName(self, name):
+        name = name.strip()
+        if not name:
+            return
         self._show_name = name
+        self.settings.setValue(f"show_name_{self._model_type}", name)
+        self.settings.setValue("show_name", name)
+        self.settings.sync()
         self.stateChanged.emit()
-        if self._connected and not self._permission_error:
+        if self._connected and not self._permission_error and not self._is_streamer_x:
             self.executor.submit(
                 self.bridge.run_cmd,
                 ["show", "set-name", name]
             )
-            self.toastMessage.emit(f"Nombre de show actualizado: {name}")
+        self.toastMessage.emit(f"Perfil guardado: {name}")
 
     @pyqtSlot(int)
     def updateShowIcon(self, icon_idx):
         self._show_icon = icon_idx
+        self.settings.setValue(f"show_icon_{self._model_type}", icon_idx)
+        self.settings.setValue("show_icon", icon_idx)
+        self.settings.sync()
         self.stateChanged.emit()
-        if self._connected and not self._permission_error:
+        if self._connected and not self._permission_error and not self._is_streamer_x:
             self.executor.submit(
                 self.bridge.run_cmd,
                 ["show", "set-icon", str(icon_idx)]
             )
-            self.toastMessage.emit(f"Icono de show actualizado")
 
     @pyqtProperty(QVariant, notify=recordingsChanged)
     def recordings(self):
