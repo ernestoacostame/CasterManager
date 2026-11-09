@@ -30,11 +30,11 @@ Item {
             }
         }
 
-        // 2x2 Grid of Main Features
+        // Feature Cards Grid (2x2 for Duo/Pro II with SD recordings, 3 columns for Streamer X)
         GridLayout {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            columns: 2
+            columns: (stateManager && stateManager.isStreamerX) ? 3 : 2
             rowSpacing: 20
             columnSpacing: 20
 
@@ -255,8 +255,9 @@ Item {
                 }
             }
 
-            // 4. Transfer Recordings
+            // 4. Transfer Recordings (Only for Duo/Pro II with SD card support)
             Rectangle {
+                visible: !(stateManager && stateManager.isStreamerX)
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 radius: 14
@@ -280,7 +281,7 @@ Item {
 
                         Text {
                             anchors.centerIn: parent
-                            text: (stateManager && stateManager.isStreamerX) ? "🎛️" : "🎙️"
+                            text: "🎙️"
                             font.pixelSize: 28
                         }
                     }
@@ -290,18 +291,14 @@ Item {
                         spacing: 6
 
                         Text {
-                            text: (stateManager && stateManager.isStreamerX)
-                                  ? "Arquitectura Multipista UNIFY"
-                                  : (stateManager ? stateManager.strings.hub_recordings : "Transferir Grabaciones")
+                            text: stateManager ? stateManager.strings.hub_recordings : "Transferir Grabaciones"
                             font.pixelSize: 18
                             font.bold: true
                             color: "#FFFFFF"
                         }
 
                         Text {
-                            text: (stateManager && stateManager.isStreamerX)
-                                  ? "Enrutamiento PipeWire virtual para Game, Chat, Música y OBS"
-                                  : (stateManager ? stateManager.strings.hub_recordings_desc : "Gestiona podcasts y tomas grabadas en la MicroSD")
+                            text: stateManager ? stateManager.strings.hub_recordings_desc : "Gestiona podcasts y tomas grabadas en la MicroSD"
                             font.pixelSize: 13
                             color: "#9A9A9E"
                             wrapMode: Text.WordWrap
@@ -324,11 +321,7 @@ Item {
                     cursorShape: Qt.PointingHandCursor
                     onClicked: {
                         if (stateManager) {
-                            if (stateManager.isStreamerX) {
-                                stateManager.navigateTo("device_config");
-                            } else {
-                                stateManager.navigateTo("recordings");
-                            }
+                            stateManager.navigateTo("recordings");
                         }
                     }
                 }

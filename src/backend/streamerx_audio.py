@@ -53,6 +53,14 @@ class StreamerXAudioRouter:
     Manages PipeWire and ALSA routing and virtual audio sinks for RØDE Streamer X.
     """
 
+    CHANNELS = [
+        ("streamerx_game", "UNIFY-Game"),
+        ("streamerx_chat", "UNIFY-Chat"),
+        ("streamerx_music", "UNIFY-Music"),
+        ("streamerx_system", "UNIFY-System"),
+        ("streamerx_stream_mix", "UNIFY-StreamMix"),
+    ]
+
     @staticmethod
     def get_streamer_x_nodes() -> Dict[str, Optional[str]]:
         """Finds the current PipeWire sink and source node names for Streamer X."""
@@ -84,8 +92,14 @@ class StreamerXAudioRouter:
 
     @classmethod
     def is_unify_profile_installed(cls) -> bool:
-        """Checks if the PipeWire configuration file is currently installed."""
-        return os.path.isfile(STREAMERX_CONF_PATH)
+        """Checks if the UNIFY virtual audio sinks are actively loaded in PipeWire/PulseAudio."""
+        try:
+            res = subprocess.run(["pactl", "list", "sinks", "short"], capture_output=True, text=True, timeout=2)
+            if res.returncode == 0 and "streamerx_game" in res.stdout:
+                return True
+        except Exception:
+            pass
+        return False
 
     @classmethod
     def generate_pipewire_config(cls, hw_sink: str, hw_source: str) -> str:
@@ -198,21 +212,64 @@ context.modules = [
 
     @classmethod
     def install_unify_profile(cls) -> bool:
-        """Installs the PipeWire and ALSA configurations and reloads user services."""
+        """
+        Loads UNIFY virtual devices immediately in PipeWire/PulseAudio via pactl,
+        saves ~/.asoundrc for ALSA DAWs, and writes pipewire.conf.d for session persistence.
+        """
         try:
             nodes = cls.get_streamer_x_nodes()
             hw_sink = nodes.get("sink") or "alsa_output.usb-RODE_Streamer_X_HT0004996-00.analog-stereo"
             hw_source = nodes.get("source") or "alsa_input.usb-RODE_Streamer_X_HT0004996-00.analog-stereo"
 
-            # 1. PipeWire configuration
-            os.makedirs(PIPEWIRE_CONF_DIR, exist_ok=True)
-            content = cls.generate_pipewire_config(hw_sink, hw_source)
-            with open(STREAMERX_CONF_PATH, "w", encoding="utf-8") as f:
-                f.write(content)
+            # 1. First remove any previous instances to avoid duplicates
+            cls.remove_unify_profile(reload_services=False)
 
-            logger.info(f"Streamer X PipeWire profile written to {STREAMERX_CONF_PATH}")
+            # 2. Hot-load virtual sinks and loopbacks immediately
+            loaded_ids = []
+            for ch_name, ch_desc in cls.CHANNELS:
+                # Load null-sink
+                cmd_sink = [
+                    "pactl", "load-module", "module-null-sink",
+                    f"sink_name={ch_name}",
+                    f"sink_properties=device.description='{ch_desc}'"
+                ]
+                res = subprocess.run(cmd_sink, capture_output=True, text=True, timeout=3)
+                if res.returncode == 0 and res.stdout.strip().isdigit():
+                    loaded_ids.append(res.stdout.strip())
 
-            # 2. ALSA configuration (~/.asoundrc for DAWs like Reaper, Ardour, Bitwig)
+                # For playback channels, loopback to Streamer X headphones
+                if ch_name != "streamerx_stream_mix":
+                    cmd_loop = [
+                        "pactl", "load-module", "module-loopback",
+                        f"source={ch_name}.monitor",
+                        f"sink={hw_sink}"
+                    ]
+                    res_loop = subprocess.run(cmd_loop, capture_output=True, text=True, timeout=3)
+                    if res_loop.returncode == 0 and res_loop.stdout.strip().isdigit():
+                        loaded_ids.append(res_loop.stdout.strip())
+                else:
+                    # For Stream Mix: loopback Streamer X mic into the stream mix
+                    cmd_mic = [
+                        "pactl", "load-module", "module-loopback",
+                        f"source={hw_source}",
+                        f"sink={ch_name}"
+                    ]
+                    res_mic = subprocess.run(cmd_mic, capture_output=True, text=True, timeout=3)
+                    if res_mic.returncode == 0 and res_mic.stdout.strip().isdigit():
+                        loaded_ids.append(res_mic.stdout.strip())
+
+            logger.info(f"Loaded {len(loaded_ids)} UNIFY PipeWire modules in real-time.")
+
+            # 3. Write PipeWire configuration for persistence across reboots
+            try:
+                os.makedirs(PIPEWIRE_CONF_DIR, exist_ok=True)
+                content = cls.generate_pipewire_config(hw_sink, hw_source)
+                with open(STREAMERX_CONF_PATH, "w", encoding="utf-8") as f:
+                    f.write(content)
+            except Exception as pe:
+                logger.warning(f"Could not write persistent conf: {pe}")
+
+            # 4. ALSA configuration (~/.asoundrc for DAWs like Reaper, Ardour)
             try:
                 existing_asound = ""
                 if os.path.isfile(ASOUNDRC_PATH):
@@ -221,26 +278,41 @@ context.modules = [
                 if "# --- RODE UNIFY START ---" not in existing_asound:
                     with open(ASOUNDRC_PATH, "a", encoding="utf-8") as af:
                         af.write("\n" + ASOUND_UNIFY_BLOCK)
-                    logger.info("Added RØDE UNIFY virtual devices to ~/.asoundrc")
             except Exception as ae:
                 logger.warning(f"Could not update ~/.asoundrc: {ae}")
 
-            # 3. Reload PipeWire, WirePlumber and PipeWire-Pulse to expose nodes
-            subprocess.run(["systemctl", "--user", "restart", "pipewire", "pipewire-pulse", "wireplumber"], check=False)
             return True
         except Exception as e:
             logger.error(f"Failed to install PipeWire profile: {e}")
             return False
 
     @classmethod
-    def remove_unify_profile(cls) -> bool:
-        """Removes the PipeWire and ALSA configurations and reloads."""
+    def remove_unify_profile(cls, reload_services=True) -> bool:
+        """
+        Unloads active UNIFY modules immediately in real-time and removes configs.
+        """
         try:
-            if os.path.exists(STREAMERX_CONF_PATH):
-                os.remove(STREAMERX_CONF_PATH)
-                logger.info(f"Removed {STREAMERX_CONF_PATH}")
+            # 1. Unload all modules associated with streamerx sinks
+            try:
+                out = subprocess.run(["pactl", "list", "modules", "short"], capture_output=True, text=True, timeout=3).stdout
+                for line in out.splitlines():
+                    parts = line.split()
+                    if len(parts) >= 3:
+                        mod_id = parts[0]
+                        mod_args = " ".join(parts[2:])
+                        if "streamerx" in mod_args:
+                            subprocess.run(["pactl", "unload-module", mod_id], capture_output=True, timeout=2)
+            except Exception as ue:
+                logger.warning(f"Error unloading live modules: {ue}")
 
-            # Remove from ~/.asoundrc
+            # 2. Remove persistent PipeWire config file
+            if os.path.exists(STREAMERX_CONF_PATH):
+                try:
+                    os.remove(STREAMERX_CONF_PATH)
+                except Exception:
+                    pass
+
+            # 3. Clean ~/.asoundrc
             try:
                 if os.path.isfile(ASOUNDRC_PATH):
                     with open(ASOUNDRC_PATH, "r", encoding="utf-8") as af:
@@ -250,11 +322,9 @@ context.modules = [
                         cleaned = re.sub(r"# --- RODE UNIFY START ---[\s\S]*?# --- RODE UNIFY END ---\n?", "", asound_content)
                         with open(ASOUNDRC_PATH, "w", encoding="utf-8") as af:
                             af.write(cleaned.strip() + "\n" if cleaned.strip() else "")
-                        logger.info("Removed RØDE UNIFY devices from ~/.asoundrc")
             except Exception as ae:
                 logger.warning(f"Could not clean ~/.asoundrc: {ae}")
 
-            subprocess.run(["systemctl", "--user", "restart", "pipewire", "pipewire-pulse", "wireplumber"], check=False)
             return True
         except Exception as e:
             logger.error(f"Failed to remove PipeWire profile: {e}")
