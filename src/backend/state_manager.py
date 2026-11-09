@@ -453,6 +453,70 @@ TRANSLATIONS = {
     }
 }
 
+
+DSP_PRESETS = {
+    "broadcast": {
+        "hpf_on": True, "hpf_frequency": 0.4,
+        "noise_gate_on": True, "noise_gate_threshold": 0.35, "noise_gate_range": 0.75,
+        "noise_gate_attack": 0.4, "noise_gate_release": 0.45,
+        "deesser_on": True, "deesser_threshold": 0.6, "deesser_ratio": 0.5,
+        "compressor_on": True, "compressor_threshold": 0.6, "compressor_ratio": 0.5, "compressor_gain": 0.25,
+        "eq_on": True, "eq_low": 0.65, "eq_mid": 0.45, "eq_high": 0.65,
+        "aphex_on": True, "aphex_ae_mix": 0.55, "aphex_ae_tune": 0.5, "aphex_bb_drive": 0.6, "aphex_bb_tune": 0.4,
+        "voxlab_depth": 60, "voxlab_sparkle": 55, "voxlab_punch": 55
+    },
+    "podcast": {
+        "hpf_on": True, "hpf_frequency": 0.35,
+        "noise_gate_on": True, "noise_gate_threshold": 0.25, "noise_gate_range": 0.6,
+        "noise_gate_attack": 0.5, "noise_gate_release": 0.4,
+        "deesser_on": True, "deesser_threshold": 0.65, "deesser_ratio": 0.45,
+        "compressor_on": True, "compressor_threshold": 0.7, "compressor_ratio": 0.38, "compressor_gain": 0.15,
+        "eq_on": True, "eq_low": 0.55, "eq_mid": 0.5, "eq_high": 0.55,
+        "aphex_on": True, "aphex_ae_mix": 0.4, "aphex_ae_tune": 0.5, "aphex_bb_drive": 0.45, "aphex_bb_tune": 0.35,
+        "voxlab_depth": 45, "voxlab_sparkle": 40, "voxlab_punch": 40
+    },
+    "gaming": {
+        "hpf_on": True, "hpf_frequency": 0.5,
+        "noise_gate_on": True, "noise_gate_threshold": 0.48, "noise_gate_range": 0.85,
+        "noise_gate_attack": 0.3, "noise_gate_release": 0.35,
+        "deesser_on": True, "deesser_threshold": 0.55, "deesser_ratio": 0.55,
+        "compressor_on": True, "compressor_threshold": 0.52, "compressor_ratio": 0.65, "compressor_gain": 0.32,
+        "eq_on": True, "eq_low": 0.45, "eq_mid": 0.55, "eq_high": 0.7,
+        "aphex_on": True, "aphex_ae_mix": 0.7, "aphex_ae_tune": 0.6, "aphex_bb_drive": 0.35, "aphex_bb_tune": 0.3,
+        "voxlab_depth": 35, "voxlab_sparkle": 70, "voxlab_punch": 65
+    },
+    "neutral": {
+        "hpf_on": False,
+        "noise_gate_on": False,
+        "deesser_on": False,
+        "compressor_on": False,
+        "eq_on": False,
+        "aphex_on": False,
+        "voxlab_depth": 0, "voxlab_sparkle": 0, "voxlab_punch": 0
+    }
+}
+
+
+def detect_dsp_preset(ch):
+    """Return the preset id whose hardware values match channel `ch`, or "custom"."""
+    for pid, values in DSP_PRESETS.items():
+        match = True
+        for k, v in values.items():
+            if k.startswith("voxlab_"):
+                continue
+            cur = ch.get(k)
+            if isinstance(v, bool):
+                if bool(cur) != v:
+                    match = False
+                    break
+            else:
+                if cur is None or abs(float(cur) - float(v)) > 0.01:
+                    match = False
+                    break
+        if match:
+            return pid
+    return "custom"
+
 class StateManager(QObject):
     stateChanged = pyqtSignal()
     padsChanged = pyqtSignal()
@@ -1099,6 +1163,9 @@ class StateManager(QObject):
                         pwr = int(inp["inputPower"])
                         dsp["phantom_power"] = (pwr == 1)
                     if "inputPhaseFlip" in inp: dsp["phase_flip"] = bool(inp["inputPhaseFlip"])
+
+                # The device has no notion of "voice profile": infer it from the real values
+                dsp["active_preset"] = detect_dsp_preset(dsp)
 
             # Map child node indices dynamically
             for child_idx, c in enumerate(children):
@@ -2828,6 +2895,8 @@ class StateManager(QObject):
             return
         ch = self._dsp_channels[self._active_dsp_channel]
         ch[name] = value
+        if name != "active_preset" and not name.startswith("voxlab_"):
+            ch["active_preset"] = detect_dsp_preset(ch)
         self.dspChanged.emit()
 
         if not self._connected or self._permission_error:
@@ -2943,47 +3012,7 @@ class StateManager(QObject):
             return
         ch = self._dsp_channels[self._active_dsp_channel]
 
-        presets = {
-            "broadcast": {
-                "hpf_on": True, "hpf_frequency": 0.4,
-                "noise_gate_on": True, "noise_gate_threshold": 0.35, "noise_gate_range": 0.75,
-                "noise_gate_attack": 0.4, "noise_gate_release": 0.45,
-                "deesser_on": True, "deesser_threshold": 0.6, "deesser_ratio": 0.5,
-                "compressor_on": True, "compressor_threshold": 0.6, "compressor_ratio": 0.5, "compressor_gain": 0.25,
-                "eq_on": True, "eq_low": 0.65, "eq_mid": 0.45, "eq_high": 0.65,
-                "aphex_on": True, "aphex_ae_mix": 0.55, "aphex_ae_tune": 0.5, "aphex_bb_drive": 0.6, "aphex_bb_tune": 0.4,
-                "voxlab_depth": 60, "voxlab_sparkle": 55, "voxlab_punch": 55
-            },
-            "podcast": {
-                "hpf_on": True, "hpf_frequency": 0.35,
-                "noise_gate_on": True, "noise_gate_threshold": 0.25, "noise_gate_range": 0.6,
-                "noise_gate_attack": 0.5, "noise_gate_release": 0.4,
-                "deesser_on": True, "deesser_threshold": 0.65, "deesser_ratio": 0.45,
-                "compressor_on": True, "compressor_threshold": 0.7, "compressor_ratio": 0.38, "compressor_gain": 0.15,
-                "eq_on": True, "eq_low": 0.55, "eq_mid": 0.5, "eq_high": 0.55,
-                "aphex_on": True, "aphex_ae_mix": 0.4, "aphex_ae_tune": 0.5, "aphex_bb_drive": 0.45, "aphex_bb_tune": 0.35,
-                "voxlab_depth": 45, "voxlab_sparkle": 40, "voxlab_punch": 40
-            },
-            "gaming": {
-                "hpf_on": True, "hpf_frequency": 0.5,
-                "noise_gate_on": True, "noise_gate_threshold": 0.48, "noise_gate_range": 0.85,
-                "noise_gate_attack": 0.3, "noise_gate_release": 0.35,
-                "deesser_on": True, "deesser_threshold": 0.55, "deesser_ratio": 0.55,
-                "compressor_on": True, "compressor_threshold": 0.52, "compressor_ratio": 0.65, "compressor_gain": 0.32,
-                "eq_on": True, "eq_low": 0.45, "eq_mid": 0.55, "eq_high": 0.7,
-                "aphex_on": True, "aphex_ae_mix": 0.7, "aphex_ae_tune": 0.6, "aphex_bb_drive": 0.35, "aphex_bb_tune": 0.3,
-                "voxlab_depth": 35, "voxlab_sparkle": 70, "voxlab_punch": 65
-            },
-            "neutral": {
-                "hpf_on": False,
-                "noise_gate_on": False,
-                "deesser_on": False,
-                "compressor_on": False,
-                "eq_on": False,
-                "aphex_on": False,
-                "voxlab_depth": 0, "voxlab_sparkle": 0, "voxlab_punch": 0
-            }
-        }
+        presets = DSP_PRESETS
 
         if preset_name in presets:
             p_data = presets[preset_name]
