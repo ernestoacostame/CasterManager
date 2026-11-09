@@ -595,33 +595,32 @@ Item {
                     visible: root.activeCategory === 1
 
                     // Target Channel & Trigger Mode Selectors
-                    RowLayout {
+                    Rectangle {
                         Layout.fillWidth: true
-                        spacing: 12
+                        implicitHeight: controlsLayout.implicitHeight + 24
+                        radius: 8
+                        color: "#1C1C1F"
+                        border.color: "#2C2C32"
 
-                        // Target Channel Card
-                        Rectangle {
-                            Layout.fillWidth: true
-                            Layout.preferredWidth: 240
-                            Layout.minimumWidth: 180
-                            height: 56
-                            radius: 8
-                            color: "#1C1C1F"
-                            border.color: "#2C2C32"
-                            clip: true
+                        Flow {
+                            id: controlsLayout
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.top: parent.top
+                            anchors.margins: 12
+                            spacing: 24
 
+                            // Target Channel Card / Selector
                             RowLayout {
-                                anchors.fill: parent
-                                anchors.margins: 12
                                 spacing: 10
+
                                 Text {
                                     text: "Canal Destino:"
                                     font.pixelSize: 12
                                     font.bold: true
                                     color: "#FFFFFF"
                                 }
-                                Item { Layout.fillWidth: true }
-                                // Segmented Control
+
                                 Rectangle {
                                     height: 32
                                     radius: 6
@@ -651,6 +650,7 @@ Item {
                                                 onClicked: root.fxTargetChannel = 0
                                             }
                                         }
+
                                         Rectangle {
                                             visible: !(stateManager && stateManager.isStreamerX)
                                             Layout.fillWidth: true
@@ -673,31 +673,18 @@ Item {
                                     }
                                 }
                             }
-                        }
 
-                        // Trigger Mode Card (Latch vs Momentary / Hold)
-                        Rectangle {
-                            Layout.fillWidth: true
-                            Layout.preferredWidth: 240
-                            Layout.minimumWidth: 180
-                            height: 56
-                            radius: 8
-                            color: "#1C1C1F"
-                            border.color: "#2C2C32"
-                            clip: true
-
+                            // Trigger Mode (Latch vs Hold)
                             RowLayout {
-                                anchors.fill: parent
-                                anchors.margins: 12
                                 spacing: 10
+
                                 Text {
                                     text: "Comportamiento:"
                                     font.pixelSize: 12
                                     font.bold: true
                                     color: "#FFFFFF"
                                 }
-                                Item { Layout.fillWidth: true }
-                                // Segmented Control
+
                                 Rectangle {
                                     height: 32
                                     radius: 6
@@ -727,6 +714,7 @@ Item {
                                                 onClicked: root.fxTriggerMode = 1
                                             }
                                         }
+
                                         Rectangle {
                                             Layout.fillWidth: true
                                             Layout.fillHeight: true
