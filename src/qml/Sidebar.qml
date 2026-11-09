@@ -242,6 +242,110 @@ Rectangle {
                     }
                 }
             }
+
+            // MicroSD Removable Storage Card (matches RØDECaster App)
+            Rectangle {
+                id: sdCardEntry
+                readonly property bool isSelectedView: (stateManager && stateManager.currentView === "recordings")
+                Layout.fillWidth: true
+                height: 58
+                radius: 8
+                color: isSelectedView ? "#24242A" : (sdHover.containsMouse ? "#202024" : "#19191C")
+                border.color: isSelectedView ? "#CBA158" : (sdHover.containsMouse ? "#3A3A42" : "#28282E")
+                border.width: isSelectedView ? 1.5 : 1
+
+                RowLayout {
+                    anchors.fill: parent
+                    anchors.margins: 10
+                    spacing: 10
+
+                    // MicroSD black badge with white RØDE text
+                    Rectangle {
+                        width: 36
+                        height: 36
+                        radius: 6
+                        color: "#0D0D0F"
+                        border.color: "#35353C"
+                        border.width: 1
+
+                        ColumnLayout {
+                            anchors.centerIn: parent
+                            spacing: 1
+                            Text {
+                                text: "RØDE"
+                                font.pixelSize: 8
+                                font.bold: true
+                                color: "#FFFFFF"
+                                Layout.alignment: Qt.AlignHCenter
+                            }
+                            Text {
+                                text: "SD"
+                                font.pixelSize: 7
+                                font.bold: true
+                                color: "#CBA158"
+                                Layout.alignment: Qt.AlignHCenter
+                            }
+                        }
+                    }
+
+                    ColumnLayout {
+                        spacing: 2
+                        Layout.fillWidth: true
+
+                        Text {
+                            text: "microSD"
+                            font.pixelSize: 12
+                            font.bold: true
+                            color: sdCardEntry.isSelectedView ? "#CBA158" : "#FFFFFF"
+                        }
+
+                        Text {
+                            text: stateManager ? stateManager.strings.removable_storage : "Removable Storage"
+                            font.pixelSize: 10
+                            color: "#8E8E93"
+                        }
+                    }
+
+                    // Eject / Mount indicator
+                    Rectangle {
+                        visible: Boolean(stateManager && stateManager.isMicroSDMounted)
+                        width: 18
+                        height: 18
+                        radius: 3
+                        color: "#282830"
+                        border.color: "#CBA158"
+                        border.width: 1
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: "⏏"
+                            font.pixelSize: 10
+                            font.bold: true
+                            color: "#CBA158"
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                if (stateManager) stateManager.exitTransferMode();
+                            }
+                        }
+                    }
+                }
+
+                MouseArea {
+                    id: sdHover
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        if (stateManager) {
+                            stateManager.currentView = "recordings";
+                        }
+                    }
+                }
+            }
         }
 
         // Permission warning banner if permission is not set
