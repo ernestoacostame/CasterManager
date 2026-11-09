@@ -618,7 +618,7 @@ class StateManager(QObject):
 
         # Polling timer for live fader & recording status
         self._live_poll_timer = QTimer(self)
-        self._live_poll_timer.setInterval(3000)
+        self._live_poll_timer.setInterval(1000)
         self._live_poll_timer.timeout.connect(self._poll_live_hardware)
         self._live_poll_timer.start()
 
@@ -1036,7 +1036,17 @@ class StateManager(QObject):
 
             # Live Faders
             if self.isStreamerX:
-                sx_map = {0: 179, 1: 180, 2: 182, 3: 184, 4: 187, 5: 188}
+                # Fader 0: Mic Gain (Node 191)
+                if 191 < len(children) and len(self._faders) > 0:
+                    g_prop = children[191].get("properties", {}).get("inputMicrophoneGain", {}).get("U32")
+                    if g_prop is not None:
+                        self._faders[0]["level"] = int(round((int(g_prop) / 76.0) * 100))
+                if 28 < len(children) and len(self._faders) > 0:
+                    c0_props = children[28].get("properties", {})
+                    if "channelOutputMute" in c0_props:
+                        self._faders[0]["mute"] = bool(c0_props["channelOutputMute"].get("Bool", False))
+                # Faders 1..5: Stream Mix
+                sx_map = {1: 180, 2: 182, 3: 184, 4: 187, 5: 188}
                 for f_idx, node_id in sx_map.items():
                     if 0 <= f_idx < len(self._faders) and node_id < len(children):
                         node_props = children[node_id].get("properties", {})
@@ -1046,10 +1056,6 @@ class StateManager(QObject):
                                 self._faders[f_idx]["level"] = int(round(val * 100))
                                 if f_idx >= 2 and val == 0:
                                     self._faders[f_idx]["mute"] = True
-                if 28 < len(children) and len(self._faders) > 0:
-                    c0_props = children[28].get("properties", {})
-                    if "channelOutputMute" in c0_props:
-                        self._faders[0]["mute"] = bool(c0_props["channelOutputMute"].get("Bool", False))
                 if 29 < len(children) and len(self._faders) > 1:
                     c1_props = children[29].get("properties", {})
                     if "channelOutputMute" in c1_props:
@@ -2549,15 +2555,25 @@ class StateManager(QObject):
         to_send = dict(self._pending_fader_levels)
         self._pending_fader_levels.clear()
         if self.isStreamerX:
-            sx_map = {0: 179, 1: 180, 2: 182, 3: 184, 4: 187, 5: 188}
+            sx_map = {1: 180, 2: 182, 3: 184, 4: 187, 5: 188}
             for idx, lvl in to_send.items():
-                node_id = sx_map.get(idx)
-                if node_id is not None:
-                    raw_val = round(lvl / 100.0, 4)
+                if idx == 0:
+                    gain_db = int(round((lvl / 100.0) * 76))
                     self.executor.submit(
                         self.bridge.run_cmd,
-                        ["set-property", str(node_id), "streammixmixLevel", f"f64:{raw_val}"]
+                        ["set-property", "191", "inputMicrophoneGain", f"u32:{gain_db}"]
                     )
+                    if len(self._dsp_channels) > 0:
+                        self._dsp_channels[0]["preamp_gain"] = gain_db
+                        self.dspChanged.emit()
+                else:
+                    node_id = sx_map.get(idx)
+                    if node_id is not None:
+                        raw_val = round(lvl / 100.0, 4)
+                        self.executor.submit(
+                            self.bridge.run_cmd,
+                            ["set-property", str(node_id), "streammixmixLevel", f"f64:{raw_val}"]
+                        )
         else:
             for idx, lvl in to_send.items():
                 raw_val = int(round(lvl * 127.0 / 100.0))
@@ -2705,18 +2721,28 @@ class StateManager(QObject):
                 # 1. Physical Rotary Knob 1: Mic Gain (Node 191) & Mute (Node 28)
                 if 191 < len(children) and len(self._dsp_channels) > 0:
                     g_val = children[191].get("properties", {}).get("inputMicrophoneGain", {}).get("U32")
-                    if g_val is not None and self._dsp_channels[0].get("preamp_gain") != int(g_val):
-                        self._dsp_channels[0]["preamp_gain"] = int(g_val)
-                        self.dspChannelsChanged.emit()
+                    if g_val is not None:
+                        gain_int = int(g_val)
+                        if self._dsp_channels[0].get("preamp_gain") != gain_int:
+                            self._dsp_channels[0]["preamp_gain"] = gain_int
+                            self.dspChanged.emit()
+                        # Sync Fader 0 level (0..76 dB mapped to 0..100%)
+                        if 0 not in self._pending_fader_levels and len(self._faders) > 0:
+                            fader_lvl = int(round((gain_int / 76.0) * 100))
+                            if abs(self._faders[0].get("level", 0) - fader_lvl) > 1:
+                                self._faders[0]["level"] = fader_lvl
+                                changed = True
 
                 if 28 < len(children) and len(self._faders) > 0:
                     m_val = children[28].get("properties", {}).get("channelOutputMute", {}).get("Bool")
-                    if m_val is not None and self._faders[0]["mute"] != bool(m_val):
-                        self._faders[0]["mute"] = bool(m_val)
-                        changed = True
+                    if m_val is not None:
+                        mute_bool = bool(m_val)
+                        if self._faders[0].get("mute") != mute_bool:
+                            self._faders[0]["mute"] = mute_bool
+                            changed = True
 
-                # 2. Stream Mix levels (Nodes 179..188)
-                sx_map = {0: 179, 1: 180, 2: 182, 3: 184, 4: 187, 5: 188}
+                # 2. Stream Mix levels (Nodes 180..188 for faders 1..5)
+                sx_map = {1: 180, 2: 182, 3: 184, 4: 187, 5: 188}
                 for f_idx, node_id in sx_map.items():
                     if 0 <= f_idx < len(self._faders) and node_id < len(children):
                         if f_idx in self._pending_fader_levels:
