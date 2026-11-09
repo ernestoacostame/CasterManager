@@ -534,6 +534,7 @@ class StateManager(QObject):
     padClipboardChanged = pyqtSignal()
     dspChanged = pyqtSignal()
     activeDspChannelChanged = pyqtSignal()
+    headphoneVolumeChanged = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -547,6 +548,8 @@ class StateManager(QObject):
         self._connected = False
         self._permission_error = False
         self._permission_path = ""
+        self._headphone_volume = 25
+        self._headphone_mute = False
         self._model_name = "RØDECaster Duo"
         self._is_duo = True
         self._is_streamer_x = False
@@ -1013,6 +1016,11 @@ class StateManager(QObject):
                     self._listen_prefader = bool(oprops["outputPrefader"])
                 if "recordingMultitrackMode" in oprops:
                     self._multitrack_mode = int(oprops["recordingMultitrackMode"])
+                if "outputMonLevel" in oprops:
+                    self._headphone_volume = int(round(float(oprops["outputMonLevel"]) * 100))
+                if "outputMonMute" in oprops:
+                    self._headphone_mute = bool(oprops["outputMonMute"])
+                self.headphoneVolumeChanged.emit()
 
             # System settings (Haptics, MIDI)
             if sys_node:
@@ -1045,8 +1053,13 @@ class StateManager(QObject):
                     c0_props = children[28].get("properties", {})
                     if "channelOutputMute" in c0_props:
                         self._faders[0]["mute"] = bool(c0_props["channelOutputMute"].get("Bool", False))
-                # Faders 1..5: Stream Mix
-                sx_map = {1: 180, 2: 182, 3: 184, 4: 187, 5: 188}
+                # Fader 1: Headset Gain (Node 192)
+                if 192 < len(children) and len(self._faders) > 1:
+                    hg_prop = children[192].get("properties", {}).get("inputMicrophoneGain", {}).get("U32")
+                    if hg_prop is not None:
+                        self._faders[1]["level"] = int(round((int(hg_prop) / 76.0) * 100))
+                # Faders 2..5: Stream Mix
+                sx_map = {2: 182, 3: 184, 4: 187, 5: 188}
                 for f_idx, node_id in sx_map.items():
                     if 0 <= f_idx < len(self._faders) and node_id < len(children):
                         node_props = children[node_id].get("properties", {})
@@ -2471,8 +2484,12 @@ class StateManager(QObject):
                     if self.isStreamerX:
                         if index == 0:
                             self.executor.submit(self.bridge.run_cmd, ["set-property", "28", "channelOutputMute", f"bool:{str(new_mute).lower()}"])
+                            lvl = 0.0 if new_mute else (self._faders[0].get("level", 70) / 100.0)
+                            self.executor.submit(self.bridge.run_cmd, ["set-property", "179", "streammixmixLevel", f"f64:{lvl:.4f}"])
                         elif index == 1:
                             self.executor.submit(self.bridge.run_cmd, ["set-property", "29", "channelOutputMute", f"bool:{str(new_mute).lower()}"])
+                            lvl = 0.0 if new_mute else (self._faders[1].get("level", 70) / 100.0)
+                            self.executor.submit(self.bridge.run_cmd, ["set-property", "180", "streammixmixLevel", f"f64:{lvl:.4f}"])
                         else:
                             sx_map = {2: 182, 3: 184, 4: 187, 5: 188}
                             node_id = sx_map.get(index)
@@ -2718,7 +2735,8 @@ class StateManager(QObject):
                 children = dump.get("children", [])
                 changed = False
 
-                # 1. Physical Rotary Knob 1: Mic Gain (Node 191) & Mute (Node 28)
+                # 1. Rotary Knob 1: Input Gain & Mute
+                # Input 0: Mic / Line (Node 191)
                 if 191 < len(children) and len(self._dsp_channels) > 0:
                     g_val = children[191].get("properties", {}).get("inputMicrophoneGain", {}).get("U32")
                     if g_val is not None:
@@ -2733,6 +2751,17 @@ class StateManager(QObject):
                                 self._faders[0]["level"] = fader_lvl
                                 changed = True
 
+                # Input 1: Headset (Node 192)
+                if 192 < len(children) and len(self._faders) > 1:
+                    hs_val = children[192].get("properties", {}).get("inputMicrophoneGain", {}).get("U32")
+                    if hs_val is not None and 1 not in self._pending_fader_levels:
+                        hs_int = int(hs_val)
+                        hs_lvl = int(round((hs_int / 76.0) * 100))
+                        if abs(self._faders[1].get("level", 0) - hs_lvl) > 1:
+                            self._faders[1]["level"] = hs_lvl
+                            changed = True
+
+                # Mic Mute (Node 28)
                 if 28 < len(children) and len(self._faders) > 0:
                     m_val = children[28].get("properties", {}).get("channelOutputMute", {}).get("Bool")
                     if m_val is not None:
@@ -2741,8 +2770,17 @@ class StateManager(QObject):
                             self._faders[0]["mute"] = mute_bool
                             changed = True
 
-                # 2. Stream Mix levels (Nodes 180..188 for faders 1..5)
-                sx_map = {1: 180, 2: 182, 3: 184, 4: 187, 5: 188}
+                # Headset Mute (Node 29)
+                if 29 < len(children) and len(self._faders) > 1:
+                    hm_val = children[29].get("properties", {}).get("channelOutputMute", {}).get("Bool")
+                    if hm_val is not None:
+                        hmute_bool = bool(hm_val)
+                        if self._faders[1].get("mute") != hmute_bool:
+                            self._faders[1]["mute"] = hmute_bool
+                            changed = True
+
+                # 2. Stream Mix levels (Nodes 182..188 for faders 2..5)
+                sx_map = {2: 182, 3: 184, 4: 187, 5: 188}
                 for f_idx, node_id in sx_map.items():
                     if 0 <= f_idx < len(self._faders) and node_id < len(children):
                         if f_idx in self._pending_fader_levels:
@@ -2753,6 +2791,17 @@ class StateManager(QObject):
                             if not self._faders[f_idx].get("mute", False) and abs(self._faders[f_idx]["level"] - lvl_val) > 1:
                                 self._faders[f_idx]["level"] = lvl_val
                                 changed = True
+
+                # 3. Rotary Knob 2: Headphone Master Output (Node 13)
+                if 13 < len(children):
+                    out_props = children[13].get("properties", {})
+                    if "outputMonLevel" in out_props:
+                        mon_lvl = int(round(float(out_props["outputMonLevel"].get("F64", 0.25)) * 100))
+                        mon_mute = bool(out_props.get("outputMonMute", {}).get("Bool", False))
+                        if mon_lvl != self._headphone_volume or mon_mute != self._headphone_mute:
+                            self._headphone_volume = mon_lvl
+                            self._headphone_mute = mon_mute
+                            self.headphoneVolumeChanged.emit()
 
                 if changed:
                     self.fadersChanged.emit()
@@ -2815,6 +2864,39 @@ class StateManager(QObject):
         self.deviceConfigChanged.emit()
         if self._connected and not self._permission_error:
             self.executor.submit(self.bridge.run_cmd, ["set-property", "10", "headphoneType", f"u32:{val}"])
+
+    @pyqtProperty(int, notify=headphoneVolumeChanged)
+    def headphoneVolume(self):
+        return self._headphone_volume
+
+    @pyqtProperty(bool, notify=headphoneVolumeChanged)
+    def headphoneMute(self):
+        return self._headphone_mute
+
+    @pyqtSlot(int)
+    def setHeadphoneVolume(self, volume):
+        clamped = max(0, min(100, volume))
+        if clamped != self._headphone_volume:
+            self._headphone_volume = clamped
+            self.headphoneVolumeChanged.emit()
+            if self._connected and not self._permission_error:
+                raw_f64 = round(clamped / 100.0, 4)
+                self.executor.submit(
+                    self.bridge.run_cmd,
+                    ["set-property", "13", "outputMonLevel", f"f64:{raw_f64}"]
+                )
+
+    @pyqtSlot()
+    def toggleHeadphoneMute(self):
+        new_mute = not self._headphone_mute
+        self._headphone_mute = new_mute
+        self.headphoneVolumeChanged.emit()
+        if self._connected and not self._permission_error:
+            self.executor.submit(
+                self.bridge.run_cmd,
+                ["set-property", "13", "outputMonMute", f"bool:{str(new_mute).lower()}"]
+            )
+        self.toastMessage.emit("Auriculares: " + ("Silenciados" if new_mute else "Activos"))
 
     @pyqtProperty(bool, notify=deviceConfigChanged)
     def monitorAutoMute(self):
