@@ -44,6 +44,7 @@ Item {
 
             // Submix Switcher Pill (Stream / Broadcast vs Headphones / Monitor)
             Rectangle {
+                visible: !stateManager || !stateManager.isStreamerX
                 height: 36
                 width: 360
                 radius: 18
@@ -166,6 +167,7 @@ Item {
 
         // Submix Information Banner
         Rectangle {
+            visible: !stateManager || !stateManager.isStreamerX
             Layout.fillWidth: true
             height: 38
             radius: 8
@@ -256,8 +258,8 @@ Item {
                             color: root.selectedChannelIndex === modelData.index 
                                    ? ((stateManager && stateManager.activeMixTarget === "headphones") ? "#302B1E" : "#282830")
                                    : "#222226"
-                            border.color: modelData.mute ? "#FF3B30" : (modelData.listen ? "#34C759" : (root.selectedChannelIndex === modelData.index ? "#CBA158" : "#303036"))
-                            border.width: (root.selectedChannelIndex === modelData.index || modelData.mute || modelData.listen) ? 2 : 1
+                            border.color: modelData.mute ? "#FF3B30" : ((!stateManager || !stateManager.isStreamerX) && modelData.listen ? "#34C759" : (root.selectedChannelIndex === modelData.index ? "#CBA158" : "#303036"))
+                            border.width: (root.selectedChannelIndex === modelData.index || modelData.mute || ((!stateManager || !stateManager.isStreamerX) && modelData.listen)) ? 2 : 1
 
                             ColumnLayout {
                                 anchors.fill: parent
@@ -435,6 +437,7 @@ Item {
                                     }
 
                                     Rectangle {
+                                        visible: !stateManager || !stateManager.isStreamerX
                                         Layout.fillWidth: true
                                         height: 22
                                         radius: 5
@@ -491,6 +494,7 @@ Item {
                                     }
 
                                     Rectangle {
+                                        visible: !stateManager || !stateManager.isStreamerX
                                         Layout.fillWidth: true
                                         height: 28
                                         radius: 6
