@@ -613,6 +613,22 @@ Item {
                                         }
                                     }
 
+                                    Binding {
+                                        target: hpMasterSlider
+                                        property: "value"
+                                        value: stateManager ? stateManager.headphoneVolume : 25
+                                        when: !hpMasterSlider.pressed
+                                    }
+
+                                    Connections {
+                                        target: stateManager
+                                        function onHeadphoneVolumeChanged() {
+                                            if (stateManager && !hpMasterSlider.pressed) {
+                                                hpMasterSlider.value = stateManager.headphoneVolume;
+                                            }
+                                        }
+                                    }
+
                                     background: Rectangle {
                                         x: hpMasterSlider.leftPadding + hpMasterSlider.availableWidth / 2 - width / 2
                                         y: hpMasterSlider.topPadding
