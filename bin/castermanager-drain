@@ -2,8 +2,8 @@
 """
 CasterManager HID Drainer Daemon
 Runs quietly in the background of the user session.
-Continuously keeps /dev/hidraw* for RØDECaster open and drained.
-Prevents the RØDECaster firmware from freezing when buttons/pads are pressed or sounds play.
+Continuously keeps /dev/hidraw* for RØDECaster and Streamer X open and drained.
+Prevents the hardware firmware from freezing when buttons/pads are pressed or faders move.
 Uses virtually 0% CPU.
 """
 import os
@@ -14,6 +14,7 @@ import signal
 import sys
 
 RODE_VID = "19f7"
+LOCK_FILE = "/tmp/.castermanager_rcp.lock"
 running = True
 
 def sig_handler(signum, frame):
@@ -23,52 +24,74 @@ def sig_handler(signum, frame):
 signal.signal(signal.SIGINT, sig_handler)
 signal.signal(signal.SIGTERM, sig_handler)
 
-def find_rodecaster_hidraw():
+def find_rodecaster_hidraws():
+    """Finds all /dev/hidraw* device nodes belonging to RØDE devices."""
+    nodes = []
     for h in sorted(glob.glob("/sys/class/hidraw/hidraw*")):
         try:
             target = os.path.realpath(h)
             if RODE_VID in target.lower():
-                # Never drain the primary RCP2 command interfaces (:1.6 on Streamer X, :1.9 on Duo/Pro II)
-                if ":1.6/" in target or ":1.9/" in target:
-                    continue
                 dev_name = os.path.basename(h)
                 path = f"/dev/{dev_name}"
                 if os.path.exists(path) and os.access(path, os.R_OK):
-                    return path
+                    nodes.append(path)
         except Exception:
             pass
-    return None
+    return nodes
 
 def main():
+    open_fds = {}  # path -> fd
+
     while running:
-        hidraw = find_rodecaster_hidraw()
-        if not hidraw:
-            time.sleep(2)
+        # If an active CLI command is running, pause briefly to yield exclusive access
+        if os.path.exists(LOCK_FILE):
+            time.sleep(0.05)
+            continue
+
+        current_nodes = find_rodecaster_hidraws()
+
+        # Close fds for nodes that no longer exist
+        for path in list(open_fds.keys()):
+            if path not in current_nodes:
+                try:
+                    os.close(open_fds[path])
+                except Exception:
+                    pass
+                del open_fds[path]
+
+        # Open newly discovered nodes
+        for path in current_nodes:
+            if path not in open_fds:
+                try:
+                    fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK)
+                    open_fds[path] = fd
+                except Exception:
+                    pass
+
+        if not open_fds:
+            time.sleep(1.5)
             continue
 
         try:
-            fd = os.open(hidraw, os.O_RDONLY | os.O_NONBLOCK)
-            while running:
-                r, _, _ = select.select([fd], [], [], 1.0)
-                if r:
-                    # Drain ALL queued incoming report chunks until buffer is empty
-                    while running:
+            readable, _, _ = select.select(list(open_fds.values()), [], [], 0.5)
+            if readable and not os.path.exists(LOCK_FILE):
+                for fd in readable:
+                    while running and not os.path.exists(LOCK_FILE):
                         try:
                             chunk = os.read(fd, 4096)
                             if not chunk:
                                 break
                         except (BlockingIOError, OSError):
                             break
-                if not os.path.exists(hidraw):
-                    break
         except Exception:
-            time.sleep(1)
-        finally:
-            try:
-                os.close(fd)
-            except Exception:
-                pass
+            time.sleep(0.2)
+
+    # Clean up on shutdown
+    for fd in open_fds.values():
+        try:
+            os.close(fd)
+        except Exception:
+            pass
 
 if __name__ == "__main__":
     main()
-

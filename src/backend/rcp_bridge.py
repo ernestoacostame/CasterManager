@@ -143,8 +143,16 @@ class RcpBridge:
         if self.target_serial:
             env["RCP_DEVICE_SERIAL"] = str(self.target_serial)
 
+        LOCK_FILE = "/tmp/.castermanager_rcp.lock"
         with self._lock:
             try:
+                # Signal drain daemon to pause during this CLI command
+                try:
+                    with open(LOCK_FILE, "w") as lf:
+                        lf.write(str(os.getpid()))
+                except Exception:
+                    pass
+
                 res = subprocess.run(
                     cmd,
                     capture_output=True,
@@ -160,6 +168,12 @@ class RcpBridge:
                 return None, "Command timed out"
             except Exception as e:
                 return None, str(e)
+            finally:
+                try:
+                    if os.path.exists(LOCK_FILE):
+                        os.unlink(LOCK_FILE)
+                except Exception:
+                    pass
 
     def trigger_pad(self, bank, pad, hold_ms=50):
         out, err = self.run_cmd(["pad", "trigger", str(bank), str(pad), "--hold", str(hold_ms)], timeout=6)
