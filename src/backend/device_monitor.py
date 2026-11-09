@@ -223,19 +223,10 @@ class DeviceMonitor(QObject):
                 except Exception:
                     continue
 
-        # Maintain background HID drainers on all connected devices
-        active_nodes = {d["hidraw_node"] for d in found_devices if d.get("has_permission") and d.get("hidraw_node")}
-        # Remove drainers for disconnected devices
+        # Clean up any lingering drainers if any were active
         for node in list(self._drainers.keys()):
-            if node not in active_nodes:
-                self._drainers[node].stop()
-                del self._drainers[node]
-        # Start drainers for newly connected devices
-        for node in active_nodes:
-            if node not in self._drainers:
-                drainer = HidDrainer(node)
-                drainer.start()
-                self._drainers[node] = drainer
+            self._drainers[node].stop()
+            del self._drainers[node]
 
         # Report permission issues if any
         for d in found_devices:

@@ -129,6 +129,39 @@ Item {
                     }
                 }
             }
+
+            // Audio Processing Quick Jump Button
+            Rectangle {
+                height: 36
+                implicitWidth: procRow.implicitWidth + 24
+                radius: 18
+                color: procArea.containsMouse ? "#2A2A32" : "#1A1A20"
+                border.color: procArea.containsMouse ? "#CBA158" : "#2C2C36"
+                border.width: 1
+
+                RowLayout {
+                    id: procRow
+                    anchors.centerIn: parent
+                    spacing: 6
+                    Text { text: "✨"; font.pixelSize: 12 }
+                    Text {
+                        text: stateManager ? stateManager.strings.audio_processing : "Procesamiento"
+                        font.pixelSize: 11
+                        font.bold: true
+                        color: procArea.containsMouse ? "#CBA158" : "#E0E0E0"
+                    }
+                }
+
+                MouseArea {
+                    id: procArea
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        if (stateManager) stateManager.openAudioProcessing();
+                    }
+                }
+            }
         }
 
         // Submix Information Banner

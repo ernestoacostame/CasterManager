@@ -177,6 +177,42 @@ TRANSLATIONS = {
         "independent_mix": "Monitoreo Personalizado",
         "reset_submix": "Restablecer a Principal",
         "dual_mix_title": "Modo Submezclas / Dual Mix",
+        "hub_audio_processing": "Procesamiento de Audio",
+        "hub_audio_processing_desc": "Efectos APHEX®, Puerta de Ruido, Compresor, HPF, De-Esser y EQ",
+        "audio_processing": "Procesamiento",
+        "audio_processing_title": "Procesamiento de Audio en Vivo",
+        "aphex_title": "Procesamiento APHEX®",
+        "aphex_desc": "Mejora psicoacústica profesional para dar brillo y presencia a la voz.",
+        "aural_exciter": "Aural Exciter™",
+        "big_bottom": "Big Bottom™",
+        "noise_gate": "Puerta de Ruido",
+        "noise_gate_desc": "Elimina ruidos de fondo no deseados cuando no estás hablando.",
+        "compressor": "Compresor",
+        "compressor_desc": "Controla la dinámica vocal para un sonido consistente y profesional.",
+        "hpf": "Filtro Paso Alto (HPF)",
+        "hpf_desc": "Corta frecuencias graves bajas para eliminar retumbos y vibraciones.",
+        "deesser": "De-Esser",
+        "deesser_desc": "Atenúa frecuencias sibilantes agudas estridentes ('S').",
+        "equalizer": "Ecualizador (EQ)",
+        "equalizer_desc": "Modela el perfil tonal en frecuencias graves, medias y agudas.",
+        "preamp": "Preamplificador / Entrada",
+        "preamp_gain": "Ganancia de Entrada",
+        "phantom_power": "Phantom (+48V)",
+        "phase_invert": "Invertir Fase (Ø)",
+        "threshold": "Umbral",
+        "range": "Rango",
+        "attack": "Ataque",
+        "release": "Liberación",
+        "ratio": "Relación",
+        "makeup_gain": "Ganancia Compensación",
+        "frequency": "Frecuencia",
+        "slope": "Pendiente",
+        "tune": "Sintonía (Tune)",
+        "mix": "Mezcla (Mix)",
+        "drive": "Empuje (Drive)",
+        "low": "Graves",
+        "mid": "Medios",
+        "high": "Agudos",
     },
     "en": {
         "settings": "Settings",
@@ -328,6 +364,42 @@ TRANSLATIONS = {
         "independent_mix": "Custom Monitor Mix",
         "reset_submix": "Reset to Main",
         "dual_mix_title": "Dual Mix / Submix Mode",
+        "hub_audio_processing": "Audio Processing",
+        "hub_audio_processing_desc": "APHEX® effects, Noise Gate, Compressor, HPF, De-Esser and EQ",
+        "audio_processing": "Processing",
+        "audio_processing_title": "Live Audio Processing",
+        "aphex_title": "APHEX® Processing",
+        "aphex_desc": "Professional psychoacoustic enhancement for clarity and presence.",
+        "aural_exciter": "Aural Exciter™",
+        "big_bottom": "Big Bottom™",
+        "noise_gate": "Noise Gate",
+        "noise_gate_desc": "Eliminates unwanted ambient background noise when silent.",
+        "compressor": "Compressor",
+        "compressor_desc": "Levels out vocal dynamics for punchy and consistent tone.",
+        "hpf": "High Pass Filter (HPF)",
+        "hpf_desc": "Cuts ultra-low frequencies to remove desk rumbles and handling noise.",
+        "deesser": "De-Esser",
+        "deesser_desc": "Tames harsh sibilance and whistling high frequencies ('S' sounds).",
+        "equalizer": "Equalizer (EQ)",
+        "equalizer_desc": "Sculpts vocal tone by adjusting low, mid and high frequencies.",
+        "preamp": "Preamplifier / Input",
+        "preamp_gain": "Input Gain",
+        "phantom_power": "Phantom (+48V)",
+        "phase_invert": "Phase Invert (Ø)",
+        "threshold": "Threshold",
+        "range": "Range",
+        "attack": "Attack",
+        "release": "Release",
+        "ratio": "Ratio",
+        "makeup_gain": "Makeup Gain",
+        "frequency": "Frequency",
+        "slope": "Slope",
+        "tune": "Tune",
+        "mix": "Mix",
+        "drive": "Drive",
+        "low": "Low",
+        "mid": "Mid",
+        "high": "High",
     }
 }
 
@@ -346,6 +418,8 @@ class StateManager(QObject):
     devicesChanged = pyqtSignal()
     activeMixTargetChanged = pyqtSignal()
     padClipboardChanged = pyqtSignal()
+    dspChanged = pyqtSignal()
+    activeDspChannelChanged = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -434,6 +508,15 @@ class StateManager(QObject):
         self._live_poll_timer.timeout.connect(self._poll_live_hardware)
         self._live_poll_timer.start()
 
+        # DSP Audio Processing State
+        self._active_dsp_channel = 0
+        self._dsp_channels = self._init_default_dsp_channels()
+        self._pending_dsp_updates = {}
+        self._dsp_timer = QTimer(self)
+        self._dsp_timer.setSingleShot(True)
+        self._dsp_timer.setInterval(120)
+        self._dsp_timer.timeout.connect(self._flush_dsp_hardware)
+
         self.monitor = DeviceMonitor(self)
         self.monitor.devices_changed.connect(self._on_devices_changed)
         self.monitor.device_changed.connect(self._on_device_changed)
@@ -445,6 +528,52 @@ class StateManager(QObject):
 
         # Start monitoring
         self.monitor.start()
+
+    def _init_default_dsp_channels(self):
+        if getattr(self, "_is_streamer_x", False):
+            names = ["Micrófono XLR", "Auriculares TRRS", "Inalámbrico"]
+        elif getattr(self, "_is_duo", True):
+            names = ["Micrófono 1", "Micrófono 2", "Wireless 1", "Wireless 2"]
+        else:
+            names = ["Micrófono 1", "Micrófono 2", "Micrófono 3", "Micrófono 4"]
+
+        channels = []
+        for i, name in enumerate(names):
+            channels.append({
+                "id": i,
+                "name": name,
+                "channel_idx": 28 + i,
+                "input_idx": 191 + i,
+                "preamp_gain": 45,
+                "phantom_power": False,
+                "phase_flip": False,
+                "aphex_on": True,
+                "aphex_ae_mix": 0.5,
+                "aphex_ae_tune": 0.5,
+                "aphex_bb_drive": 0.5,
+                "aphex_bb_tune": 0.35,
+                "noise_gate_on": True,
+                "noise_gate_threshold": 0.28,
+                "noise_gate_range": 0.7,
+                "noise_gate_attack": 0.5,
+                "noise_gate_release": 0.4,
+                "compressor_on": True,
+                "compressor_threshold": 0.65,
+                "compressor_ratio": 0.4,
+                "compressor_gain": 0.2,
+                "compressor_attack": 0.4,
+                "compressor_release": 0.4,
+                "hpf_on": True,
+                "hpf_frequency": 0.5,
+                "deesser_on": True,
+                "deesser_threshold": 0.65,
+                "deesser_ratio": 0.5,
+                "eq_on": True,
+                "eq_low": 0.5,
+                "eq_mid": 0.5,
+                "eq_high": 0.5,
+            })
+        return channels
 
     def _init_default_faders(self):
         if getattr(self, "_is_streamer_x", False):
@@ -562,11 +691,15 @@ class StateManager(QObject):
         self._current_bank = int(self.settings.value(f"current_bank_{self._model_type}", 0))
         self._banks = self._init_empty_banks()
         self._faders = self._init_default_faders()
+        self._dsp_channels = self._init_default_dsp_channels()
+        self._active_dsp_channel = 0
 
         self.stateChanged.emit()
         self.padsChanged.emit()
         self.selectedPadChanged.emit()
         self.fadersChanged.emit()
+        self.dspChanged.emit()
+        self.activeDspChannelChanged.emit()
 
         if info.get("has_permission"):
             self.executor.submit(self._sync_hardware_state)
@@ -740,20 +873,21 @@ class StateManager(QObject):
                 hp2_props = {k: list(v.values())[0] for k, v in hp_nodes[1].get("properties", {}).items()}
                 self._headphone2_type = int(hp2_props.get("headphoneType", 0))
 
-            # Live Faders
-            fout, _ = self.bridge.run_cmd(["fader", "list", "--json"])
-            if fout:
-                import json
-                try:
-                    f_list = json.loads(fout)
-                    for item in f_list:
-                        idx = item.get("index", 0)
-                        if 0 <= idx < len(self._faders):
-                            self._faders[idx]["mute"] = bool(item.get("mute", False))
-                            self._faders[idx]["listen"] = bool(item.get("listen", False))
-                            self._faders[idx]["level"] = int(round(float(item.get("level", 0.7)) * 100))
-                except Exception as e:
-                    logger.debug(f"Error parsing fader list: {e}")
+            # Live Faders (only for consoles with faders)
+            if not self.isStreamerX:
+                fout, _ = self.bridge.run_cmd(["fader", "list", "--json"])
+                if fout:
+                    import json
+                    try:
+                        f_list = json.loads(fout)
+                        for item in f_list:
+                            idx = item.get("index", 0)
+                            if 0 <= idx < len(self._faders):
+                                self._faders[idx]["mute"] = bool(item.get("mute", False))
+                                self._faders[idx]["listen"] = bool(item.get("listen", False))
+                                self._faders[idx]["level"] = int(round(float(item.get("level", 0.7)) * 100))
+                    except Exception as e:
+                        logger.debug(f"Error parsing fader list: {e}")
 
             # Get current active bank from hardware
             out, _ = self.bridge.run_cmd(["pad", "bank", "--json"])
@@ -817,6 +951,59 @@ class StateManager(QObject):
                         }
                         self._banks[bank][pos] = pad_entry
 
+            # Populate DSP Channels from CHANNEL and INPUTSOURCE
+            channel_nodes = [c for c in children if c.get("name") == "CHANNEL"]
+            input_nodes = [c for c in children if c.get("name") == "INPUTSOURCE"]
+            for i, dsp in enumerate(self._dsp_channels):
+                c_node = channel_nodes[i] if i < len(channel_nodes) else None
+                if c_node:
+                    cp = {k: list(v.values())[0] for k, v in c_node.get("properties", {}).items()}
+                    if "aphexOn" in cp: dsp["aphex_on"] = bool(cp["aphexOn"])
+                    if "aphexAEMix" in cp: dsp["aphex_ae_mix"] = float(cp["aphexAEMix"])
+                    if "aphexAETune" in cp: dsp["aphex_ae_tune"] = float(cp["aphexAETune"])
+                    if "aphexBBDrive" in cp: dsp["aphex_bb_drive"] = float(cp["aphexBBDrive"])
+                    if "aphexBBTune" in cp: dsp["aphex_bb_tune"] = float(cp["aphexBBTune"])
+                    if "noiseGateOn" in cp: dsp["noise_gate_on"] = bool(cp["noiseGateOn"])
+                    if "noiseGateThreshold" in cp: dsp["noise_gate_threshold"] = float(cp["noiseGateThreshold"])
+                    if "noiseGateRange" in cp: dsp["noise_gate_range"] = float(cp["noiseGateRange"])
+                    if "noiseGateAttack" in cp: dsp["noise_gate_attack"] = float(cp["noiseGateAttack"])
+                    if "noiseGateRelease" in cp: dsp["noise_gate_release"] = float(cp["noiseGateRelease"])
+                    if "compressorOn" in cp: dsp["compressor_on"] = bool(cp["compressorOn"])
+                    if "compressorThreshold" in cp: dsp["compressor_threshold"] = float(cp["compressorThreshold"])
+                    if "compressorRatio" in cp: dsp["compressor_ratio"] = float(cp["compressorRatio"])
+                    if "compressorGain" in cp: dsp["compressor_gain"] = float(cp["compressorGain"])
+                    if "compressorAttack" in cp: dsp["compressor_attack"] = float(cp["compressorAttack"])
+                    if "compressorRelease" in cp: dsp["compressor_release"] = float(cp["compressorRelease"])
+                    if "hpfOn" in cp: dsp["hpf_on"] = bool(cp["hpfOn"])
+                    if "hpfFrequency" in cp: dsp["hpf_frequency"] = float(cp["hpfFrequency"])
+                    if "deesserOn" in cp: dsp["deesser_on"] = bool(cp["deesserOn"])
+                    if "deesserThreshold" in cp: dsp["deesser_threshold"] = float(cp["deesserThreshold"])
+                    if "deesserRatio" in cp: dsp["deesser_ratio"] = float(cp["deesserRatio"])
+                    if "eqOn" in cp: dsp["eq_on"] = bool(cp["eqOn"])
+                    if "eqLowGain" in cp: dsp["eq_low"] = float(cp["eqLowGain"])
+                    if "eqMidGain" in cp: dsp["eq_mid"] = float(cp["eqMidGain"])
+                    if "eqHighGain" in cp: dsp["eq_high"] = float(cp["eqHighGain"])
+
+                in_node = input_nodes[i] if i < len(input_nodes) else None
+                if in_node:
+                    inp = {k: list(v.values())[0] for k, v in in_node.get("properties", {}).items()}
+                    if "inputMicrophoneGain" in inp: dsp["preamp_gain"] = int(inp["inputMicrophoneGain"])
+                    if "inputPower" in inp:
+                        pwr = int(inp["inputPower"])
+                        dsp["phantom_power"] = (pwr == 1)
+                    if "inputPhaseFlip" in inp: dsp["phase_flip"] = bool(inp["inputPhaseFlip"])
+
+            # Map child node indices dynamically
+            for child_idx, c in enumerate(children):
+                if c.get("name") == "CHANNEL":
+                    src = c.get("properties", {}).get("channelInputSource", {}).get("U32", 0)
+                    if src < len(self._dsp_channels):
+                        self._dsp_channels[src]["channel_idx"] = child_idx
+                elif c.get("name") == "INPUTSOURCE":
+                    iid = c.get("properties", {}).get("inputId", {}).get("U32", 0)
+                    if iid < len(self._dsp_channels):
+                        self._dsp_channels[iid]["input_idx"] = child_idx
+
             logger.info("Successfully synced hardware state!")
             self.stateChanged.emit()
             self.padsChanged.emit()
@@ -824,6 +1011,7 @@ class StateManager(QObject):
             self.fadersChanged.emit()
             self.recordingChanged.emit()
             self.deviceConfigChanged.emit()
+            self.dspChanged.emit()
             self.toastMessage.emit(f"Sincronizado con {self._model_name}")
 
         except Exception as e:
@@ -2242,6 +2430,8 @@ class StateManager(QObject):
     def _poll_live_hardware(self):
         if not self._connected or self._permission_error or self._transfer_mode:
             return
+        if self.isStreamerX:
+            return
 
         def do_poll():
             fout, _ = self.bridge.run_cmd(["fader", "list", "--json"], timeout=2)
@@ -2464,3 +2654,108 @@ class StateManager(QObject):
             self.toastMessage.emit("Perfil UNIFY (Multipista PipeWire) activado")
         self.deviceConfigChanged.emit()
         return res
+
+    # DSP Processing Properties & Slots
+    @pyqtProperty("QVariantList", notify=dspChanged)
+    def dspChannels(self):
+        return [
+            {"id": i, "name": ch["name"], "channel_idx": ch.get("channel_idx", 28 + i)}
+            for i, ch in enumerate(self._dsp_channels)
+        ]
+
+    @pyqtProperty(int, notify=activeDspChannelChanged)
+    def activeDspChannel(self):
+        return self._active_dsp_channel
+
+    @pyqtSlot(int)
+    def setActiveDspChannel(self, idx):
+        if 0 <= idx < len(self._dsp_channels) and idx != self._active_dsp_channel:
+            self._active_dsp_channel = idx
+            self.activeDspChannelChanged.emit()
+            self.dspChanged.emit()
+
+    @pyqtProperty("QVariantMap", notify=dspChanged)
+    def currentDsp(self):
+        if 0 <= self._active_dsp_channel < len(self._dsp_channels):
+            return self._dsp_channels[self._active_dsp_channel]
+        return {}
+
+    @pyqtSlot(str, "QVariant")
+    def setDspParameter(self, name, value):
+        if not (0 <= self._active_dsp_channel < len(self._dsp_channels)):
+            return
+        ch = self._dsp_channels[self._active_dsp_channel]
+        ch[name] = value
+        self.dspChanged.emit()
+
+        if not self._connected or self._permission_error:
+            return
+
+        channel_node_idx = ch.get("channel_idx", 28 + self._active_dsp_channel)
+        input_node_idx = ch.get("input_idx", 191 + self._active_dsp_channel)
+
+        if name == "preamp_gain":
+            val_str = f"u32:{int(value)}"
+            self._pending_dsp_updates[(input_node_idx, "inputMicrophoneGain")] = val_str
+            self._dsp_timer.start()
+        elif name == "phantom_power":
+            val_str = f"u32:{1 if value else 0}"
+            self._pending_dsp_updates[(input_node_idx, "inputPower")] = val_str
+            self._flush_dsp_hardware()
+        elif name == "phase_flip":
+            val_str = f"bool:{str(bool(value)).lower()}"
+            self._pending_dsp_updates[(input_node_idx, "inputPhaseFlip")] = val_str
+            self._flush_dsp_hardware()
+        else:
+            prop_map = {
+                "aphex_on": ("aphexOn", "bool"),
+                "aphex_ae_mix": ("aphexAEMix", "f64"),
+                "aphex_ae_tune": ("aphexAETune", "f64"),
+                "aphex_bb_drive": ("aphexBBDrive", "f64"),
+                "aphex_bb_tune": ("aphexBBTune", "f64"),
+                "noise_gate_on": ("noiseGateOn", "bool"),
+                "noise_gate_threshold": ("noiseGateThreshold", "f64"),
+                "noise_gate_range": ("noiseGateRange", "f64"),
+                "noise_gate_attack": ("noiseGateAttack", "f64"),
+                "noise_gate_release": ("noiseGateRelease", "f64"),
+                "compressor_on": ("compressorOn", "bool"),
+                "compressor_threshold": ("compressorThreshold", "f64"),
+                "compressor_ratio": ("compressorRatio", "f64"),
+                "compressor_gain": ("compressorGain", "f64"),
+                "compressor_attack": ("compressorAttack", "f64"),
+                "compressor_release": ("compressorRelease", "f64"),
+                "hpf_on": ("hpfOn", "bool"),
+                "hpf_frequency": ("hpfFrequency", "f64"),
+                "deesser_on": ("deesserOn", "bool"),
+                "deesser_threshold": ("deesserThreshold", "f64"),
+                "deesser_ratio": ("deesserRatio", "f64"),
+                "eq_on": ("eqOn", "bool"),
+                "eq_low": ("eqLowGain", "f64"),
+                "eq_mid": ("eqMidGain", "f64"),
+                "eq_high": ("eqHighGain", "f64"),
+            }
+            if name in prop_map:
+                hw_prop, hw_type = prop_map[name]
+                if hw_type == "bool":
+                    val_str = f"bool:{str(bool(value)).lower()}"
+                    self._pending_dsp_updates[(channel_node_idx, hw_prop)] = val_str
+                    self._flush_dsp_hardware()
+                elif hw_type == "f64":
+                    val_str = f"f64:{float(value):.4f}"
+                    self._pending_dsp_updates[(channel_node_idx, hw_prop)] = val_str
+                    self._dsp_timer.start()
+
+    def _flush_dsp_hardware(self):
+        if not self._connected or self._permission_error or not self._pending_dsp_updates:
+            return
+        to_send = list(self._pending_dsp_updates.items())
+        self._pending_dsp_updates.clear()
+        def do_send():
+            for (node_idx, prop_name), val_str in to_send:
+                logger.info(f"Setting DSP hardware: node {node_idx} {prop_name} = {val_str}")
+                self.bridge.run_cmd(["set-property", str(node_idx), prop_name, str(val_str)])
+        self.executor.submit(do_send)
+
+    @pyqtSlot()
+    def openAudioProcessing(self):
+        self.navigateTo("audio_processing")

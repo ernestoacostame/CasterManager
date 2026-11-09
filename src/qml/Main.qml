@@ -148,6 +148,12 @@ ApplicationWindow {
                     anchors.fill: parent
                     visible: stateManager && stateManager.connected && stateManager.currentView === "recordings"
                 }
+
+                // 7. Audio Processing View (APHEX, Noise Gate, Compressor, HPF, De-Esser, EQ)
+                AudioProcessingView {
+                    anchors.fill: parent
+                    visible: stateManager && stateManager.connected && stateManager.currentView === "audio_processing"
+                }
             }
         }
     }

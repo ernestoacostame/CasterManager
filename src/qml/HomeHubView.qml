@@ -30,10 +30,10 @@ Item {
             }
         }
 
-        // Feature Cards Grid (2x2 for Duo/Pro II with SD recordings, 3 columns for Streamer X)
+        // Feature Cards Grid
         GridLayout {
             Layout.fillWidth: true
-            columns: (stateManager && stateManager.isStreamerX) ? 3 : 2
+            columns: (stateManager && stateManager.isStreamerX) ? 2 : (root.width > 900 ? 3 : 2)
             rowSpacing: 20
             columnSpacing: 20
 
@@ -116,6 +116,89 @@ Item {
                     cursorShape: Qt.PointingHandCursor
                     onClicked: {
                         if (stateManager) stateManager.navigateTo("audio_setup");
+                    }
+                }
+            }
+
+            // 2. Audio Processing (APHEX, Dynamics, EQ)
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 185
+                Layout.minimumHeight: 170
+                Layout.maximumHeight: 210
+                radius: 14
+                color: cardProcArea.containsMouse ? "#26262B" : "#1C1C1F"
+                border.color: cardProcArea.containsMouse ? "#CBA158" : "#2E2E33"
+                border.width: 1
+
+                ColumnLayout {
+                    anchors.fill: parent
+                    anchors.margins: 20
+                    spacing: 12
+
+                    // Top Row: Icon Badge & Arrow
+                    RowLayout {
+                        Layout.fillWidth: true
+
+                        Rectangle {
+                            width: 50
+                            height: 50
+                            radius: 12
+                            color: "#2C2C32"
+                            border.color: "#3E3E46"
+                            border.width: 1
+
+                            Text {
+                                anchors.centerIn: parent
+                                text: "✨"
+                                font.pixelSize: 24
+                            }
+                        }
+
+                        Item { Layout.fillWidth: true }
+
+                        Text {
+                            text: "›"
+                            font.pixelSize: 24
+                            font.bold: true
+                            color: cardProcArea.containsMouse ? "#CBA158" : "#666666"
+                        }
+                    }
+
+                    // Texts section
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        spacing: 4
+
+                        Text {
+                            text: stateManager ? stateManager.strings.hub_audio_processing : "Procesamiento de Audio"
+                            font.pixelSize: 16
+                            font.bold: true
+                            color: "#FFFFFF"
+                            wrapMode: Text.WordWrap
+                            Layout.fillWidth: true
+                        }
+
+                        Text {
+                            text: stateManager ? stateManager.strings.hub_audio_processing_desc : "Efectos APHEX®, Puerta de Ruido, Compresor, HPF, De-Esser y EQ"
+                            font.pixelSize: 12
+                            color: "#9A9A9E"
+                            wrapMode: Text.WordWrap
+                            Layout.fillWidth: true
+                        }
+
+                        Item { Layout.fillHeight: true }
+                    }
+                }
+
+                MouseArea {
+                    id: cardProcArea
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        if (stateManager) stateManager.openAudioProcessing();
                     }
                 }
             }

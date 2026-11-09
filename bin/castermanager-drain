@@ -24,10 +24,13 @@ signal.signal(signal.SIGINT, sig_handler)
 signal.signal(signal.SIGTERM, sig_handler)
 
 def find_rodecaster_hidraw():
-    for h in glob.glob("/sys/class/hidraw/hidraw*"):
+    for h in sorted(glob.glob("/sys/class/hidraw/hidraw*")):
         try:
             target = os.path.realpath(h)
             if RODE_VID in target.lower():
+                # Never drain the primary RCP2 command interfaces (:1.6 on Streamer X, :1.9 on Duo/Pro II)
+                if ":1.6/" in target or ":1.9/" in target:
+                    continue
                 dev_name = os.path.basename(h)
                 path = f"/dev/{dev_name}"
                 if os.path.exists(path) and os.access(path, os.R_OK):
