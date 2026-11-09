@@ -14,7 +14,6 @@ logger = logging.getLogger("CasterManager.state")
 DUO_PHYSICAL_ORDER = [0, 3, 1, 4, 2, 5]
 PRO_II_PHYSICAL_ORDER = [0, 4, 1, 5, 2, 6, 3, 7]
 STREAMER_X_PHYSICAL_ORDER = [0, 2, 1, 3]
-STREAMERX_PROFILE_PATH = os.path.expanduser("~/.config/CasterManager/streamerx_pads.json")
 
 FACTORY_SOUNDS = [
     {"id": "applause", "name": "Applause", "filename": "Applause.wav"},
@@ -570,53 +569,6 @@ class StateManager(QObject):
         if info.get("has_permission"):
             self.executor.submit(self._sync_hardware_state)
 
-    def _save_streamerx_banks(self):
-        if not getattr(self, "_is_streamer_x", False):
-            return
-        try:
-            os.makedirs(os.path.dirname(STREAMERX_PROFILE_PATH), exist_ok=True)
-            with open(STREAMERX_PROFILE_PATH, "w", encoding="utf-8") as f:
-                json.dump(self._banks, f, indent=2, ensure_ascii=False)
-            logger.info("Saved Streamer X pad profile to disk.")
-        except Exception as e:
-            logger.warning(f"Error saving Streamer X pads: {e}")
-
-    def _load_streamerx_banks(self):
-        if os.path.exists(STREAMERX_PROFILE_PATH):
-            try:
-                with open(STREAMERX_PROFILE_PATH, "r", encoding="utf-8") as f:
-                    loaded = json.load(f)
-                if isinstance(loaded, list) and len(loaded) > 0:
-                    self._banks = loaded
-                    logger.info("Loaded persisted Streamer X pads from disk.")
-                    return True
-            except Exception as e:
-                logger.warning(f"Error loading Streamer X pads: {e}")
-
-        # Initialize with factory sound presets for Streamer X (4 pads per bank)
-        self._banks = self._init_empty_banks()
-        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        default_sounds = [
-            {"name": "Applause", "file": "Applause.wav", "color_idx": 4, "type": "sound", "mode": "oneshot"},
-            {"name": "Airhorn", "file": "Airhorn.wav", "color_idx": 0, "type": "sound", "mode": "oneshot"},
-            {"name": "Rim Shot", "file": "Rim_Shot.wav", "color_idx": 1, "type": "sound", "mode": "oneshot"},
-            {"name": "Crickets", "file": "Crickets.wav", "color_idx": 7, "type": "sound", "mode": "oneshot"},
-        ]
-        for p_idx, s in enumerate(default_sounds):
-            if p_idx < len(self._banks[0]):
-                pad = self._banks[0][p_idx]
-                pad["name"] = s["name"]
-                pad["file"] = s["file"]
-                sound_p = os.path.join(base_dir, "assets", "sounds", s["file"])
-                if os.path.exists(sound_p):
-                    pad["file_path"] = sound_p
-                pad["color_idx"] = s["color_idx"]
-                pad["color_hex"] = PAD_COLORS[s["color_idx"]]["hex"]
-                pad["type"] = s["type"]
-                pad["mode"] = s["mode"]
-
-        self._save_streamerx_banks()
-        return True
 
     def _on_device_changed(self, info):
         # Fallback single device handler
@@ -1126,15 +1078,12 @@ class StateManager(QObject):
         self.padsChanged.emit()
         self.selectedPadChanged.emit()
 
-        if self._is_streamer_x:
-            self._save_streamerx_banks()
-            self.toastMessage.emit(f"Nombre guardado: {name}")
-        elif self._connected and not self._permission_error:
+        if self._connected and not self._permission_error:
             self.executor.submit(
                 self.bridge.run_cmd,
                 ["pad", "set-prop", str(self._current_bank), str(self._selected_pad_index), "padName", f"str:{name}"]
             )
-            self.toastMessage.emit(f"Nombre guardado: {name}")
+        self.toastMessage.emit(f"Nombre guardado: {name}")
 
     @pyqtSlot(int)
     def updatePadColor(self, color_idx):
@@ -1147,9 +1096,7 @@ class StateManager(QObject):
             self.padsChanged.emit()
             self.selectedPadChanged.emit()
 
-            if self._is_streamer_x:
-                self._save_streamerx_banks()
-            elif self._connected and not self._permission_error:
+            if self._connected and not self._permission_error:
                 self.executor.submit(
                     self.bridge.run_cmd,
                     ["pad", "set-prop", str(self._current_bank), str(self._selected_pad_index), "padColourIndex", f"u32:{color_idx}"]
@@ -1167,17 +1114,14 @@ class StateManager(QObject):
         mode_name = "Toggle (Reproducir/Pausar)" if mode == "toggle" else ("One Shot (Completo)" if mode == "oneshot" else "Hold (Mantener)")
         self.toastMessage.emit(f"Modo: {mode_name}")
 
-        if self._is_streamer_x:
-            self._save_streamerx_banks()
-        else:
-            mode_val = 0 if mode == "toggle" else (1 if mode == "oneshot" else 2)
-            if self._connected and not self._permission_error:
-                def do_update():
-                    self.bridge.run_cmd(
-                        ["pad", "set-prop", str(self._current_bank), str(self._selected_pad_index), "padPlayMode", f"u32:{mode_val}"]
-                    )
-                    self._sync_hardware_state()
-                self.executor.submit(do_update)
+        mode_val = 0 if mode == "toggle" else (1 if mode == "oneshot" else 2)
+        if self._connected and not self._permission_error:
+            def do_update():
+                self.bridge.run_cmd(
+                    ["pad", "set-prop", str(self._current_bank), str(self._selected_pad_index), "padPlayMode", f"u32:{mode_val}"]
+                )
+                self._sync_hardware_state()
+            self.executor.submit(do_update)
 
     @pyqtSlot(bool)
     def updatePadLoop(self, loop):
@@ -1190,17 +1134,14 @@ class StateManager(QObject):
 
         self.toastMessage.emit("Bucle: " + ("Activado (Loop On)" if loop else "Desactivado (Loop Off)"))
 
-        if self._is_streamer_x:
-            self._save_streamerx_banks()
-        else:
-            val_str = "bool:true" if loop else "bool:false"
-            if self._connected and not self._permission_error:
-                def do_update():
-                    self.bridge.run_cmd(
-                        ["pad", "set-prop", str(self._current_bank), str(self._selected_pad_index), "padLoop", val_str]
-                    )
-                    self._sync_hardware_state()
-                self.executor.submit(do_update)
+        val_str = "bool:true" if loop else "bool:false"
+        if self._connected and not self._permission_error:
+            def do_update():
+                self.bridge.run_cmd(
+                    ["pad", "set-prop", str(self._current_bank), str(self._selected_pad_index), "padLoop", val_str]
+                )
+                self._sync_hardware_state()
+            self.executor.submit(do_update)
 
     @pyqtSlot(bool)
     def updatePadReplay(self, replay):
@@ -1213,17 +1154,14 @@ class StateManager(QObject):
 
         self.toastMessage.emit("Replay: " + ("Activado (Reiniciar al pulsar)" if replay else "Desactivado (Pausar al pulsar)"))
 
-        if self._is_streamer_x:
-            self._save_streamerx_banks()
-        else:
-            val_str = "bool:true" if replay else "bool:false"
-            if self._connected and not self._permission_error:
-                def do_update():
-                    self.bridge.run_cmd(
-                        ["pad", "set-prop", str(self._current_bank), str(self._selected_pad_index), "padReplay", val_str]
-                    )
-                    self._sync_hardware_state()
-                self.executor.submit(do_update)
+        val_str = "bool:true" if replay else "bool:false"
+        if self._connected and not self._permission_error:
+            def do_update():
+                self.bridge.run_cmd(
+                    ["pad", "set-prop", str(self._current_bank), str(self._selected_pad_index), "padReplay", val_str]
+                )
+                self._sync_hardware_state()
+            self.executor.submit(do_update)
 
     @pyqtSlot(float)
     def updatePadGain(self, gain):
@@ -1234,9 +1172,7 @@ class StateManager(QObject):
         self.padsChanged.emit()
         self.selectedPadChanged.emit()
 
-        if self._is_streamer_x:
-            self._save_streamerx_banks()
-        elif self._connected and not self._permission_error:
+        if self._connected and not self._permission_error:
             def do_update():
                 self.bridge.run_cmd(
                     ["pad", "set-prop", str(self._current_bank), str(self._selected_pad_index), "padGain", f"f64:{gain}"]
@@ -1282,8 +1218,6 @@ class StateManager(QObject):
                     self._sync_hardware_state()
             self.executor.submit(do_upload)
         else:
-            if self._is_streamer_x:
-                self._save_streamerx_banks()
             self.toastMessage.emit(f"Audio asignado al Pad {self._selected_pad_index + 1}: {name}")
 
     @pyqtSlot()
@@ -1297,9 +1231,6 @@ class StateManager(QObject):
         pad["type"] = "empty"
         self.padsChanged.emit()
         self.selectedPadChanged.emit()
-
-        if self._is_streamer_x:
-            self._save_streamerx_banks()
 
         if self._connected and not self._permission_error:
             def do_clear():
@@ -2374,11 +2305,6 @@ class StateManager(QObject):
         self.padsChanged.emit()
         self.selectedPadChanged.emit()
 
-        if self._is_streamer_x:
-            self._save_streamerx_banks()
-            self.toastMessage.emit(f"Efecto '{fx_name}' configurado")
-            return
-
         if self._connected and not self._permission_error:
             def do_assign():
                 b_str = str(self._current_bank)
@@ -2417,8 +2343,6 @@ class StateManager(QObject):
                 pad["name"] = "MIDI CC#1"
         self.padsChanged.emit()
         self.selectedPadChanged.emit()
-        if self._is_streamer_x:
-            self._save_streamerx_banks()
         self.toastMessage.emit(f"Tipo: {ptype.upper()}")
 
     @pyqtSlot()
