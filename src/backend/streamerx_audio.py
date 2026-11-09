@@ -20,45 +20,45 @@ STREAMERX_CONF_PATH = os.path.join(PIPEWIRE_CONF_DIR, "99-streamerx-unify.conf")
 
 ASOUNDRC_PATH = os.path.expanduser("~/.asoundrc")
 ASOUND_UNIFY_BLOCK = """# --- RODE UNIFY START ---
-pcm.StreamerX_Game {
+pcm.UNIFY_StreamMix {
     type pulse
-    device "streamerx_game"
-    hint { show on description "RØDE Streamer X - Game (UNIFY)" }
+    device "unify_stream_mix_in"
+    hint { show on description "UNIFY - Stream Mix (Broadcast / OBS)" }
 }
-pcm.StreamerX_Chat {
+pcm.UNIFY_Game {
     type pulse
-    device "streamerx_chat"
-    hint { show on description "RØDE Streamer X - Chat (UNIFY)" }
+    device "unify_game_in"
+    hint { show on description "UNIFY - Game" }
 }
-pcm.StreamerX_Music {
+pcm.UNIFY_Chat {
     type pulse
-    device "streamerx_music"
-    hint { show on description "RØDE Streamer X - Music (UNIFY)" }
+    device "unify_chat_in"
+    hint { show on description "UNIFY - Chat" }
 }
-pcm.StreamerX_System {
+pcm.UNIFY_Music {
     type pulse
-    device "streamerx_system"
-    hint { show on description "RØDE Streamer X - System (UNIFY)" }
+    device "unify_music_in"
+    hint { show on description "UNIFY - Music" }
 }
-pcm.StreamerX_StreamMix {
+pcm.UNIFY_System {
     type pulse
-    device "streamerx_stream_mix"
-    hint { show on description "RØDE Streamer X - Stream Mix (UNIFY OBS/DAW)" }
+    device "unify_system_in"
+    hint { show on description "UNIFY - System" }
 }
 # --- RODE UNIFY END ---
 """
 
 class StreamerXAudioRouter:
     """
-    Manages PipeWire and ALSA routing and virtual audio sinks for RØDE Streamer X.
+    Manages PipeWire and ALSA routing and virtual audio sinks/sources for RØDE Streamer X.
     """
 
     CHANNELS = [
-        ("streamerx_game", "UNIFY-Game"),
-        ("streamerx_chat", "UNIFY-Chat"),
-        ("streamerx_music", "UNIFY-Music"),
-        ("streamerx_system", "UNIFY-System"),
-        ("streamerx_stream_mix", "UNIFY-StreamMix"),
+        ("streamerx_game", "UNIFY-Game", "unify_game_in"),
+        ("streamerx_chat", "UNIFY-Chat", "unify_chat_in"),
+        ("streamerx_music", "UNIFY-Music", "unify_music_in"),
+        ("streamerx_system", "UNIFY-System", "unify_system_in"),
+        ("streamerx_stream_mix", "UNIFY-StreamMix", "unify_stream_mix_in"),
     ]
 
     @staticmethod
@@ -213,8 +213,9 @@ context.modules = [
     @classmethod
     def install_unify_profile(cls) -> bool:
         """
-        Loads UNIFY virtual devices immediately in PipeWire/PulseAudio via pactl,
-        saves ~/.asoundrc for ALSA DAWs, and writes pipewire.conf.d for session persistence.
+        Loads UNIFY virtual devices on-demand in PipeWire/PulseAudio via pactl,
+        providing both playback sinks and recording sources (visible to OBS Studio,
+        DAWs like KutEditor/Reaper, and system mixers) with zero PipeWire restarts.
         """
         try:
             nodes = cls.get_streamer_x_nodes()
@@ -224,21 +225,22 @@ context.modules = [
             # 1. First remove any previous instances to avoid duplicates
             cls.remove_unify_profile(reload_services=False)
 
-            # 2. Hot-load virtual sinks and loopbacks immediately
+            # 2. Hot-load virtual playback sinks, loopbacks and recording sources immediately
             loaded_ids = []
-            for ch_name, ch_desc in cls.CHANNELS:
-                # Load null-sink
+            for ch_name, ch_desc, src_name in cls.CHANNELS:
+                # A) Load virtual playback sink (Output Device in KDE/System)
                 cmd_sink = [
                     "pactl", "load-module", "module-null-sink",
                     f"sink_name={ch_name}",
                     f"sink_properties=device.description='{ch_desc}'"
                 ]
-                res = subprocess.run(cmd_sink, capture_output=True, text=True, timeout=3)
-                if res.returncode == 0 and res.stdout.strip().isdigit():
-                    loaded_ids.append(res.stdout.strip())
+                res_sink = subprocess.run(cmd_sink, capture_output=True, text=True, timeout=3)
+                if res_sink.returncode == 0 and res_sink.stdout.strip().isdigit():
+                    loaded_ids.append(res_sink.stdout.strip())
 
-                # For playback channels, loopback to Streamer X headphones
+                # B) Loopback routing
                 if ch_name != "streamerx_stream_mix":
+                    # Loopback from channel monitor to Streamer X physical headphones
                     cmd_loop = [
                         "pactl", "load-module", "module-loopback",
                         f"source={ch_name}.monitor",
@@ -248,7 +250,7 @@ context.modules = [
                     if res_loop.returncode == 0 and res_loop.stdout.strip().isdigit():
                         loaded_ids.append(res_loop.stdout.strip())
                 else:
-                    # For Stream Mix: loopback Streamer X mic into the stream mix
+                    # For Stream Mix: loopback physical mic into the stream mix sink
                     cmd_mic = [
                         "pactl", "load-module", "module-loopback",
                         f"source={hw_source}",
@@ -258,18 +260,27 @@ context.modules = [
                     if res_mic.returncode == 0 and res_mic.stdout.strip().isdigit():
                         loaded_ids.append(res_mic.stdout.strip())
 
-            logger.info(f"Loaded {len(loaded_ids)} UNIFY PipeWire modules in real-time.")
+                # C) Load virtual recording source (Input Device in OBS Studio, KutEditor & DAWs!)
+                cmd_src = [
+                    "pactl", "load-module", "module-remap-source",
+                    f"source_name={src_name}",
+                    f"master={ch_name}.monitor",
+                    f"source_properties=device.description='{ch_desc}'"
+                ]
+                res_src = subprocess.run(cmd_src, capture_output=True, text=True, timeout=3)
+                if res_src.returncode == 0 and res_src.stdout.strip().isdigit():
+                    loaded_ids.append(res_src.stdout.strip())
 
-            # 3. Write PipeWire configuration for persistence across reboots
-            try:
-                os.makedirs(PIPEWIRE_CONF_DIR, exist_ok=True)
-                content = cls.generate_pipewire_config(hw_sink, hw_source)
-                with open(STREAMERX_CONF_PATH, "w", encoding="utf-8") as f:
-                    f.write(content)
-            except Exception as pe:
-                logger.warning(f"Could not write persistent conf: {pe}")
+            logger.info(f"Loaded {len(loaded_ids)} UNIFY PipeWire virtual sink/source modules in real-time.")
 
-            # 4. ALSA configuration (~/.asoundrc for DAWs like Reaper, Ardour)
+            # 3. Clean any persistent file from pipewire.conf.d so PipeWire never auto-loads it on session start
+            if os.path.exists(STREAMERX_CONF_PATH):
+                try:
+                    os.remove(STREAMERX_CONF_PATH)
+                except Exception:
+                    pass
+
+            # 4. ALSA configuration (~/.asoundrc for DAWs like Reaper, Ardour, KutEditor)
             try:
                 existing_asound = ""
                 if os.path.isfile(ASOUNDRC_PATH):
@@ -289,23 +300,23 @@ context.modules = [
     @classmethod
     def remove_unify_profile(cls, reload_services=True) -> bool:
         """
-        Unloads active UNIFY modules immediately in real-time and removes configs.
+        Unloads active UNIFY modules immediately in real-time without restarting audio services.
         """
         try:
-            # 1. Unload all modules associated with streamerx sinks
+            # 1. Unload all modules associated with streamerx or unify sinks/sources
             try:
                 out = subprocess.run(["pactl", "list", "modules", "short"], capture_output=True, text=True, timeout=3).stdout
                 for line in out.splitlines():
                     parts = line.split()
                     if len(parts) >= 3:
                         mod_id = parts[0]
-                        mod_args = " ".join(parts[2:])
-                        if "streamerx" in mod_args:
+                        mod_args = " ".join(parts[2:]).lower()
+                        if "streamerx" in mod_args or "unify" in mod_args:
                             subprocess.run(["pactl", "unload-module", mod_id], capture_output=True, timeout=2)
             except Exception as ue:
                 logger.warning(f"Error unloading live modules: {ue}")
 
-            # 2. Remove persistent PipeWire config file
+            # 2. Ensure persistent PipeWire config file is completely removed
             if os.path.exists(STREAMERX_CONF_PATH):
                 try:
                     os.remove(STREAMERX_CONF_PATH)
@@ -328,5 +339,6 @@ context.modules = [
             return True
         except Exception as e:
             logger.error(f"Failed to remove PipeWire profile: {e}")
+            return False
             return False
 
