@@ -1050,22 +1050,30 @@ class StateManager(QObject):
                     except Exception as e:
                         logger.debug(f"Error parsing fader list: {e}")
 
-            # Get current active bank from hardware
-            out, _ = self.bridge.run_cmd(["pad", "bank", "--json"])
-            if out:
-                import json
-                try:
-                    bank_info = json.loads(out)
-                    if "selected" in bank_info:
-                        self._current_bank = bank_info["selected"]
-                except Exception:
-                    pass
+            # Current active bank: already in the dump (GUI.selectedBank), no extra CLI call
+            gui_node = find_node(dump, "GUI")
+            sel = None
+            if gui_node:
+                sel = gui_node.get("properties", {}).get("selectedBank", {}).get("U32")
+            if sel is not None:
+                self._current_bank = int(sel)
+            else:
+                out, _ = self.bridge.run_cmd(["pad", "bank", "--json"])
+                if out:
+                    try:
+                        bank_info = json.loads(out)
+                        if "selected" in bank_info:
+                            self._current_bank = bank_info["selected"]
+                    except Exception:
+                        pass
 
             # Populate Pads from SOUNDPADS
             soundpads_node = find_node(dump, "SOUNDPADS")
             if soundpads_node:
                 pads_per_bank = self._pads_per_bank
                 self._banks = self._init_empty_banks()
+                order = STREAMER_X_PHYSICAL_ORDER if self._is_streamer_x else (DUO_PHYSICAL_ORDER if self._is_duo else PRO_II_PHYSICAL_ORDER)
+                slot_counts = {}
 
                 for c in soundpads_node.get("children", []):
                     p = {k: list(v.values())[0] for k, v in c.get("properties", {}).items()}
@@ -1075,6 +1083,8 @@ class StateManager(QObject):
                     idx = int(idx)
                     bank = idx // pads_per_bank
                     pos = idx % pads_per_bank
+                    disp = order.index(pos) if pos in order else pos
+                    slot_counts[(bank, disp)] = slot_counts.get((bank, disp), 0) + 1
 
                     if bank < len(self._banks) and pos < len(self._banks[bank]):
                         color_idx = int(p.get("padColourIndex", 0)) % 12
@@ -1108,9 +1118,11 @@ class StateManager(QObject):
                             "file": p.get("padFilePath", ""),
                             "fx_id": int(p.get("padTriggerControl", 8)),
                             "fx_channel": int(p.get("padEffectInput", 0)),
-                            "fx_mode": int(p.get("padEffectTriggerMode", 1))
+                            "fx_mode": int(p.get("padEffectTriggerMode", 1)),
+                            "_raw": {k: v for k, v in p.items() if isinstance(v, (int, float, str, bool))}
                         }
                         self._banks[bank][pos] = pad_entry
+                self.bridge.seed_pads(slot_counts)
 
                 try:
                     self.settings.setValue(f"cached_banks_{self._model_type}", json.dumps(self._banks))
@@ -1124,6 +1136,7 @@ class StateManager(QObject):
             for i, dsp in enumerate(self._dsp_channels):
                 c_node = channel_nodes[i] if i < len(channel_nodes) else None
                 if c_node:
+                    dsp["_synced"] = True
                     cp = {k: list(v.values())[0] for k, v in c_node.get("properties", {}).items()}
                     if "aphexOn" in cp: dsp["aphex_on"] = bool(cp["aphexOn"])
                     if "aphexAEMix" in cp: dsp["aphex_ae_mix"] = float(cp["aphexAEMix"])
@@ -1695,19 +1708,21 @@ class StateManager(QObject):
                     fx_channel = target.get("fx_channel", 0)
                     fx_mode = target.get("fx_mode", 1)
                     col = target.get("color_idx", 8)
-                    self.bridge.run_cmd(["pad", "set-prop", b_str, p_str, "padType", "u32:2"])
-                    self.bridge.run_cmd(["pad", "set-prop", b_str, p_str, "padFilePath", "str:"])
-                    self.bridge.run_cmd(["pad", "set-prop", b_str, p_str, "padName", f"str:{target.get('name', '')}"])
-                    self.bridge.run_cmd(["pad", "set-prop", b_str, p_str, "padColourIndex", f"u32:{col}"])
-                    self.bridge.run_cmd(["pad", "set-prop", b_str, p_str, "padEffectTriggerMode", f"u32:{fx_mode}"])
-                    self.bridge.run_cmd(["pad", "set-prop", b_str, p_str, "padEffectInput", f"u32:{fx_channel}"])
-                    self.bridge.run_cmd(["pad", "set-prop", b_str, p_str, "padTriggerControl", f"u32:{fx_id}"])
-                    self.bridge.run_cmd(["pad", "set-prop", b_str, p_str, "padTriggerSend", "u32:2"])
-                    self.bridge.run_cmd(["pad", "set-prop", b_str, p_str, "padTriggerChannel", "u32:1"])
-                    self.bridge.run_cmd(["pad", "set-prop", b_str, p_str, "padTriggerMode", "u32:1"])
-                    self.bridge.run_cmd(["pad", "set-prop", b_str, p_str, "padTriggerOn", "u32:127"])
-                    self.bridge.run_cmd(["pad", "set-prop", b_str, p_str, "padTriggerOff", "u32:0"])
-                    self.bridge.run_cmd(["pad", "set-prop", b_str, p_str, "padActive", "bool:false"])
+                    self._send_pad_props(b_str, p_str, [
+                        ("padType", "u32:2"),
+                        ("padFilePath", "str:"),
+                        ("padName", f"str:{target.get('name', '')}"),
+                        ("padColourIndex", f"u32:{col}"),
+                        ("padEffectTriggerMode", f"u32:{fx_mode}"),
+                        ("padEffectInput", f"u32:{fx_channel}"),
+                        ("padTriggerControl", f"u32:{fx_id}"),
+                        ("padTriggerSend", "u32:2"),
+                        ("padTriggerChannel", "u32:1"),
+                        ("padTriggerMode", "u32:1"),
+                        ("padTriggerOn", "u32:127"),
+                        ("padTriggerOff", "u32:0"),
+                        ("padActive", "bool:false"),
+                    ])
                 elif ptype == "sound":
                     sound_p = target.get("file_path") or ""
                     tmp_path = None
@@ -2775,6 +2790,40 @@ class StateManager(QObject):
         if self._connected and not self._permission_error:
             self.executor.submit(self.bridge.run_cmd, ["set-property", "15", "systemMidiControl", f"bool:{str(val).lower()}"])
 
+    @staticmethod
+    def _raw_matches(raw_val, val_str):
+        """Compare a value from the device dump with a CLI-typed value string."""
+        if raw_val is None:
+            return False
+        kind, _, v = val_str.partition(":")
+        try:
+            if kind == "u32":
+                return not isinstance(raw_val, bool) and int(raw_val) == int(v)
+            if kind == "bool":
+                return bool(raw_val) == (v in ("true", "1"))
+            if kind == "f64":
+                return abs(float(raw_val) - float(v)) < 1e-4
+            if kind == "str":
+                return str(raw_val) == v
+        except (TypeError, ValueError):
+            return False
+        return False
+
+    def _send_pad_props(self, b_str, p_str, props, raw=None):
+        """Send pad properties, skipping the ones the device already has."""
+        raw = raw if raw is not None else {}
+        sent = 0
+        for name, val in props:
+            if self._raw_matches(raw.get(name), val):
+                continue
+            _, err = self.bridge.run_cmd(["pad", "set-prop", b_str, p_str, name, val])
+            sent += 1
+            if not err:
+                kind, _, v = val.partition(":")
+                raw[name] = (int(v) if kind == "u32" else v in ("true", "1") if kind == "bool"
+                             else float(v) if kind == "f64" else v)
+        logger.info(f"Pad {b_str}/{p_str}: {sent} of {len(props)} properties sent (rest unchanged)")
+
     @pyqtSlot(int, str, int, int)
     def assignPadEffect(self, fx_id, fx_name, input_ch=0, trigger_mode=1):
         """
@@ -2803,23 +2852,27 @@ class StateManager(QObject):
         self.selectedPadChanged.emit()
 
         if self._connected and not self._permission_error:
+            b_str = str(self._current_bank)
+            p_str = str(self._selected_pad_index)
+            raw = pad.setdefault("_raw", {})
+            props = [
+                ("padType", "u32:2"),
+                ("padFilePath", "str:"),
+                ("padName", f"str:{fx_name}"),
+                ("padColourIndex", f"u32:{col}"),
+                ("padEffectTriggerMode", f"u32:{trigger_mode}"),
+                ("padEffectInput", f"u32:{input_ch}"),
+                ("padTriggerControl", f"u32:{fx_id}"),
+                ("padTriggerSend", "u32:2"),
+                ("padTriggerChannel", "u32:1"),
+                ("padTriggerMode", "u32:1"),
+                ("padTriggerOn", "u32:127"),
+                ("padTriggerOff", "u32:0"),
+                ("padActive", "bool:false"),
+            ]
             def do_assign():
-                b_str = str(self._current_bank)
-                p_str = str(self._selected_pad_index)
                 # Set proper hardware properties to prevent audio engine lockup
-                self.bridge.run_cmd(["pad", "set-prop", b_str, p_str, "padType", "u32:2"])
-                self.bridge.run_cmd(["pad", "set-prop", b_str, p_str, "padFilePath", "str:"])
-                self.bridge.run_cmd(["pad", "set-prop", b_str, p_str, "padName", f"str:{fx_name}"])
-                self.bridge.run_cmd(["pad", "set-prop", b_str, p_str, "padColourIndex", f"u32:{col}"])
-                self.bridge.run_cmd(["pad", "set-prop", b_str, p_str, "padEffectTriggerMode", f"u32:{trigger_mode}"])
-                self.bridge.run_cmd(["pad", "set-prop", b_str, p_str, "padEffectInput", f"u32:{input_ch}"])
-                self.bridge.run_cmd(["pad", "set-prop", b_str, p_str, "padTriggerControl", f"u32:{fx_id}"])
-                self.bridge.run_cmd(["pad", "set-prop", b_str, p_str, "padTriggerSend", "u32:2"])
-                self.bridge.run_cmd(["pad", "set-prop", b_str, p_str, "padTriggerChannel", "u32:1"])
-                self.bridge.run_cmd(["pad", "set-prop", b_str, p_str, "padTriggerMode", "u32:1"])
-                self.bridge.run_cmd(["pad", "set-prop", b_str, p_str, "padTriggerOn", "u32:127"])
-                self.bridge.run_cmd(["pad", "set-prop", b_str, p_str, "padTriggerOff", "u32:0"])
-                self.bridge.run_cmd(["pad", "set-prop", b_str, p_str, "padActive", "bool:false"])
+                self._send_pad_props(b_str, p_str, props, raw)
             self.executor.submit(do_assign)
         self.toastMessage.emit(f"Efecto '{fx_name}' configurado")
 
@@ -2894,7 +2947,13 @@ class StateManager(QObject):
         if not (0 <= self._active_dsp_channel < len(self._dsp_channels)):
             return
         ch = self._dsp_channels[self._active_dsp_channel]
+        prev = ch.get(name)
+        unchanged = prev is not None and (
+            prev == value if isinstance(value, (bool, str)) or isinstance(prev, bool)
+            else abs(float(prev) - float(value)) < 1e-4)
         ch[name] = value
+        if unchanged and ch.get("_synced"):
+            return  # device already has this value: no hardware round-trip
         if name != "active_preset" and not name.startswith("voxlab_"):
             ch["active_preset"] = detect_dsp_preset(ch)
         self.dspChanged.emit()
@@ -3017,7 +3076,6 @@ class StateManager(QObject):
         if preset_name in presets:
             p_data = presets[preset_name]
             for k, v in p_data.items():
-                ch[k] = v
                 self.setDspParameter(k, v)
             ch["active_preset"] = preset_name
             self.dspChanged.emit()

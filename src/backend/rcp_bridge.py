@@ -27,7 +27,8 @@ class RcpBridge:
         self.target_pid = None
         self.target_serial = None
         self._lock = threading.Lock()
-        self._known_pads = set()
+        self._known_pads = {}
+        self._pads_seeded = False
         base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         if not cli_path:
             # Check local bin/ first, then Resources target
@@ -51,42 +52,66 @@ class RcpBridge:
     # reported the first one. `pad clear` then only removed one node per click and
     # the pad "came back" again and again.
     # ------------------------------------------------------------------
+    #
+    # Speed: the last hardware dump tells us exactly which slots hold how many
+    # nodes (`seed_pads`). With that, set-prop needs no existence probe and
+    # clear knows how many deletions to run without a confirmation round-trip.
+    # ------------------------------------------------------------------
     def invalidate_pad_cache(self):
         self._known_pads.clear()
+        self._pads_seeded = False
+
+    def seed_pads(self, slot_counts):
+        """slot_counts: {(bank, display_pad): node_count} taken from a fresh dump."""
+        self._known_pads = {(self.target_pid, str(b), str(p)): n for (b, p), n in slot_counts.items()}
+        self._pads_seeded = True
 
     def pad_exists(self, bank, pad):
         """Read-only check (dry-run) whether a PAD node exists for bank/pad."""
         out, err = self.run_cmd(["--dry-run", "pad", "clear", str(bank), str(pad)], timeout=8)
         return bool(out) and "deleting pad idx" in out
 
+    def _slot_known(self, key):
+        """True/False when we know whether the slot has a node, None if unknown."""
+        if self._known_pads.get(key, 0) > 0:
+            return True
+        return False if self._pads_seeded else None
+
     def _set_pad_prop(self, args, timeout):
         bank, pad = args[2], args[3]
         key = (self.target_pid, str(bank), str(pad))
-        if key in self._known_pads:
-            return self.run_cmd(args, timeout=timeout, _raw=True)
-
-        if self.pad_exists(bank, pad):
-            self._known_pads.add(key)
+        exists = self._slot_known(key)
+        if exists is None:
+            exists = self.pad_exists(bank, pad)
+        if exists:
+            self._known_pads[key] = max(1, self._known_pads.get(key, 0))
             return self.run_cmd(args, timeout=timeout, _raw=True)
 
         # Slot is empty: this call creates the node. Wait until the device
         # reports it before letting any further set-prop through.
         result = self.run_cmd(args, timeout=timeout, _raw=True)
-        for _ in range(12):
-            time.sleep(0.35)
+        for _ in range(15):
+            time.sleep(0.2)
             if self.pad_exists(bank, pad):
                 break
         else:
             logger.warning(f"Pad node for bank {bank} pad {pad} not confirmed after creation")
-        self._known_pads.add(key)
+        self._known_pads[key] = 1
         return result
 
     def clear_pad(self, bank, pad, max_passes=16):
         """Delete every PAD node for bank/pad (also removes leftover duplicates)."""
-        self._known_pads.discard((self.target_pid, str(bank), str(pad)))
+        key = (self.target_pid, str(bank), str(pad))
+        known = self._slot_known(key)
+        expected = self._known_pads.get(key, 0)
+        self._known_pads[key] = 0
+        if known is False:
+            return 0, None  # last dump says the slot is already empty: no round-trip
+
         removed = 0
         last_err = None
-        for _ in range(max_passes):
+        passes = expected if known else max_passes
+        for _ in range(passes):
             out, err = self.run_cmd(["pad", "clear", str(bank), str(pad)], timeout=10)
             if err:
                 last_err = err
@@ -94,7 +119,7 @@ class RcpBridge:
             if not out or "already empty" in out:
                 break
             removed += 1
-            time.sleep(0.3)
+            time.sleep(0.15)
         if removed > 1:
             logger.info(f"Removed {removed} duplicated nodes for bank {bank} pad {pad}")
         return removed, last_err
@@ -102,6 +127,11 @@ class RcpBridge:
     def run_cmd(self, args, timeout=5, _raw=False):
         if not _raw and len(args) >= 4 and args[0] == "pad" and args[1] == "set-prop":
             return self._set_pad_prop(args, timeout)
+        if not _raw and len(args) >= 4 and args[0] == "pad" and args[1] == "upload":
+            out, err = self.run_cmd(args, timeout=timeout, _raw=True)
+            if not err:
+                self._known_pads[(self.target_pid, str(args[2]), str(args[3]))] = 1
+            return out, err
         if not self.is_available():
             logger.warning(f"CLI binary not found at {self.cli_path}")
             return None, "Binary not found"
