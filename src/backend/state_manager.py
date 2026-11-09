@@ -516,10 +516,10 @@ class StateManager(QObject):
         self._dsp_timer.setSingleShot(True)
         self._dsp_timer.setInterval(120)
         self._dsp_timer.timeout.connect(self._flush_dsp_hardware)
+        self._is_syncing = False
 
         self.monitor = DeviceMonitor(self)
         self.monitor.devices_changed.connect(self._on_devices_changed)
-        self.monitor.device_changed.connect(self._on_device_changed)
         self.monitor.device_disconnected.connect(self._on_device_disconnected)
         self.monitor.permission_issue.connect(self._on_permission_issue)
 
@@ -651,7 +651,15 @@ class StateManager(QObject):
         elif self._selected_device_index >= len(device_list):
             self._selected_device_index = 0
 
-        self._apply_device_config(device_list[self._selected_device_index])
+        target_dev = device_list[self._selected_device_index]
+        if (self._connected and 
+            self._model_type == target_dev.get("model_type") and 
+            self._serial == target_dev.get("serial") and 
+            self.bridge.target_pid == target_dev.get("product_id")):
+            self.devicesChanged.emit()
+            return
+
+        self._apply_device_config(target_dev)
         self.devicesChanged.emit()
 
     def _apply_device_config(self, info):
@@ -728,13 +736,17 @@ class StateManager(QObject):
         self.stateChanged.emit()
 
     def _sync_hardware_state(self):
-        # 1. Query device full dump
-        dump = self.bridge.dump_state()
-        if not dump:
-            logger.warning("Could not dump hardware state")
+        if getattr(self, "_is_syncing", False):
+            logger.info("Hardware sync already in progress, skipping duplicate call")
             return
-
+        self._is_syncing = True
         try:
+            # 1. Query device full dump
+            dump = self.bridge.dump_state()
+            if not dump:
+                logger.warning("Could not dump hardware state")
+                return
+
             def find_node(node, name):
                 if node.get("name") == name:
                     return node
@@ -1016,6 +1028,8 @@ class StateManager(QObject):
 
         except Exception as e:
             logger.error(f"Error parsing hardware state: {e}")
+        finally:
+            self._is_syncing = False
 
     # Properties
     @pyqtProperty(bool, notify=stateChanged)

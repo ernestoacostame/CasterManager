@@ -2,6 +2,7 @@ import os
 import subprocess
 import json
 import logging
+import threading
 
 logger = logging.getLogger("CasterManager.rcp_bridge")
 
@@ -24,6 +25,7 @@ class RcpBridge:
     def __init__(self, cli_path=None):
         self.target_pid = None
         self.target_serial = None
+        self._lock = threading.Lock()
         base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         if not cli_path:
             # Check local bin/ first, then Resources target
@@ -49,39 +51,40 @@ class RcpBridge:
         if self.target_serial:
             env["RCP_DEVICE_SERIAL"] = str(self.target_serial)
 
-        try:
-            res = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=timeout,
-                env=env
-            )
-            if res.returncode == 0:
-                return res.stdout, None
-            else:
-                return None, res.stderr or res.stdout
-        except subprocess.TimeoutExpired:
-            return None, "Command timed out"
-        except Exception as e:
-            return None, str(e)
+        with self._lock:
+            try:
+                res = subprocess.run(
+                    cmd,
+                    capture_output=True,
+                    text=True,
+                    timeout=timeout,
+                    env=env
+                )
+                if res.returncode == 0:
+                    return res.stdout, None
+                else:
+                    return None, res.stderr or res.stdout
+            except subprocess.TimeoutExpired:
+                return None, "Command timed out"
+            except Exception as e:
+                return None, str(e)
 
     def trigger_pad(self, bank, pad, hold_ms=50):
-        out, err = self.run_cmd(["pad", "trigger", str(bank), str(pad), "--hold", str(hold_ms)])
+        out, err = self.run_cmd(["pad", "trigger", str(bank), str(pad), "--hold", str(hold_ms)], timeout=6)
         if err:
             logger.error(f"Error triggering pad {bank}:{pad} -> {err}")
             return False, err
         return True, "Triggered"
 
     def set_bank(self, bank):
-        out, err = self.run_cmd(["pad", "bank", str(bank)])
+        out, err = self.run_cmd(["pad", "bank", str(bank)], timeout=8)
         if err:
             logger.error(f"Error switching to bank {bank} -> {err}")
             return False, err
         return True, "Switched"
 
     def dump_state(self):
-        out, err = self.run_cmd(["dump"], timeout=8)
+        out, err = self.run_cmd(["dump"], timeout=16)
         if err or not out:
             logger.warning(f"Could not dump device state: {err}")
             return None
@@ -90,4 +93,5 @@ class RcpBridge:
         except Exception as e:
             logger.error(f"Failed to parse JSON state dump: {e}")
             return None
+
 
