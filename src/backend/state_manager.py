@@ -1049,7 +1049,11 @@ class StateManager(QObject):
                     g_prop = children[191].get("properties", {}).get("inputMicrophoneGain", {}).get("U32")
                     if g_prop is not None:
                         self._faders[0]["level"] = int(round((int(g_prop) / 76.0) * 100))
-                if 28 < len(children) and len(self._faders) > 0:
+                if 5 < len(children) and len(self._faders) > 0:
+                    em_props = children[5].get("properties", {})
+                    if "emergencyMuteActive" in em_props:
+                        self._faders[0]["mute"] = bool(em_props["emergencyMuteActive"].get("Bool", False))
+                elif 28 < len(children) and len(self._faders) > 0:
                     c0_props = children[28].get("properties", {})
                     if "channelOutputMute" in c0_props:
                         self._faders[0]["mute"] = bool(c0_props["channelOutputMute"].get("Bool", False))
@@ -2483,6 +2487,7 @@ class StateManager(QObject):
                 if self._connected and not self._permission_error:
                     if self.isStreamerX:
                         if index == 0:
+                            self.executor.submit(self.bridge.run_cmd, ["set-property", "5", "emergencyMuteActive", f"bool:{str(new_mute).lower()}"])
                             self.executor.submit(self.bridge.run_cmd, ["set-property", "28", "channelOutputMute", f"bool:{str(new_mute).lower()}"])
                             lvl = 0.0 if new_mute else (self._faders[0].get("level", 70) / 100.0)
                             self.executor.submit(self.bridge.run_cmd, ["set-property", "179", "streammixmixLevel", f"f64:{lvl:.4f}"])
@@ -2761,8 +2766,15 @@ class StateManager(QObject):
                             self._faders[1]["level"] = hs_lvl
                             changed = True
 
-                # Mic Mute (Node 28)
-                if 28 < len(children) and len(self._faders) > 0:
+                # Mic Mute (Node 5 emergencyMuteActive / Node 28)
+                if 5 < len(children) and len(self._faders) > 0:
+                    em_val = children[5].get("properties", {}).get("emergencyMuteActive", {}).get("Bool")
+                    if em_val is not None:
+                        em_bool = bool(em_val)
+                        if self._faders[0].get("mute") != em_bool:
+                            self._faders[0]["mute"] = em_bool
+                            changed = True
+                elif 28 < len(children) and len(self._faders) > 0:
                     m_val = children[28].get("properties", {}).get("channelOutputMute", {}).get("Bool")
                     if m_val is not None:
                         mute_bool = bool(m_val)
