@@ -1,5 +1,6 @@
 import os
 import tempfile
+import threading
 import json
 import logging
 from datetime import datetime
@@ -566,6 +567,8 @@ class StateManager(QObject):
         self._dsp_timer.setInterval(120)
         self._dsp_timer.timeout.connect(self._flush_dsp_hardware)
         self._is_syncing = False
+        self._resync_requested = False
+        self._sync_guard = threading.Lock()
 
         self.monitor = DeviceMonitor(self)
         self.monitor.devices_changed.connect(self._on_devices_changed)
@@ -799,10 +802,26 @@ class StateManager(QObject):
 
     def _sync_hardware_state(self):
         self.bridge.invalidate_pad_cache()
-        if getattr(self, "_is_syncing", False):
-            logger.info("Hardware sync already in progress, skipping duplicate call")
-            return
-        self._is_syncing = True
+        with self._sync_guard:
+            if self._is_syncing:
+                # A sync is already running, but its dump may predate the change
+                # that triggered this call (e.g. a pad clear). Queue one more pass.
+                self._resync_requested = True
+                logger.info("Hardware sync in progress, queued another pass")
+                return
+            self._is_syncing = True
+        try:
+            while True:
+                self._resync_requested = False
+                self._sync_hardware_state_once()
+                if not self._resync_requested:
+                    break
+                logger.info("Running queued hardware sync pass")
+        finally:
+            with self._sync_guard:
+                self._is_syncing = False
+
+    def _sync_hardware_state_once(self):
         try:
             # 1. Query device full dump
             dump = self.bridge.dump_state()
@@ -1100,9 +1119,7 @@ class StateManager(QObject):
             self.toastMessage.emit(f"Sincronizado con {self._model_name}")
 
         except Exception as e:
-            logger.error(f"Error parsing hardware state: {e}")
-        finally:
-            self._is_syncing = False
+            logger.exception(f"Error parsing hardware state: {e}")
 
     # Properties
     @pyqtProperty(bool, notify=stateChanged)
