@@ -162,67 +162,90 @@ Rectangle {
                         }
 
                         // SD Card Storage Meter (Shown for active device)
-                        ColumnLayout {
+                        // SD Card / Internal Storage Meter (Shown for active device)
+                        Item {
                             visible: devCard.isSelectedDevice || !devCard.hasRealDevice
                             Layout.fillWidth: true
-                            spacing: 6
+                            height: 38
+                            z: 20
 
-                            RowLayout {
-                                Text {
-                                    text: "💾 " + (stateManager ? (stateManager.storageLabel || stateManager.strings.microsd) : "MicroSD")
-                                    font.pixelSize: 11
-                                    color: "#9A9A9E"
-                                }
+                            ColumnLayout {
+                                anchors.fill: parent
+                                spacing: 6
 
-                                // Eject / Unmount Button when Transfer Mode is active
-                                Rectangle {
-                                    visible: Boolean(stateManager && stateManager.transferModeActive && devCard.isSelectedDevice)
-                                    width: 20
-                                    height: 20
-                                    radius: 4
-                                    color: ejectArea.containsMouse ? "#442A2A" : "#282830"
-                                    border.color: "#CBA158"
-                                    border.width: 1
-
+                                RowLayout {
                                     Text {
-                                        anchors.centerIn: parent
-                                        text: "⏏"
+                                        text: "💾 " + (stateManager ? (stateManager.storageLabel || stateManager.strings.microsd) : "MicroSD")
                                         font.pixelSize: 11
-                                        font.bold: true
-                                        color: "#CBA158"
+                                        color: (stateManager && stateManager.hasMicroSD) ? "#CBA158" : "#9A9A9E"
                                     }
 
-                                    MouseArea {
-                                        id: ejectArea
-                                        anchors.fill: parent
-                                        hoverEnabled: true
-                                        cursorShape: Qt.PointingHandCursor
-                                        onClicked: {
-                                            if (stateManager) stateManager.exitTransferMode();
+                                    // Eject / Unmount Button when Transfer Mode is active
+                                    Rectangle {
+                                        visible: Boolean(stateManager && stateManager.transferModeActive && devCard.isSelectedDevice)
+                                        width: 20
+                                        height: 20
+                                        radius: 4
+                                        color: ejectArea.containsMouse ? "#442A2A" : "#282830"
+                                        border.color: "#CBA158"
+                                        border.width: 1
+
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: "⏏"
+                                            font.pixelSize: 11
+                                            font.bold: true
+                                            color: "#CBA158"
+                                        }
+
+                                        MouseArea {
+                                            id: ejectArea
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: {
+                                                if (stateManager) stateManager.exitTransferMode();
+                                            }
                                         }
                                     }
+
+                                    Item { Layout.fillWidth: true }
+                                    Text {
+                                        text: (stateManager ? stateManager.sdCardUsed : "0 GB") + " / " + (stateManager ? stateManager.sdCardTotal : "5 GB")
+                                        font.pixelSize: 10
+                                        color: "#8E8E93"
+                                    }
                                 }
 
-                                Item { Layout.fillWidth: true }
-                                Text {
-                                    text: (stateManager ? stateManager.sdCardUsed : "0 GB") + " / " + (stateManager ? stateManager.sdCardTotal : "119 GB")
-                                    font.pixelSize: 10
-                                    color: "#8E8E93"
+                                // Progress Bar
+                                Rectangle {
+                                    Layout.fillWidth: true
+                                    height: 4
+                                    radius: 2
+                                    color: "#323236"
+
+                                    Rectangle {
+                                        width: Math.max(4, parent.width * ((stateManager ? stateManager.sdCardPercent : 0) / 100.0))
+                                        height: parent.height
+                                        radius: 2
+                                        color: "#CBA158"
+                                    }
                                 }
                             }
 
-                            // Progress Bar
-                            Rectangle {
-                                Layout.fillWidth: true
-                                height: 4
-                                radius: 2
-                                color: "#323236"
-
-                                Rectangle {
-                                    width: Math.max(4, parent.width * ((stateManager ? stateManager.sdCardPercent : 0) / 100.0))
-                                    height: parent.height
-                                    radius: 2
-                                    color: "#CBA158"
+                            // Direct click on storage meter row navigates to recordings
+                            MouseArea {
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: (stateManager && stateManager.hasMicroSD) ? Qt.PointingHandCursor : Qt.ArrowCursor
+                                onClicked: {
+                                    if (stateManager) {
+                                        if (stateManager.hasMicroSD) {
+                                            stateManager.navigateTo("recordings");
+                                        } else {
+                                            stateManager.toastMessage.emit(stateManager.strings.no_microsd_title || "No hay tarjeta MicroSD instalada");
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -243,17 +266,18 @@ Rectangle {
                 }
             }
 
-            // MicroSD Removable Storage Card (matches RØDECaster App - shown when card is present)
+            // MicroSD Removable Storage Card (matches RØDECaster App - active only when MicroSD is present)
             Rectangle {
                 id: sdCardEntry
-                visible: Boolean(!stateManager || stateManager.hasMicroSD)
+                readonly property bool hasCard: Boolean(stateManager && stateManager.hasMicroSD)
                 readonly property bool isSelectedView: (stateManager && stateManager.currentView === "recordings")
                 Layout.fillWidth: true
                 height: 58
                 radius: 8
-                color: isSelectedView ? "#24242A" : (sdHover.containsMouse ? "#202024" : "#19191C")
-                border.color: isSelectedView ? "#CBA158" : (sdHover.containsMouse ? "#3A3A42" : "#28282E")
-                border.width: isSelectedView ? 1.5 : 1
+                opacity: hasCard ? 1.0 : 0.42
+                color: (hasCard && isSelectedView) ? "#24242A" : (sdHover.containsMouse && hasCard ? "#202024" : "#19191C")
+                border.color: (hasCard && isSelectedView) ? "#CBA158" : (sdHover.containsMouse && hasCard ? "#3A3A42" : "#28282E")
+                border.width: (hasCard && isSelectedView) ? 1.5 : 1
 
                 RowLayout {
                     anchors.fill: parent
@@ -276,14 +300,14 @@ Rectangle {
                                 text: "RØDE"
                                 font.pixelSize: 8
                                 font.bold: true
-                                color: "#FFFFFF"
+                                color: sdCardEntry.hasCard ? "#FFFFFF" : "#77777E"
                                 Layout.alignment: Qt.AlignHCenter
                             }
                             Text {
                                 text: "SD"
                                 font.pixelSize: 7
                                 font.bold: true
-                                color: "#CBA158"
+                                color: sdCardEntry.hasCard ? "#CBA158" : "#606066"
                                 Layout.alignment: Qt.AlignHCenter
                             }
                         }
@@ -297,13 +321,15 @@ Rectangle {
                             text: "microSD"
                             font.pixelSize: 12
                             font.bold: true
-                            color: sdCardEntry.isSelectedView ? "#CBA158" : "#FFFFFF"
+                            color: (sdCardEntry.hasCard && sdCardEntry.isSelectedView) ? "#CBA158" : (sdCardEntry.hasCard ? "#FFFFFF" : "#7A7A82")
                         }
 
                         Text {
-                            text: stateManager ? stateManager.strings.removable_storage : "Removable Storage"
+                            text: !sdCardEntry.hasCard
+                                  ? (stateManager && stateManager.language === "es" ? "No insertada" : "Not inserted")
+                                  : (stateManager ? stateManager.strings.removable_storage : "Removable Storage")
                             font.pixelSize: 10
-                            color: "#8E8E93"
+                            color: sdCardEntry.hasCard ? "#8E8E93" : "#55555C"
                         }
                     }
 
@@ -339,10 +365,14 @@ Rectangle {
                     id: sdHover
                     anchors.fill: parent
                     hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
+                    cursorShape: sdCardEntry.hasCard ? Qt.PointingHandCursor : Qt.ArrowCursor
                     onClicked: {
                         if (stateManager) {
-                            stateManager.currentView = "recordings";
+                            if (sdCardEntry.hasCard) {
+                                stateManager.navigateTo("recordings");
+                            } else {
+                                stateManager.toastMessage.emit(stateManager.strings.no_microsd_title || "No hay tarjeta MicroSD instalada");
+                            }
                         }
                     }
                 }

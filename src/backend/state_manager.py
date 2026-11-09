@@ -1742,6 +1742,10 @@ class StateManager(QObject):
     def currentView(self):
         return self._current_view
 
+    @currentView.setter
+    def currentView(self, view):
+        self.navigateTo(view)
+
     @pyqtSlot(str)
     def navigateTo(self, view):
         if self._current_view != view:
