@@ -1,5 +1,7 @@
 import os
+import json
 import logging
+from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
 from PyQt6.QtCore import QObject, pyqtSignal, pyqtProperty, pyqtSlot, QVariant, QSettings, QTimer
 
@@ -129,6 +131,20 @@ TRANSLATIONS = {
         "censor_bleep": "Censura (Bleep)",
         "trash_talk": "Trash Talk",
         "ducking": "Ducking",
+        "show_profiles": "Gestión de Perfiles de Show",
+        "show_profiles_desc": "Guarda o carga configuraciones completas de Pads, Faders y ajustes para distintos podcasts o directos.",
+        "export_profile": "Exportar Perfil...",
+        "load_profile": "Cargar Perfil...",
+        "save_to_microsd": "Guardar en MicroSD",
+        "load_from_microsd": "Cargar de MicroSD",
+        "export_profile_title": "Exportar Perfil de Show",
+        "load_profile_title": "Cargar Perfil de Show",
+        "profile_filter": "Perfiles CasterManager (*.castershow *.json)",
+        "microsd_detected": "MicroSD detectada",
+        "microsd_not_mounted": "MicroSD no montada (activa Modo Transferencia en Grabaciones)",
+        "profile_exported": "Perfil guardado con éxito",
+        "profile_loaded": "Perfil cargado con éxito",
+        "profile_invalid": "El archivo seleccionado no es un perfil de show válido",
     },
     "en": {
         "settings": "Settings",
@@ -236,6 +252,20 @@ TRANSLATIONS = {
         "censor_bleep": "Censor (Bleep)",
         "trash_talk": "Trash Talk",
         "ducking": "Ducking",
+        "show_profiles": "Show Profiles Management",
+        "show_profiles_desc": "Save or load complete configurations of Pads, Faders, and settings for different podcasts or live streams.",
+        "export_profile": "Export Profile...",
+        "load_profile": "Load Profile...",
+        "save_to_microsd": "Save to MicroSD",
+        "load_from_microsd": "Load from MicroSD",
+        "export_profile_title": "Export Show Profile",
+        "load_profile_title": "Load Show Profile",
+        "profile_filter": "CasterManager Profiles (*.castershow *.json)",
+        "microsd_detected": "MicroSD detected",
+        "microsd_not_mounted": "MicroSD not mounted (enable Transfer Mode in Recordings)",
+        "profile_exported": "Profile saved successfully",
+        "profile_loaded": "Profile loaded successfully",
+        "profile_invalid": "The selected file is not a valid show profile",
     }
 }
 
@@ -1149,6 +1179,216 @@ class StateManager(QObject):
     @pyqtProperty(str, notify=transferStateChanged)
     def mountPoint(self):
         return self._mount_point
+
+    def get_microsd_path(self):
+        if self._mount_point and os.path.isdir(self._mount_point):
+            return self._mount_point
+        import glob
+        matches = (
+            glob.glob("/run/media/*/*Rode*") +
+            glob.glob("/media/*/*Rode*") +
+            glob.glob("/run/media/*/*RODE*") +
+            glob.glob("/media/*/*RODE*")
+        )
+        for m in matches:
+            if os.path.isdir(m):
+                return m
+        return ""
+
+    @pyqtProperty(bool, notify=transferStateChanged)
+    def isMicroSDMounted(self):
+        p = self.get_microsd_path()
+        return bool(p and os.path.isdir(p))
+
+    @pyqtProperty(str, notify=transferStateChanged)
+    def microSDRoot(self):
+        return self.get_microsd_path()
+
+    @pyqtSlot(str, result=bool)
+    def exportShowProfile(self, target_filepath):
+        try:
+            clean_path = target_filepath
+            if clean_path.startswith("file://"):
+                clean_path = clean_path[7:]
+
+            if not clean_path.endswith(".castershow") and not clean_path.endswith(".json"):
+                clean_path += ".castershow"
+
+            parent_dir = os.path.dirname(clean_path)
+            if parent_dir and not os.path.exists(parent_dir):
+                os.makedirs(parent_dir, exist_ok=True)
+
+            model_name = self._model_name or ("RØDECaster Duo" if self._is_duo else "RØDECaster Pro II")
+            profile_data = {
+                "format": "castershow",
+                "version": 1,
+                "show_name": self._show_name or "TuPodcast",
+                "show_icon": self._show_icon,
+                "device_model": model_name,
+                "is_duo": self._is_duo,
+                "pads_per_bank": self._pads_per_bank,
+                "exported_at": datetime.now().isoformat(),
+                "banks": self._banks,
+                "faders": self._faders,
+                "device_config": {
+                    "screen_brightness": self._screen_brightness,
+                    "button_brightness": self._button_brightness,
+                    "auto_brightness": self._auto_brightness
+                }
+            }
+
+            with open(clean_path, "w", encoding="utf-8") as f:
+                json.dump(profile_data, f, indent=2, ensure_ascii=False)
+
+            filename = os.path.basename(clean_path)
+            msg = f"Perfil guardado exitosamente: {filename}" if self._language == "es" else f"Profile saved successfully: {filename}"
+            self.toastMessage.emit(msg)
+            return True
+        except Exception as e:
+            logger.error(f"Error exporting show profile: {e}")
+            err_msg = f"Error al exportar perfil: {e}" if self._language == "es" else f"Error exporting profile: {e}"
+            self.toastMessage.emit(err_msg)
+            return False
+
+    @pyqtSlot(result=bool)
+    def exportShowProfileToMicroSD(self):
+        sd_path = self.get_microsd_path()
+        if not sd_path:
+            err = self.strings.get("microsd_not_mounted", "MicroSD no montada")
+            self.toastMessage.emit(err)
+            return False
+
+        shows_dir = os.path.join(sd_path, "RODECaster", "Shows")
+        os.makedirs(shows_dir, exist_ok=True)
+        safe_name = "".join(c for c in (self._show_name or "Show") if c.isalnum() or c in (' ', '_', '-')).strip()
+        if not safe_name:
+            safe_name = "Show"
+        target_path = os.path.join(shows_dir, f"{safe_name}.castershow")
+        return self.exportShowProfile(target_path)
+
+    @pyqtSlot(str, result=bool)
+    def loadShowProfile(self, source_filepath):
+        try:
+            clean_path = source_filepath
+            if clean_path.startswith("file://"):
+                clean_path = clean_path[7:]
+
+            if not os.path.exists(clean_path):
+                self.toastMessage.emit("Archivo no encontrado")
+                return False
+
+            with open(clean_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+
+            if not isinstance(data, dict):
+                self.toastMessage.emit(self.strings.get("profile_invalid", "Perfil no válido"))
+                return False
+
+            # 1. Update Show Name & Icon
+            if "show_name" in data and data["show_name"]:
+                self.updateShowName(str(data["show_name"]))
+            if "show_icon" in data:
+                self.updateShowIcon(int(data["show_icon"]))
+
+            # 2. Update Banks and Pads
+            if "banks" in data and isinstance(data["banks"], list):
+                incoming_banks = data["banks"]
+                ppb = self._pads_per_bank
+                new_banks = self._init_empty_banks()
+
+                for b_idx, bank_pads in enumerate(incoming_banks[:8]):
+                    if isinstance(bank_pads, list):
+                        for p_idx, p_data in enumerate(bank_pads[:ppb]):
+                            if isinstance(p_data, dict):
+                                pad = new_banks[b_idx][p_idx]
+                                pad["name"] = p_data.get("name", "")
+                                pad["color_idx"] = p_data.get("color_idx", pad["color_idx"])
+                                pad["color_hex"] = p_data.get("color_hex", pad["color_hex"])
+                                pad["type"] = p_data.get("type", "empty")
+                                pad["mode"] = p_data.get("mode", "toggle")
+                                pad["loop"] = bool(p_data.get("loop", False))
+                                pad["replay"] = bool(p_data.get("replay", False))
+                                pad["gain"] = float(p_data.get("gain", 0.0))
+                                pad["file"] = p_data.get("file", "")
+                                if "fx_name" in p_data:
+                                    pad["fx_name"] = p_data["fx_name"]
+                                if "fx_channel" in p_data:
+                                    pad["fx_channel"] = p_data["fx_channel"]
+                                if "fx_mode" in p_data:
+                                    pad["fx_mode"] = p_data["fx_mode"]
+
+                self._banks = new_banks
+                self.padsChanged.emit()
+                self.selectedPadChanged.emit()
+
+                # Sync hardware pads if connected
+                if self._connected and not self._permission_error:
+                    def do_sync_pads():
+                        for b in range(min(len(self._banks), 8)):
+                            for p in range(len(self._banks[b])):
+                                cur = self._banks[b][p]
+                                if cur.get("name"):
+                                    self.bridge.run_cmd(["pad", "set-prop", str(b), str(p), "padName", f"str:{cur['name']}"])
+                                if "color_idx" in cur:
+                                    self.bridge.run_cmd(["pad", "set-prop", str(b), str(p), "padColourIndex", f"u32:{cur['color_idx']}"])
+                    self.executor.submit(do_sync_pads)
+
+            # 3. Update Faders
+            if "faders" in data and isinstance(data["faders"], list):
+                incoming_faders = data["faders"]
+                for i, in_f in enumerate(incoming_faders):
+                    if i < len(self._faders) and isinstance(in_f, dict):
+                        if "level" in in_f:
+                            self._faders[i]["level"] = in_f["level"]
+                        if "mute" in in_f:
+                            self._faders[i]["mute"] = bool(in_f["mute"])
+                        if "listen" in in_f:
+                            self._faders[i]["listen"] = bool(in_f["listen"])
+                self.fadersChanged.emit()
+
+            # 4. Device config (brightness)
+            if "device_config" in data and isinstance(data["device_config"], dict):
+                cfg = data["device_config"]
+                if "screen_brightness" in cfg:
+                    self.setScreenBrightness(int(cfg["screen_brightness"]))
+                elif "brightness" in cfg:
+                    self.setScreenBrightness(int(cfg["brightness"]))
+                if "button_brightness" in cfg:
+                    self.setButtonBrightness(int(cfg["button_brightness"]))
+                if "auto_brightness" in cfg:
+                    self.setAutoBrightness(bool(cfg["auto_brightness"]))
+
+            loaded_name = data.get("show_name", os.path.basename(clean_path))
+            msg = f"Perfil '{loaded_name}' cargado con éxito" if self._language == "es" else f"Profile '{loaded_name}' loaded successfully"
+            self.toastMessage.emit(msg)
+            return True
+        except Exception as e:
+            logger.error(f"Error loading show profile: {e}")
+            err_msg = f"Error al cargar perfil: {e}" if self._language == "es" else f"Error loading profile: {e}"
+            self.toastMessage.emit(err_msg)
+            return False
+
+    @pyqtSlot(result=QVariant)
+    def getMicroSDProfiles(self):
+        sd_path = self.get_microsd_path()
+        if not sd_path:
+            return []
+        import glob
+        files = glob.glob(os.path.join(sd_path, "RODECaster", "Shows", "*.castershow")) + \
+                glob.glob(os.path.join(sd_path, "RODECaster", "Shows", "*.json")) + \
+                glob.glob(os.path.join(sd_path, "*.castershow"))
+        res = []
+        for f in files:
+            name = os.path.splitext(os.path.basename(f))[0]
+            try:
+                with open(f, "r", encoding="utf-8") as fp:
+                    meta = json.load(fp)
+                    if isinstance(meta, dict) and "show_name" in meta:
+                        name = meta["show_name"]
+            except Exception:
+                pass
+            res.append({"name": name, "path": f, "filename": os.path.basename(f)})
+        return res
 
     def _scan_recordings(self, mount_point=None):
         import glob

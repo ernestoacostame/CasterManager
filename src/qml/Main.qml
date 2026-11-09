@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Window
 import QtQuick.Controls
 import QtQuick.Layouts
+import QtQuick.Dialogs
 
 ApplicationWindow {
     id: window
@@ -151,6 +152,44 @@ ApplicationWindow {
         }
     }
 
+    // FileDialogs for Show Profile Import and Export
+    FileDialog {
+        id: exportShowDialog
+        title: stateManager ? stateManager.strings.export_profile_title : "Exportar Perfil de Show"
+        fileMode: FileDialog.SaveFile
+        defaultSuffix: "castershow"
+        nameFilters: [
+            stateManager ? stateManager.strings.profile_filter : "Perfiles CasterManager (*.castershow *.json)",
+            stateManager ? stateManager.strings.all_files_filter : "Todos los archivos (*)"
+        ]
+        onAccepted: {
+            if (stateManager && selectedFile) {
+                stateManager.exportShowProfile(selectedFile.toString());
+            }
+        }
+    }
+
+    FileDialog {
+        id: importShowDialog
+        title: stateManager ? stateManager.strings.load_profile_title : "Cargar Perfil de Show"
+        fileMode: FileDialog.OpenFile
+        nameFilters: [
+            stateManager ? stateManager.strings.profile_filter : "Perfiles CasterManager (*.castershow *.json)",
+            stateManager ? stateManager.strings.all_files_filter : "Todos los archivos (*)"
+        ]
+        onAccepted: {
+            if (stateManager && selectedFile) {
+                var ok = stateManager.loadShowProfile(selectedFile.toString());
+                if (ok) {
+                    if (stateManager.showName) {
+                        showNameInput.text = stateManager.showName;
+                    }
+                    profileModalBox.selectedIconIdx = stateManager.showIcon;
+                }
+            }
+        }
+    }
+
     // Show Profile Edit Modal Overlay (Centered, Full Window, Non-Clipped)
     Rectangle {
         id: profileModalOverlay
@@ -169,8 +208,8 @@ ApplicationWindow {
         Rectangle {
             id: profileModalBox
             anchors.centerIn: parent
-            width: 380
-            height: 250
+            width: 470
+            height: 430
             radius: 12
             color: "#222226"
             border.color: "#3D3D45"
@@ -187,27 +226,52 @@ ApplicationWindow {
 
             ColumnLayout {
                 anchors.fill: parent
-                anchors.margins: 24
-                spacing: 16
+                anchors.margins: 22
+                spacing: 12
 
-                Text {
-                    text: stateManager ? stateManager.strings.edit_profile : "Editar Perfil del Show"
-                    font.pixelSize: 16
-                    font.bold: true
-                    color: "#FFFFFF"
+                // Header with Title and Close button
+                RowLayout {
+                    Layout.fillWidth: true
+                    Text {
+                        text: stateManager ? stateManager.strings.edit_profile : "Editar Perfil del Show"
+                        font.pixelSize: 16
+                        font.bold: true
+                        color: "#FFFFFF"
+                        Layout.fillWidth: true
+                    }
+                    Text {
+                        text: "✕"
+                        font.pixelSize: 15
+                        color: "#8E8E93"
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: profileModalOverlay.visible = false
+                        }
+                    }
                 }
 
-                TextField {
-                    id: showNameInput
+                // Show Name Input
+                ColumnLayout {
                     Layout.fillWidth: true
-                    font.pixelSize: 14
-                    color: "#FFFFFF"
-                    placeholderText: stateManager ? stateManager.strings.show_placeholder : "Nombre del show..."
+                    spacing: 4
+                    Text {
+                        text: stateManager ? stateManager.strings.show_name : "Nombre del Show:"
+                        font.pixelSize: 12
+                        color: "#8E8E93"
+                    }
+                    TextField {
+                        id: showNameInput
+                        Layout.fillWidth: true
+                        font.pixelSize: 14
+                        color: "#FFFFFF"
+                        placeholderText: stateManager ? stateManager.strings.show_placeholder : "Nombre del show..."
 
-                    background: Rectangle {
-                        color: "#2C2C32"
-                        radius: 6
-                        border.color: showNameInput.activeFocus ? "#CBA158" : "#3D3D45"
+                        background: Rectangle {
+                            color: "#2C2C32"
+                            radius: 6
+                            border.color: showNameInput.activeFocus ? "#CBA158" : "#3D3D45"
+                        }
                     }
                 }
 
@@ -243,8 +307,164 @@ ApplicationWindow {
                     }
                 }
 
+                // Divider
+                Rectangle {
+                    Layout.fillWidth: true
+                    height: 1
+                    color: "#33333A"
+                    Layout.topMargin: 4
+                    Layout.bottomMargin: 4
+                }
+
+                // Profile Management Section (Export / Import)
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: 8
+
+                    Text {
+                        text: stateManager ? stateManager.strings.show_profiles : "Gestión de Perfiles de Show"
+                        font.pixelSize: 13
+                        font.bold: true
+                        color: "#FFFFFF"
+                    }
+
+                    Text {
+                        text: stateManager ? stateManager.strings.show_profiles_desc : "Guarda o carga configuraciones completas de Pads, Faders y ajustes para distintos podcasts o directos."
+                        font.pixelSize: 11
+                        color: "#8E8E93"
+                        wrapMode: Text.WordWrap
+                        Layout.fillWidth: true
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 10
+
+                        Button {
+                            Layout.fillWidth: true
+                            text: "↑ " + (stateManager ? stateManager.strings.export_profile : "Exportar Perfil...")
+                            HoverHandler { cursorShape: Qt.PointingHandCursor }
+                            contentItem: Text {
+                                text: parent.text
+                                font.pixelSize: 12
+                                font.bold: true
+                                color: "#FFFFFF"
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                            }
+                            background: Rectangle {
+                                implicitHeight: 32
+                                radius: 6
+                                color: parent.down ? "#222226" : (parent.hovered ? "#383840" : "#2C2C32")
+                                border.color: parent.hovered ? "#CBA158" : "#3D3D45"
+                            }
+                            onClicked: {
+                                var safeName = (showNameInput.text.trim() || (stateManager ? stateManager.showName : "Show")).replace(/[^a-zA-Z0-9_\-]/g, "_");
+                                exportShowDialog.currentFile = "file://" + safeName + ".castershow";
+                                exportShowDialog.open();
+                            }
+                        }
+
+                        Button {
+                            Layout.fillWidth: true
+                            text: "↓ " + (stateManager ? stateManager.strings.load_profile : "Cargar Perfil...")
+                            HoverHandler { cursorShape: Qt.PointingHandCursor }
+                            contentItem: Text {
+                                text: parent.text
+                                font.pixelSize: 12
+                                font.bold: true
+                                color: "#FFFFFF"
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                            }
+                            background: Rectangle {
+                                implicitHeight: 32
+                                radius: 6
+                                color: parent.down ? "#222226" : (parent.hovered ? "#383840" : "#2C2C32")
+                                border.color: parent.hovered ? "#CBA158" : "#3D3D45"
+                            }
+                            onClicked: {
+                                importShowDialog.open();
+                            }
+                        }
+                    }
+
+                    // MicroSD Storage Shortcuts if available
+                    Rectangle {
+                        Layout.fillWidth: true
+                        implicitHeight: 36
+                        radius: 6
+                        color: "#1B1B1F"
+                        border.color: (stateManager && stateManager.isMicroSDMounted) ? "#554420" : "#2E2E34"
+                        border.width: 1
+
+                        RowLayout {
+                            anchors.fill: parent
+                            anchors.leftMargin: 10
+                            anchors.rightMargin: 10
+                            spacing: 8
+
+                            Text {
+                                text: (stateManager && stateManager.isMicroSDMounted) ? "💾 MicroSD" : "💾 MicroSD (No montada)"
+                                font.pixelSize: 11
+                                font.bold: true
+                                color: (stateManager && stateManager.isMicroSDMounted) ? "#CBA158" : "#66666E"
+                                Layout.fillWidth: true
+                            }
+
+                            Button {
+                                visible: stateManager && stateManager.isMicroSDMounted
+                                text: stateManager ? stateManager.strings.save_to_microsd : "Guardar en MicroSD"
+                                HoverHandler { cursorShape: Qt.PointingHandCursor }
+                                contentItem: Text {
+                                    text: parent.text
+                                    font.pixelSize: 11
+                                    color: "#FFFFFF"
+                                }
+                                background: Rectangle {
+                                    implicitHeight: 24
+                                    implicitWidth: 120
+                                    radius: 4
+                                    color: parent.down ? "#1F1F24" : (parent.hovered ? "#383840" : "#28282E")
+                                    border.color: "#3D3D45"
+                                }
+                                onClicked: {
+                                    if (stateManager) {
+                                        stateManager.exportShowProfileToMicroSD();
+                                    }
+                                }
+                            }
+
+                            Button {
+                                visible: stateManager && stateManager.isMicroSDMounted
+                                text: stateManager ? stateManager.strings.load_from_microsd : "Cargar de MicroSD"
+                                HoverHandler { cursorShape: Qt.PointingHandCursor }
+                                contentItem: Text {
+                                    text: parent.text
+                                    font.pixelSize: 11
+                                    color: "#FFFFFF"
+                                }
+                                background: Rectangle {
+                                    implicitHeight: 24
+                                    implicitWidth: 120
+                                    radius: 4
+                                    color: parent.down ? "#1F1F24" : (parent.hovered ? "#383840" : "#28282E")
+                                    border.color: "#3D3D45"
+                                }
+                                onClicked: {
+                                    if (stateManager && stateManager.microSDRoot) {
+                                        importShowDialog.currentFolder = "file://" + stateManager.microSDRoot + "/RODECaster/Shows";
+                                    }
+                                    importShowDialog.open();
+                                }
+                            }
+                        }
+                    }
+                }
+
                 Item { Layout.fillHeight: true }
 
+                // Bottom Save & Cancel buttons
                 RowLayout {
                     Layout.alignment: Qt.AlignRight
                     spacing: 12
