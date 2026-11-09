@@ -41,16 +41,16 @@ Item {
                     anchors.centerIn: parent
                     spacing: 4
 
-                    // Tab 0: Output
+                    // Tab 0: Output / Audio & UNIFY
                     Rectangle {
-                        width: 90
+                        width: (stateManager && stateManager.isStreamerX) ? 120 : 90
                         height: 30
                         radius: 6
                         color: root.activeTab === 0 ? "#CBA158" : "transparent"
 
                         Text {
                             anchors.centerIn: parent
-                            text: stateManager ? stateManager.strings.tab_output : "Salida"
+                            text: (stateManager && stateManager.isStreamerX) ? "Audio & UNIFY" : (stateManager ? stateManager.strings.tab_output : "Salida")
                             font.pixelSize: 12
                             font.bold: true
                             color: root.activeTab === 0 ? "#121214" : "#AAAAAA"
@@ -63,8 +63,9 @@ Item {
                         }
                     }
 
-                    // Tab 1: Display
+                    // Tab 1: Display (Hidden for Streamer X since it has no LCD screen)
                     Rectangle {
+                        visible: !(stateManager && stateManager.isStreamerX)
                         width: 90
                         height: 30
                         radius: 6
@@ -143,8 +144,8 @@ Item {
                         Layout.fillWidth: true
                         height: unifyCol.height + 40
                         radius: 14
-                        color: (stateManager && stateManager.streamerXUnifyInstalled) ? "#151B17" : "#1B1B20"
-                        border.color: (stateManager && stateManager.streamerXUnifyInstalled) ? "#28C850" : "#CBA158"
+                        color: (stateManager && stateManager.streamerXUnifyInstalled) ? "#141F18" : "#191920"
+                        border.color: (stateManager && stateManager.streamerXUnifyInstalled) ? "#28C850" : "#2E2E38"
                         border.width: (stateManager && stateManager.streamerXUnifyInstalled) ? 1.5 : 1
 
                         ColumnLayout {
@@ -160,19 +161,24 @@ Item {
                                 Layout.fillWidth: true
                                 spacing: 16
 
-                                // Unify Icon Badge
+                                // Unify Audio Graphic Badge
                                 Rectangle {
-                                    width: 48
-                                    height: 48
+                                    width: 46
+                                    height: 46
                                     radius: 10
-                                    color: (stateManager && stateManager.streamerXUnifyInstalled) ? "#1A3824" : "#2A2318"
-                                    border.color: (stateManager && stateManager.streamerXUnifyInstalled) ? "#28C850" : "#CBA158"
-                                    border.width: 1.5
+                                    color: (stateManager && stateManager.streamerXUnifyInstalled) ? "#1A3824" : "#22222A"
+                                    border.color: (stateManager && stateManager.streamerXUnifyInstalled) ? "#28C850" : "#383844"
+                                    border.width: 1
 
-                                    Text {
+                                    // Stylized multi-channel audio wave graphic
+                                    Row {
                                         anchors.centerIn: parent
-                                        text: "🎛️"
-                                        font.pixelSize: 24
+                                        spacing: 3
+                                        Rectangle { width: 3; height: 14; radius: 1.5; color: "#3B82F6"; anchors.verticalCenter: parent.verticalCenter }
+                                        Rectangle { width: 3; height: 22; radius: 1.5; color: "#10B981"; anchors.verticalCenter: parent.verticalCenter }
+                                        Rectangle { width: 3; height: 18; radius: 1.5; color: "#F59E0B"; anchors.verticalCenter: parent.verticalCenter }
+                                        Rectangle { width: 3; height: 26; radius: 1.5; color: "#8B5CF6"; anchors.verticalCenter: parent.verticalCenter }
+                                        Rectangle { width: 3; height: 16; radius: 1.5; color: "#EF4444"; anchors.verticalCenter: parent.verticalCenter }
                                     }
                                 }
 
@@ -183,33 +189,33 @@ Item {
                                     RowLayout {
                                         spacing: 10
                                         Text {
-                                            text: "Arquitectura Multipista PipeWire (UNIFY para Linux)"
+                                            text: "RØDE UNIFY (PipeWire Linux)"
                                             font.pixelSize: 16
                                             font.bold: true
                                             color: "#FFFFFF"
                                         }
                                         Rectangle {
-                                            width: 76
-                                            height: 20
-                                            radius: 10
-                                            color: (stateManager && stateManager.streamerXUnifyInstalled) ? "#163820" : "#2C2C34"
-                                            border.color: (stateManager && stateManager.streamerXUnifyInstalled) ? "#28C850" : "#4A4A56"
+                                            width: (stateManager && stateManager.streamerXUnifyInstalled) ? 132 : 118
+                                            height: 22
+                                            radius: 11
+                                            color: (stateManager && stateManager.streamerXUnifyInstalled) ? "#153820" : "#24242C"
+                                            border.color: (stateManager && stateManager.streamerXUnifyInstalled) ? "#28C850" : "#3E3E4C"
                                             border.width: 1
                                             Text {
                                                 anchors.centerIn: parent
-                                                text: (stateManager && stateManager.streamerXUnifyInstalled) ? "● ACTIVO" : "○ INACTIVO"
+                                                text: (stateManager && stateManager.streamerXUnifyInstalled) ? "● MULTIPISTA ACTIVA" : "○ STEREO ESTÁNDAR"
                                                 font.pixelSize: 9
                                                 font.bold: true
-                                                color: (stateManager && stateManager.streamerXUnifyInstalled) ? "#28C850" : "#9A9A9E"
+                                                color: (stateManager && stateManager.streamerXUnifyInstalled) ? "#28C850" : "#8E8E98"
                                             }
                                         }
                                     }
 
                                     Text {
-                                        text: "Crea dispositivos de audio virtuales nativos independientes en PipeWire con enrutamiento automático de baja latencia hacia los auriculares del Streamer X y OBS Studio."
+                                        text: "Crea dispositivos virtuales independientes en PipeWire (Game, Chat, Music, System y Stream Mix) con enrutamiento automático hacia auriculares y OBS Studio."
                                         font.pixelSize: 11
-                                        color: "#9A9A9E"
-                                        Layout.preferredWidth: root.width - 320
+                                        color: "#9A9AA2"
+                                        Layout.preferredWidth: root.width - 340
                                         wrapMode: Text.WordWrap
                                     }
                                 }
@@ -226,11 +232,11 @@ Item {
                                         verticalAlignment: Text.AlignVCenter
                                     }
                                     background: Rectangle {
-                                        implicitWidth: 170
+                                        implicitWidth: 165
                                         implicitHeight: 38
                                         radius: 8
-                                        color: (stateManager && stateManager.streamerXUnifyInstalled) ? "#8A2A2A" : "#24733F"
-                                        border.color: (stateManager && stateManager.streamerXUnifyInstalled) ? "#C93B3B" : "#32A056"
+                                        color: (stateManager && stateManager.streamerXUnifyInstalled) ? "#7D2525" : "#237A42"
+                                        border.color: (stateManager && stateManager.streamerXUnifyInstalled) ? "#B23636" : "#32A056"
                                         border.width: 1
                                     }
                                     onClicked: {
@@ -239,50 +245,89 @@ Item {
                                 }
                             }
 
-                            // Grid of Virtual Channels Cards
+                            // 5 Audio Channel Strips Layout
                             RowLayout {
                                 Layout.fillWidth: true
                                 spacing: 10
 
                                 Repeater {
                                     model: [
-                                        {"icon": "🎮", "name": "Game", "desc": "Juegos (Steam, etc.)", "color": "#3C96FF"},
-                                        {"icon": "💬", "name": "Chat", "desc": "Discord / Teams / Meet", "color": "#28C850"},
-                                        {"icon": "🎵", "name": "Music", "desc": "Spotify / Navegador", "color": "#FF9600"},
-                                        {"icon": "🔔", "name": "System", "desc": "Alertas y SO", "color": "#A050E6"},
-                                        {"icon": "🎙️", "name": "Stream Mix", "desc": "Salida OBS Broadcast", "color": "#FF3C3C"}
+                                        {"name": "GAME", "node": "streamerx_game", "desc": "Juegos / Steam", "color": "#3B82F6"},
+                                        {"name": "CHAT", "node": "streamerx_chat", "desc": "Discord / Teams", "color": "#10B981"},
+                                        {"name": "MUSIC", "node": "streamerx_music", "desc": "Spotify / Media", "color": "#F59E0B"},
+                                        {"name": "SYSTEM", "node": "streamerx_system", "desc": "Alertas del SO", "color": "#8B5CF6"},
+                                        {"name": "STREAM MIX", "node": "streamerx_stream_mix", "desc": "Mezcla Maestra OBS", "color": "#EF4444"}
                                     ]
 
                                     Rectangle {
                                         Layout.fillWidth: true
-                                        height: 58
+                                        height: 88
                                         radius: 8
-                                        color: "#212128"
-                                        border.color: (stateManager && stateManager.streamerXUnifyInstalled) ? modelData.color : "#2F2F38"
+                                        color: (stateManager && stateManager.streamerXUnifyInstalled) ? "#1B1F28" : "#1E1E24"
+                                        border.color: (stateManager && stateManager.streamerXUnifyInstalled) ? modelData.color : "#2C2C36"
                                         border.width: (stateManager && stateManager.streamerXUnifyInstalled) ? 1.5 : 1
+                                        clip: true
 
-                                        RowLayout {
+                                        // Top accent bar
+                                        Rectangle {
+                                            anchors.top: parent.top
+                                            anchors.left: parent.left
+                                            anchors.right: parent.right
+                                            height: 3
+                                            color: modelData.color
+                                        }
+
+                                        ColumnLayout {
                                             anchors.fill: parent
-                                            anchors.margins: 10
-                                            spacing: 10
+                                            anchors.topMargin: 10
+                                            anchors.bottomMargin: 8
+                                            anchors.leftMargin: 10
+                                            anchors.rightMargin: 10
+                                            spacing: 4
 
-                                            Text { text: modelData.icon; font.pixelSize: 18 }
-                                            ColumnLayout {
-                                                spacing: 2
-                                                Layout.fillWidth: true
+                                            RowLayout {
+                                                spacing: 6
+                                                Rectangle {
+                                                    width: 6
+                                                    height: 6
+                                                    radius: 3
+                                                    color: (stateManager && stateManager.streamerXUnifyInstalled) ? modelData.color : "#606068"
+                                                }
                                                 Text {
                                                     text: modelData.name
                                                     font.pixelSize: 12
                                                     font.bold: true
-                                                    color: (stateManager && stateManager.streamerXUnifyInstalled) ? modelData.color : "#FFFFFF"
-                                                }
-                                                Text {
-                                                    text: modelData.desc
-                                                    font.pixelSize: 10
-                                                    color: "#8E8E93"
+                                                    color: (stateManager && stateManager.streamerXUnifyInstalled) ? "#FFFFFF" : "#CCCCCC"
                                                     elide: Text.ElideRight
                                                     Layout.fillWidth: true
                                                 }
+                                            }
+
+                                            // Monospace Sink Badge
+                                            Rectangle {
+                                                Layout.fillWidth: true
+                                                height: 18
+                                                radius: 4
+                                                color: "#141418"
+                                                border.color: "#26262E"
+                                                border.width: 1
+
+                                                Text {
+                                                    anchors.centerIn: parent
+                                                    text: modelData.node
+                                                    font.family: "Monospace"
+                                                    font.pixelSize: 9
+                                                    color: (stateManager && stateManager.streamerXUnifyInstalled) ? modelData.color : "#888892"
+                                                    elide: Text.ElideRight
+                                                }
+                                            }
+
+                                            Text {
+                                                text: modelData.desc
+                                                font.pixelSize: 10
+                                                color: "#7E7E88"
+                                                elide: Text.ElideRight
+                                                Layout.fillWidth: true
                                             }
                                         }
                                     }
@@ -292,23 +337,39 @@ Item {
                             // Bottom Info Tip
                             Rectangle {
                                 Layout.fillWidth: true
-                                height: 34
-                                radius: 6
-                                color: "#18181E"
-                                border.color: "#282834"
+                                height: 36
+                                radius: 8
+                                color: "#15151B"
+                                border.color: "#252530"
                                 border.width: 1
 
                                 RowLayout {
                                     anchors.fill: parent
                                     anchors.leftMargin: 12
                                     anchors.rightMargin: 12
-                                    spacing: 8
+                                    spacing: 10
 
-                                    Text { text: "💡"; font.pixelSize: 12 }
+                                    Rectangle {
+                                        width: 80
+                                        height: 20
+                                        radius: 4
+                                        color: "#22222E"
+                                        border.color: "#353545"
+                                        border.width: 1
+
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: "OBS & DAWs"
+                                            font.pixelSize: 10
+                                            font.bold: true
+                                            color: "#CBA158"
+                                        }
+                                    }
+
                                     Text {
-                                        text: "Al activar esta opción, en OBS Studio o tu DAW podrás capturar cada canal por separado en pistas 1 a 6 para mezclar y editar audio multicanal."
+                                        text: "Los 5 canales virtuales aparecen de inmediato en PipeWire para capturar en pistas independientes (1-6) sin solapamiento."
                                         font.pixelSize: 11
-                                        color: "#CBA158"
+                                        color: "#A2A2AC"
                                         elide: Text.ElideRight
                                         Layout.fillWidth: true
                                     }
@@ -328,100 +389,104 @@ Item {
 
                         ColumnLayout {
                             id: hpCol
-                        anchors.top: parent.top
-                        anchors.left: parent.left
-                        anchors.right: parent.right
-                        anchors.margins: 18
-                        spacing: 14
-
-                        Text {
-                            text: "🎧 " + (stateManager ? stateManager.strings.headphones : "Auriculares")
-                            font.pixelSize: 15
-                            font.bold: true
-                            color: "#FFFFFF"
-                        }
-
-                        // Headphone 1
-                        RowLayout {
-                            Layout.fillWidth: true
+                            anchors.top: parent.top
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.margins: 18
                             spacing: 14
 
                             Text {
-                                text: "Headphone 1"
-                                font.pixelSize: 13
-                                color: "#E0E0E0"
-                                Layout.preferredWidth: 120
+                                text: "🎧 " + (stateManager && stateManager.isStreamerX 
+                                      ? "Salida de Auriculares (Frontal TRRS 3.5mm)" 
+                                      : (stateManager ? stateManager.strings.headphones : "Auriculares"))
+                                font.pixelSize: 15
+                                font.bold: true
+                                color: "#FFFFFF"
                             }
 
-                            Row {
-                                spacing: 8
-                                Repeater {
-                                    model: ["RØDE NTH-100", "High Sensitivity", "Low Sensitivity"]
-                                    Rectangle {
-                                        width: 130
-                                        height: 32
-                                        radius: 6
-                                        color: (stateManager && stateManager.headphone1Type === index) ? "#CBA158" : "#28282E"
-                                        border.color: "#3A3A42"
-                                        border.width: 1
+                            // Headphone 1 (or Main Headphone for Streamer X)
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 14
 
-                                        Text {
-                                            anchors.centerIn: parent
-                                            text: modelData
-                                            font.pixelSize: 11
-                                            font.bold: stateManager && stateManager.headphone1Type === index
-                                            color: (stateManager && stateManager.headphone1Type === index) ? "#121214" : "#D0D0D0"
-                                        }
+                                Text {
+                                    text: (stateManager && stateManager.isStreamerX) ? "Auricular" : "Headphone 1"
+                                    font.pixelSize: 13
+                                    color: "#E0E0E0"
+                                    Layout.preferredWidth: 120
+                                }
 
-                                        MouseArea {
-                                            anchors.fill: parent
-                                            cursorShape: Qt.PointingHandCursor
-                                            onClicked: {
-                                                if (stateManager) stateManager.setHeadphone1Type(index);
+                                Row {
+                                    spacing: 8
+                                    Repeater {
+                                        model: ["RØDE NTH-100", "High Sensitivity", "Low Sensitivity"]
+                                        Rectangle {
+                                            width: 130
+                                            height: 32
+                                            radius: 6
+                                            color: (stateManager && stateManager.headphone1Type === index) ? "#CBA158" : "#28282E"
+                                            border.color: "#3A3A42"
+                                            border.width: 1
+
+                                            Text {
+                                                anchors.centerIn: parent
+                                                text: modelData
+                                                font.pixelSize: 11
+                                                font.bold: stateManager && stateManager.headphone1Type === index
+                                                color: (stateManager && stateManager.headphone1Type === index) ? "#121214" : "#D0D0D0"
+                                            }
+
+                                            MouseArea {
+                                                anchors.fill: parent
+                                                cursorShape: Qt.PointingHandCursor
+                                                onClicked: {
+                                                    if (stateManager) stateManager.setHeadphone1Type(index);
+                                                }
                                             }
                                         }
                                     }
                                 }
                             }
-                        }
 
-                        // Headphone 2
-                        RowLayout {
-                            Layout.fillWidth: true
-                            spacing: 14
+                            // Headphone 2 (Hidden for Streamer X since it only has 1 headphone output)
+                            RowLayout {
+                                visible: Boolean(stateManager && !stateManager.isStreamerX)
+                                Layout.fillWidth: true
+                                spacing: 14
 
-                            Text {
-                                text: "Headphone 2"
-                                font.pixelSize: 13
-                                color: "#E0E0E0"
-                                Layout.preferredWidth: 120
-                            }
+                                Text {
+                                    text: "Headphone 2"
+                                    font.pixelSize: 13
+                                    color: "#E0E0E0"
+                                    Layout.preferredWidth: 120
+                                }
 
-                            Row {
-                                spacing: 8
-                                Repeater {
-                                    model: ["RØDE NTH-100", "High Sensitivity", "Low Sensitivity"]
-                                    Rectangle {
-                                        width: 130
-                                        height: 32
-                                        radius: 6
-                                        color: (stateManager && stateManager.headphone2Type === index) ? "#CBA158" : "#28282E"
-                                        border.color: "#3A3A42"
-                                        border.width: 1
+                                Row {
+                                    spacing: 8
+                                    Repeater {
+                                        model: ["RØDE NTH-100", "High Sensitivity", "Low Sensitivity"]
+                                        Rectangle {
+                                            width: 130
+                                            height: 32
+                                            radius: 6
+                                            color: (stateManager && stateManager.headphone2Type === index) ? "#CBA158" : "#28282E"
+                                            border.color: "#3A3A42"
+                                            border.width: 1
 
-                                        Text {
-                                            anchors.centerIn: parent
-                                            text: modelData
-                                            font.pixelSize: 11
-                                            font.bold: stateManager && stateManager.headphone2Type === index
-                                            color: (stateManager && stateManager.headphone2Type === index) ? "#121214" : "#D0D0D0"
-                                        }
+                                            Text {
+                                                anchors.centerIn: parent
+                                                text: modelData
+                                                font.pixelSize: 11
+                                                font.bold: stateManager && stateManager.headphone2Type === index
+                                                color: (stateManager && stateManager.headphone2Type === index) ? "#121214" : "#D0D0D0"
+                                            }
 
-                                        MouseArea {
-                                            anchors.fill: parent
-                                            cursorShape: Qt.PointingHandCursor
-                                            onClicked: {
-                                                if (stateManager) stateManager.setHeadphone2Type(index);
+                                            MouseArea {
+                                                anchors.fill: parent
+                                                cursorShape: Qt.PointingHandCursor
+                                                onClicked: {
+                                                    if (stateManager) stateManager.setHeadphone2Type(index);
+                                                }
                                             }
                                         }
                                     }
@@ -429,9 +494,8 @@ Item {
                             }
                         }
                     }
-                }
 
-                // 2. Monitor & Routing Options Card
+                    // 2. Monitor & Routing Options Card
                 Rectangle {
                     Layout.fillWidth: true
                     height: monCol.height + 36
@@ -455,8 +519,9 @@ Item {
                             color: "#FFFFFF"
                         }
 
-                        // Auto-mute Monitor Output
+                        // Auto-mute Monitor Output (Duo / Pro II)
                         RowLayout {
+                            visible: Boolean(stateManager && !stateManager.isStreamerX)
                             Layout.fillWidth: true
                             ColumnLayout {
                                 spacing: 2
@@ -480,10 +545,14 @@ Item {
                             }
                         }
 
-                        Rectangle { Layout.fillWidth: true; height: 1; color: "#28282E" }
+                        Rectangle {
+                            visible: Boolean(stateManager && !stateManager.isStreamerX)
+                            Layout.fillWidth: true; height: 1; color: "#28282E"
+                        }
 
-                        // Auto-mute Bluetooth
+                        // Auto-mute Bluetooth (Duo / Pro II)
                         RowLayout {
+                            visible: Boolean(stateManager && !stateManager.isStreamerX)
                             Layout.fillWidth: true
                             ColumnLayout {
                                 spacing: 2
@@ -507,7 +576,10 @@ Item {
                             }
                         }
 
-                        Rectangle { Layout.fillWidth: true; height: 1; color: "#28282E" }
+                        Rectangle {
+                            visible: Boolean(stateManager && !stateManager.isStreamerX)
+                            Layout.fillWidth: true; height: 1; color: "#28282E"
+                        }
 
                         // Listen PFL vs AFL
                         RowLayout {

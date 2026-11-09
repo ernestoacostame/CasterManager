@@ -69,18 +69,18 @@ Rectangle {
 
                             // Device Hardware Icon
                             Rectangle {
-                                width: 40
-                                height: 40
+                                width: 44
+                                height: 44
                                 radius: 8
-                                color: "#161618"
-                                border.color: isSelectedDevice ? "#CBA158" : "#2C2C30"
+                                color: devCard.isSelectedDevice ? "#222228" : "#1B1B1F"
+                                border.color: devCard.isSelectedDevice ? "#CBA158" : "#323238"
                                 border.width: 1
                                 clip: true
 
                                 Image {
                                     anchors.centerIn: parent
-                                    width: 32
-                                    height: 32
+                                    width: 36
+                                    height: 36
                                     source: {
                                         var m = devCard.hasRealDevice ? modelData.model_type : (stateManager ? stateManager.modelType : "Duo");
                                         if (m === "ProII") return "../../assets/rodecasterproii.svg";
@@ -90,8 +90,8 @@ Rectangle {
                                     fillMode: Image.PreserveAspectFit
                                     mipmap: true
                                     smooth: true
-                                    sourceSize.width: 64
-                                    sourceSize.height: 64
+                                    sourceSize.width: 128
+                                    sourceSize.height: 128
                                 }
                             }
 
