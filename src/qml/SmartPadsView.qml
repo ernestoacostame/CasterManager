@@ -14,7 +14,9 @@ Item {
     FileDialog {
         id: fileDialog
         title: stateManager ? stateManager.strings.sound_dialog_title : "Seleccionar archivo de sonido para el Pad"
-        nameFilters: [stateManager ? stateManager.strings.audio_files_filter : "Archivos de audio (*.wav *.mp3 *.ogg *.flac *.aac)", stateManager ? stateManager.strings.all_files_filter : "Todos los archivos (*)"]
+        nameFilters: (stateManager && stateManager.isStreamerX)
+            ? ["Archivos de audio Streamer X (*.wav *.mp3)", "Todos los archivos (*)"]
+            : [stateManager ? stateManager.strings.audio_files_filter : "Archivos de audio (*.wav *.mp3 *.ogg *.flac *.aac)", stateManager ? stateManager.strings.all_files_filter : "Todos los archivos (*)"]
         onAccepted: {
             if (stateManager && selectedFile) {
                 stateManager.uploadSoundFile(selectedFile.toString(), "");
@@ -600,92 +602,148 @@ Item {
                         // Target Channel Card
                         Rectangle {
                             Layout.fillWidth: true
-                            height: 60
+                            Layout.preferredWidth: 240
+                            Layout.minimumWidth: 180
+                            height: 56
                             radius: 8
                             color: "#1C1C1F"
                             border.color: "#2C2C32"
+                            clip: true
 
                             RowLayout {
                                 anchors.fill: parent
-                                anchors.margins: 14
-                                Text { text: "Canal Destino:"; font.pixelSize: 12; font.bold: true; color: "#FFFFFF" }
+                                anchors.margins: 12
+                                spacing: 10
+                                Text {
+                                    text: "Canal Destino:"
+                                    font.pixelSize: 12
+                                    font.bold: true
+                                    color: "#FFFFFF"
+                                }
                                 Item { Layout.fillWidth: true }
-                                Row {
-                                    spacing: 8
-                                    Rectangle {
-                                        width: (stateManager && stateManager.isStreamerX) ? 120 : 76
-                                        height: 32
-                                        radius: 6
-                                        color: root.fxTargetChannel === 0 ? "#CBA158" : "#28282E"
-                                        Text {
-                                            anchors.centerIn: parent
-                                            text: (stateManager && stateManager.isStreamerX) ? "Micrófono" : "Mic 1"
-                                            font.pixelSize: 11
-                                            font.bold: root.fxTargetChannel === 0
-                                            color: root.fxTargetChannel === 0 ? "#121214" : "#D0D0D0"
+                                // Segmented Control
+                                Rectangle {
+                                    height: 32
+                                    radius: 6
+                                    color: "#26262C"
+                                    implicitWidth: (stateManager && stateManager.isStreamerX) ? 96 : 140
+
+                                    RowLayout {
+                                        anchors.fill: parent
+                                        anchors.margins: 3
+                                        spacing: 3
+
+                                        Rectangle {
+                                            Layout.fillWidth: true
+                                            Layout.fillHeight: true
+                                            radius: 4
+                                            color: root.fxTargetChannel === 0 ? "#CBA158" : "transparent"
+                                            Text {
+                                                anchors.centerIn: parent
+                                                text: (stateManager && stateManager.isStreamerX) ? "Micrófono" : "Mic 1"
+                                                font.pixelSize: 11
+                                                font.bold: root.fxTargetChannel === 0
+                                                color: root.fxTargetChannel === 0 ? "#121214" : "#D0D0D0"
+                                            }
+                                            MouseArea {
+                                                anchors.fill: parent
+                                                cursorShape: Qt.PointingHandCursor
+                                                onClicked: root.fxTargetChannel = 0
+                                            }
                                         }
-                                        MouseArea {
-                                            anchors.fill: parent
-                                            cursorShape: Qt.PointingHandCursor
-                                            onClicked: root.fxTargetChannel = 0
-                                        }
-                                    }
-                                    Rectangle {
-                                        visible: !(stateManager && stateManager.isStreamerX)
-                                        width: 76
-                                        height: 32
-                                        radius: 6
-                                        color: root.fxTargetChannel === 1 ? "#CBA158" : "#28282E"
-                                        Text {
-                                            anchors.centerIn: parent
-                                            text: "Mic 2"
-                                            font.pixelSize: 11
-                                            font.bold: root.fxTargetChannel === 1
-                                            color: root.fxTargetChannel === 1 ? "#121214" : "#D0D0D0"
-                                        }
-                                        MouseArea {
-                                            anchors.fill: parent
-                                            cursorShape: Qt.PointingHandCursor
-                                            onClicked: root.fxTargetChannel = 1
+                                        Rectangle {
+                                            visible: !(stateManager && stateManager.isStreamerX)
+                                            Layout.fillWidth: true
+                                            Layout.fillHeight: true
+                                            radius: 4
+                                            color: root.fxTargetChannel === 1 ? "#CBA158" : "transparent"
+                                            Text {
+                                                anchors.centerIn: parent
+                                                text: "Mic 2"
+                                                font.pixelSize: 11
+                                                font.bold: root.fxTargetChannel === 1
+                                                color: root.fxTargetChannel === 1 ? "#121214" : "#D0D0D0"
+                                            }
+                                            MouseArea {
+                                                anchors.fill: parent
+                                                cursorShape: Qt.PointingHandCursor
+                                                onClicked: root.fxTargetChannel = 1
+                                            }
                                         }
                                     }
                                 }
                             }
                         }
 
-                        // Trigger Mode Card (Latch vs Momentary)
+                        // Trigger Mode Card (Latch vs Momentary / Hold)
                         Rectangle {
                             Layout.fillWidth: true
-                            height: 60
+                            Layout.preferredWidth: 240
+                            Layout.minimumWidth: 180
+                            height: 56
                             radius: 8
                             color: "#1C1C1F"
                             border.color: "#2C2C32"
+                            clip: true
 
                             RowLayout {
                                 anchors.fill: parent
-                                anchors.margins: 14
-                                Text { text: "Comportamiento:"; font.pixelSize: 12; font.bold: true; color: "#FFFFFF" }
+                                anchors.margins: 12
+                                spacing: 10
+                                Text {
+                                    text: "Comportamiento:"
+                                    font.pixelSize: 12
+                                    font.bold: true
+                                    color: "#FFFFFF"
+                                }
                                 Item { Layout.fillWidth: true }
-                                Row {
-                                    spacing: 8
-                                    Rectangle {
-                                        width: 76; height: 32; radius: 6
-                                        color: root.fxTriggerMode === 1 ? "#CBA158" : "#28282E"
-                                        Text { anchors.centerIn: parent; text: "Latch"; font.pixelSize: 11; font.bold: root.fxTriggerMode === 1; color: root.fxTriggerMode === 1 ? "#121214" : "#D0D0D0" }
-                                        MouseArea {
-                                            anchors.fill: parent
-                                            cursorShape: Qt.PointingHandCursor
-                                            onClicked: root.fxTriggerMode = 1
+                                // Segmented Control
+                                Rectangle {
+                                    height: 32
+                                    radius: 6
+                                    color: "#26262C"
+                                    implicitWidth: 140
+
+                                    RowLayout {
+                                        anchors.fill: parent
+                                        anchors.margins: 3
+                                        spacing: 3
+
+                                        Rectangle {
+                                            Layout.fillWidth: true
+                                            Layout.fillHeight: true
+                                            radius: 4
+                                            color: root.fxTriggerMode === 1 ? "#CBA158" : "transparent"
+                                            Text {
+                                                anchors.centerIn: parent
+                                                text: "Latch"
+                                                font.pixelSize: 11
+                                                font.bold: root.fxTriggerMode === 1
+                                                color: root.fxTriggerMode === 1 ? "#121214" : "#D0D0D0"
+                                            }
+                                            MouseArea {
+                                                anchors.fill: parent
+                                                cursorShape: Qt.PointingHandCursor
+                                                onClicked: root.fxTriggerMode = 1
+                                            }
                                         }
-                                    }
-                                    Rectangle {
-                                        width: 76; height: 32; radius: 6
-                                        color: root.fxTriggerMode === 0 ? "#CBA158" : "#28282E"
-                                        Text { anchors.centerIn: parent; text: "Hold"; font.pixelSize: 11; font.bold: root.fxTriggerMode === 0; color: root.fxTriggerMode === 0 ? "#121214" : "#D0D0D0" }
-                                        MouseArea {
-                                            anchors.fill: parent
-                                            cursorShape: Qt.PointingHandCursor
-                                            onClicked: root.fxTriggerMode = 0
+                                        Rectangle {
+                                            Layout.fillWidth: true
+                                            Layout.fillHeight: true
+                                            radius: 4
+                                            color: root.fxTriggerMode === 0 ? "#CBA158" : "transparent"
+                                            Text {
+                                                anchors.centerIn: parent
+                                                text: "Hold"
+                                                font.pixelSize: 11
+                                                font.bold: root.fxTriggerMode === 0
+                                                color: root.fxTriggerMode === 0 ? "#121214" : "#D0D0D0"
+                                            }
+                                            MouseArea {
+                                                anchors.fill: parent
+                                                cursorShape: Qt.PointingHandCursor
+                                                onClicked: root.fxTriggerMode = 0
+                                            }
                                         }
                                     }
                                 }

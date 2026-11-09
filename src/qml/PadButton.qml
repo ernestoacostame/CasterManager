@@ -17,26 +17,50 @@ Item {
     implicitWidth: 105
     implicitHeight: 95
 
+    DropArea {
+        id: dropArea
+        anchors.fill: parent
+        keys: ["castermanager/pad"]
+
+        onDropped: (drop) => {
+            if (drop.source && drop.source.padIndex !== undefined && drop.source.padIndex !== root.padIndex) {
+                if (stateManager) {
+                    stateManager.copyPad(drop.source.padIndex, root.padIndex);
+                }
+            }
+        }
+    }
+
     Rectangle {
         id: bg
         anchors.fill: parent
         radius: 8
-        color: mouseArea.pressed ? Qt.darker(root.padColor, 2.5) : (mouseArea.containsMouse ? "#262628" : "#1C1C1E")
-        border.color: root.isSelected ? root.padColor : (mouseArea.containsMouse ? Qt.rgba(root.padColor.r, root.padColor.g, root.padColor.b, 0.4) : "#2A2A2D")
-        border.width: root.isSelected ? 2 : 1
+        color: {
+            if (dropArea.containsDrag && root.padType === "empty") return "#332B1C";
+            if (mouseArea.pressed) return Qt.darker(root.padColor, 2.5);
+            if (mouseArea.containsMouse) return "#262628";
+            return "#1C1C1E";
+        }
+        border.color: {
+            if (dropArea.containsDrag && root.padType === "empty") return "#CBA158";
+            if (root.isSelected) return root.padColor;
+            if (mouseArea.containsMouse) return Qt.rgba(root.padColor.r, root.padColor.g, root.padColor.b, 0.4);
+            return "#2A2A2D";
+        }
+        border.width: (dropArea.containsDrag && root.padType === "empty") ? 2 : (root.isSelected ? 2 : 1)
 
         Behavior on color { ColorAnimation { duration: 100 } }
         Behavior on border.color { ColorAnimation { duration: 120 } }
 
-        // Glow when selected
+        // Glow when selected or when drop target
         Rectangle {
             anchors.fill: parent
             anchors.margins: -4
             radius: 12
             color: "transparent"
-            border.color: root.padColor
+            border.color: (dropArea.containsDrag && root.padType === "empty") ? "#CBA158" : root.padColor
             border.width: 2
-            opacity: root.isSelected ? 0.35 : 0.0
+            opacity: (root.isSelected || (dropArea.containsDrag && root.padType === "empty")) ? 0.4 : 0.0
             visible: opacity > 0
             Behavior on opacity { NumberAnimation { duration: 150 } }
         }
@@ -57,10 +81,10 @@ Item {
                 Text {
                     anchors.centerIn: parent
                     visible: root.padType === "empty"
-                    text: "+"
-                    font.pixelSize: 32
+                    text: dropArea.containsDrag ? "📥" : "+"
+                    font.pixelSize: dropArea.containsDrag ? 20 : 32
                     font.weight: Font.Light
-                    color: mouseArea.containsMouse ? "#AAAAAA" : "#666666"
+                    color: (dropArea.containsDrag || mouseArea.containsMouse) ? "#CBA158" : "#666666"
                 }
 
                 // Waveform bars representation for Sound pads
@@ -114,19 +138,99 @@ Item {
         }
     }
 
+    // Drag Item representation
+    Item {
+        id: dragItem
+        width: root.width
+        height: root.height
+        Drag.active: mouseArea.drag.active
+        Drag.source: root
+        Drag.hotSpot.x: width / 2
+        Drag.hotSpot.y: height / 2
+        Drag.keys: ["castermanager/pad"]
+
+        // Drag preview tile
+        Rectangle {
+            anchors.fill: parent
+            radius: 8
+            color: "#222226"
+            border.color: "#CBA158"
+            border.width: 2
+            visible: mouseArea.drag.active
+            opacity: 0.85
+
+            Text {
+                anchors.centerIn: parent
+                text: root.padName || "Pad"
+                font.pixelSize: 11
+                font.bold: true
+                color: "#FFFFFF"
+            }
+        }
+    }
+
     MouseArea {
         id: mouseArea
         anchors.fill: parent
         hoverEnabled: true
-        cursorShape: Qt.PointingHandCursor
+        acceptedButtons: Qt.LeftButton | Qt.RightButton
+        cursorShape: mouseArea.drag.active ? Qt.ClosedHandCursor : Qt.PointingHandCursor
 
-        onClicked: {
-            root.clicked();
+        drag.target: root.padType !== "empty" ? dragItem : undefined
+        drag.axis: Drag.XAndYAxis
+
+        onClicked: (mouse) => {
+            if (mouse.button === Qt.RightButton) {
+                contextMenu.popup();
+            } else {
+                root.clicked();
+            }
         }
 
-        onDoubleClicked: {
-            root.triggered();
+        onDoubleClicked: (mouse) => {
+            if (mouse.button === Qt.LeftButton) {
+                root.triggered();
+            }
+        }
+    }
+
+    Menu {
+        id: contextMenu
+
+        MenuItem {
+            text: "Copiar Pad"
+            visible: root.padType !== "empty"
+            onTriggered: {
+                if (stateManager) {
+                    stateManager.selectPad(root.padIndex);
+                    stateManager.copyCurrentPad();
+                }
+            }
+        }
+
+        MenuItem {
+            text: "Pegar Pad"
+            enabled: stateManager ? stateManager.canPastePad : false
+            onTriggered: {
+                if (stateManager) {
+                    stateManager.pasteToPad(root.padIndex);
+                }
+            }
+        }
+
+        MenuSeparator {
+            visible: root.padType !== "empty"
+        }
+
+        MenuItem {
+            text: "Limpiar Pad"
+            visible: root.padType !== "empty"
+            onTriggered: {
+                if (stateManager) {
+                    stateManager.selectPad(root.padIndex);
+                    stateManager.clearCurrentPad();
+                }
+            }
         }
     }
 }
-

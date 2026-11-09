@@ -345,6 +345,7 @@ class StateManager(QObject):
     recordingsChanged = pyqtSignal()
     devicesChanged = pyqtSignal()
     activeMixTargetChanged = pyqtSignal()
+    padClipboardChanged = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -354,6 +355,7 @@ class StateManager(QObject):
         self._active_mix_target = "main"
         self._devices = []
         self._selected_device_index = 0
+        self._copied_pad = None
         self._connected = False
         self._permission_error = False
         self._permission_path = ""
@@ -962,6 +964,10 @@ class StateManager(QObject):
                 return bank[logical_pos]
         return None
 
+    @pyqtProperty(bool, notify=padClipboardChanged)
+    def canPastePad(self):
+        return self._copied_pad is not None and self._copied_pad.get("type", "empty") != "empty"
+
     @pyqtProperty(QVariant, notify=padsChanged)
     def currentPads(self):
         order = STREAMER_X_PHYSICAL_ORDER if self._is_streamer_x else (DUO_PHYSICAL_ORDER if self._is_duo else PRO_II_PHYSICAL_ORDER)
@@ -1186,6 +1192,11 @@ class StateManager(QObject):
             self.toastMessage.emit("Archivo no encontrado")
             return
 
+        ext = os.path.splitext(clean_path)[1].lower()
+        if self._is_streamer_x and ext not in [".wav", ".mp3"]:
+            self.toastMessage.emit("La Streamer X solo admite archivos de audio .wav o .mp3")
+            return
+
         pad = self._get_current_pad()
         if not pad:
             return
@@ -1248,6 +1259,93 @@ class StateManager(QObject):
             self.executor.submit(do_clear)
         else:
             self.toastMessage.emit("Pad limpiado")
+
+    @pyqtSlot()
+    def copyCurrentPad(self):
+        pad = self._get_current_pad()
+        if not pad or pad.get("type") == "empty":
+            self.toastMessage.emit("El pad seleccionado está vacío")
+            return
+        self._copied_pad = dict(pad)
+        self.padClipboardChanged.emit()
+        self.toastMessage.emit(f"Pad copiado: {self._copied_pad.get('name') or 'Pad'}")
+
+    @pyqtSlot(int)
+    def pasteToPad(self, target_display_idx):
+        if not self._copied_pad:
+            self.toastMessage.emit("No hay ningún pad en el portapapeles")
+            return
+        self.copyPadData(self._copied_pad, target_display_idx)
+
+    @pyqtSlot(int, int)
+    def copyPad(self, src_display_idx, dst_display_idx):
+        if src_display_idx == dst_display_idx:
+            return
+        order = STREAMER_X_PHYSICAL_ORDER if self._is_streamer_x else (DUO_PHYSICAL_ORDER if self._is_duo else PRO_II_PHYSICAL_ORDER)
+        src_logical = order[src_display_idx] if src_display_idx < len(order) else src_display_idx
+        if not (0 <= self._current_bank < len(self._banks)):
+            return
+        bank = self._banks[self._current_bank]
+        if not (0 <= src_logical < len(bank)):
+            return
+        src_pad = bank[src_logical]
+        if src_pad.get("type") == "empty":
+            return
+        self.copyPadData(dict(src_pad), dst_display_idx)
+
+    def copyPadData(self, pad_data, dst_display_idx):
+        order = STREAMER_X_PHYSICAL_ORDER if self._is_streamer_x else (DUO_PHYSICAL_ORDER if self._is_duo else PRO_II_PHYSICAL_ORDER)
+        dst_logical = order[dst_display_idx] if dst_display_idx < len(order) else dst_display_idx
+        if not (0 <= self._current_bank < len(self._banks)):
+            return
+        bank = self._banks[self._current_bank]
+        if not (0 <= dst_logical < len(bank)):
+            return
+
+        target = bank[dst_logical]
+        for k in ["name", "color_idx", "color_hex", "type", "mode", "loop", "replay", "gain", "file", "file_path", "fx_id", "fx_channel", "fx_mode"]:
+            if k in pad_data:
+                target[k] = pad_data[k]
+
+        self.padsChanged.emit()
+        self.selectedPadChanged.emit()
+        pad_name = target.get("name") or "Pad"
+        self.toastMessage.emit(f"Pad copiado a la posición {dst_display_idx + 1}: {pad_name}")
+
+        if self._connected and not self._permission_error:
+            ptype = target.get("type")
+            b_str = str(self._current_bank)
+            p_str = str(dst_display_idx)
+            def do_sync():
+                if ptype == "fx":
+                    fx_id = target.get("fx_id", 8)
+                    fx_channel = target.get("fx_channel", 0)
+                    fx_mode = target.get("fx_mode", 1)
+                    col = target.get("color_idx", 8)
+                    self.bridge.run_cmd(["pad", "set-prop", b_str, p_str, "padType", "u32:2"])
+                    self.bridge.run_cmd(["pad", "set-prop", b_str, p_str, "padFilePath", "str:"])
+                    self.bridge.run_cmd(["pad", "set-prop", b_str, p_str, "padName", f"str:{target.get('name', '')}"])
+                    self.bridge.run_cmd(["pad", "set-prop", b_str, p_str, "padColourIndex", f"u32:{col}"])
+                    self.bridge.run_cmd(["pad", "set-prop", b_str, p_str, "padEffectTriggerMode", f"u32:{fx_mode}"])
+                    self.bridge.run_cmd(["pad", "set-prop", b_str, p_str, "padEffectInput", f"u32:{fx_channel}"])
+                    self.bridge.run_cmd(["pad", "set-prop", b_str, p_str, "padTriggerControl", f"u32:{fx_id}"])
+                    self.bridge.run_cmd(["pad", "set-prop", b_str, p_str, "padTriggerSend", "u32:2"])
+                    self.bridge.run_cmd(["pad", "set-prop", b_str, p_str, "padTriggerChannel", "u32:1"])
+                    self.bridge.run_cmd(["pad", "set-prop", b_str, p_str, "padTriggerMode", "u32:1"])
+                    self.bridge.run_cmd(["pad", "set-prop", b_str, p_str, "padTriggerOn", "u32:127"])
+                    self.bridge.run_cmd(["pad", "set-prop", b_str, p_str, "padTriggerOff", "u32:0"])
+                    self.bridge.run_cmd(["pad", "set-prop", b_str, p_str, "padActive", "bool:false"])
+                elif ptype == "sound":
+                    sound_p = target.get("file_path") or ""
+                    if sound_p and os.path.exists(sound_p):
+                        self.bridge.run_cmd([
+                            "pad", "upload", b_str, p_str, sound_p, "--name", target.get("name", "Sound")
+                        ], timeout=45)
+                    else:
+                        self.bridge.run_cmd(["pad", "set-prop", b_str, p_str, "padName", f"str:{target.get('name', '')}"])
+                        self.bridge.run_cmd(["pad", "set-prop", b_str, p_str, "padColourIndex", f"u32:{target.get('color_idx', 0)}"])
+                self._sync_hardware_state()
+            self.executor.submit(do_sync)
 
     @pyqtSlot(str)
     def exportCurrentPad(self, target_filepath):
