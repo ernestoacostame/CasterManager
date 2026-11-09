@@ -148,7 +148,7 @@ class DeviceMonitor(QObject):
                             physical_faders = 0
                             virtual_faders = 0
                             pots = 2
-                            physical_order = [0, 1, 2, 3]
+                            physical_order = [0, 2, 1, 3]
                         elif pid in PRO_II_PRODUCT_IDS:
                             model_type = "ProII"
                             display_name = "RØDECaster Pro II"
@@ -180,7 +180,7 @@ class DeviceMonitor(QObject):
                                 physical_faders = 0
                                 virtual_faders = 0
                                 pots = 2
-                                physical_order = [0, 1, 2, 3]
+                                physical_order = [0, 2, 1, 3]
                             else:
                                 model_type = "ProII"
                                 display_name = "RØDECaster Pro II"

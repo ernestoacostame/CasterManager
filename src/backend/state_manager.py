@@ -13,6 +13,7 @@ logger = logging.getLogger("CasterManager.state")
 
 DUO_PHYSICAL_ORDER = [0, 3, 1, 4, 2, 5]
 PRO_II_PHYSICAL_ORDER = [0, 4, 1, 5, 2, 6, 3, 7]
+STREAMER_X_PHYSICAL_ORDER = [0, 2, 1, 3]
 STREAMERX_PROFILE_PATH = os.path.expanduser("~/.config/CasterManager/streamerx_pads.json")
 
 FACTORY_SOUNDS = [
@@ -1004,7 +1005,7 @@ class StateManager(QObject):
         return self._selected_pad_index
 
     def _get_current_pad(self):
-        order = [0, 1, 2, 3] if self._is_streamer_x else (DUO_PHYSICAL_ORDER if self._is_duo else PRO_II_PHYSICAL_ORDER)
+        order = STREAMER_X_PHYSICAL_ORDER if self._is_streamer_x else (DUO_PHYSICAL_ORDER if self._is_duo else PRO_II_PHYSICAL_ORDER)
         logical_pos = order[self._selected_pad_index] if self._selected_pad_index < len(order) else self._selected_pad_index
         if 0 <= self._current_bank < len(self._banks):
             bank = self._banks[self._current_bank]
@@ -1014,7 +1015,7 @@ class StateManager(QObject):
 
     @pyqtProperty(QVariant, notify=padsChanged)
     def currentPads(self):
-        order = [0, 1, 2, 3] if self._is_streamer_x else (DUO_PHYSICAL_ORDER if self._is_duo else PRO_II_PHYSICAL_ORDER)
+        order = STREAMER_X_PHYSICAL_ORDER if self._is_streamer_x else (DUO_PHYSICAL_ORDER if self._is_duo else PRO_II_PHYSICAL_ORDER)
         if not (0 <= self._current_bank < len(self._banks)):
             return []
         bank = self._banks[self._current_bank]
@@ -1074,7 +1075,7 @@ class StateManager(QObject):
             self._current_bank = bank
             if self._is_streamer_x:
                 self.settings.setValue(f"current_bank_{self._model_type}", bank)
-            elif self._connected and not self._permission_error:
+            if self._connected and not self._permission_error:
                 self.executor.submit(self.bridge.set_bank, bank)
             self.stateChanged.emit()
             self.padsChanged.emit()
@@ -1098,23 +1099,23 @@ class StateManager(QObject):
     def triggerPad(self, display_index):
         if 0 <= display_index < self._pads_per_bank:
             self.selectPad(display_index)
-            order = [0, 1, 2, 3] if self._is_streamer_x else (DUO_PHYSICAL_ORDER if self._is_duo else PRO_II_PHYSICAL_ORDER)
+            order = STREAMER_X_PHYSICAL_ORDER if self._is_streamer_x else (DUO_PHYSICAL_ORDER if self._is_duo else PRO_II_PHYSICAL_ORDER)
             logical_pos = order[display_index] if display_index < len(order) else display_index
             bank = self._banks[self._current_bank] if (0 <= self._current_bank < len(self._banks)) else []
             pad = bank[logical_pos] if (0 <= logical_pos < len(bank)) else {}
 
             logger.info(f"Triggering Pad {display_index} (name: '{pad.get('name')}') on Bank {self._current_bank + 1}")
-            if self._is_streamer_x:
-                # Trigger audio locally on Linux
-                sound_file = pad.get("file_path") or pad.get("file")
-                if sound_file:
-                    if not os.path.isabs(sound_file):
-                        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-                        sound_file = os.path.join(base_dir, "assets", "sounds", sound_file)
-                    if os.path.exists(sound_file):
-                        self.executor.submit(subprocess.run, ["paplay", sound_file], capture_output=True)
-            elif self._connected and not self._permission_error:
+            if self._connected and not self._permission_error:
                 self.executor.submit(self.bridge.trigger_pad, self._current_bank, display_index)
+
+            # Local sound playback preview if audio file exists on Linux
+            sound_file = pad.get("file_path") or pad.get("file")
+            if sound_file:
+                if not os.path.isabs(sound_file):
+                    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+                    sound_file = os.path.join(base_dir, "assets", "sounds", sound_file)
+                if os.path.exists(sound_file):
+                    self.executor.submit(subprocess.run, ["paplay", sound_file], capture_output=True)
             self.toastMessage.emit(f"Pulsado: {pad.get('name') or f'Pad {display_index+1}'}")
 
     @pyqtSlot(str)
@@ -1265,30 +1266,28 @@ class StateManager(QObject):
         self.padsChanged.emit()
         self.selectedPadChanged.emit()
 
-        if self._is_streamer_x:
-            self._save_streamerx_banks()
+        if self._connected and not self._permission_error:
+            self.toastMessage.emit(f"Subiendo a la {self._model_name}: {name}...")
+            def do_upload():
+                out, err = self.bridge.run_cmd([
+                    "pad", "upload",
+                    str(self._current_bank),
+                    str(self._selected_pad_index),
+                    clean_path,
+                    "--name", name
+                ], timeout=45)
+                if err:
+                    logger.error(f"Upload error: {err}")
+                    self.toastMessage.emit(f"Error al subir: {err}")
+                else:
+                    logger.info(f"Upload finished: {out}")
+                    self.toastMessage.emit(f"Audio cargado con éxito en Pad {self._selected_pad_index + 1}!")
+                    self._sync_hardware_state()
+            self.executor.submit(do_upload)
+        else:
+            if self._is_streamer_x:
+                self._save_streamerx_banks()
             self.toastMessage.emit(f"Audio asignado al Pad {self._selected_pad_index + 1}: {name}")
-            return
-
-        self.toastMessage.emit(f"Subiendo a la Duo: {name}...")
-
-        def do_upload():
-            out, err = self.bridge.run_cmd([
-                "pad", "upload",
-                str(self._current_bank),
-                str(self._selected_pad_index),
-                clean_path,
-                "--name", name
-            ], timeout=45)
-            if err:
-                logger.error(f"Upload error: {err}")
-                self.toastMessage.emit(f"Error al subir: {err}")
-            else:
-                logger.info(f"Upload finished: {out}")
-                self.toastMessage.emit(f"Audio cargado con éxito en Pad {self._selected_pad_index + 1}!")
-                self._sync_hardware_state()
-
-        self.executor.submit(do_upload)
 
     @pyqtSlot()
     def clearCurrentPad(self):
@@ -1304,8 +1303,6 @@ class StateManager(QObject):
 
         if self._is_streamer_x:
             self._save_streamerx_banks()
-            self.toastMessage.emit("Pad limpiado")
-            return
 
         if self._connected and not self._permission_error:
             def do_clear():
@@ -1317,10 +1314,12 @@ class StateManager(QObject):
                     self.toastMessage.emit(f"Error al limpiar: {err}")
                 else:
                     logger.info("Pad cleared successfully on hardware")
-                    self.toastMessage.emit("Pad limpiado en la Rodecaster")
+                    self.toastMessage.emit(f"Pad limpiado en la {self._model_name}")
                     self._sync_hardware_state()
 
             self.executor.submit(do_clear)
+        else:
+            self.toastMessage.emit("Pad limpiado")
 
     @pyqtSlot(str)
     def exportCurrentPad(self, target_filepath):

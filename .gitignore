@@ -1,5 +1,6 @@
 # Reverse engineering and upstream reference materials (excluded)
 Resources/
+StreamerX/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
