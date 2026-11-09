@@ -167,6 +167,15 @@ TRANSLATIONS = {
         "no_microsd_desc": "La ranura de tarjeta MicroSD de tu RØDECaster está vacía. Inserta una tarjeta MicroSD para grabar tomas y transferirlas a tu PC.",
         "no_recordings_title": "No hay grabaciones en la tarjeta",
         "no_recordings_desc": "Las grabaciones realizadas con el botón REC en tu RØDECaster aparecerán aquí.",
+        "submixes": "Submezclas",
+        "main_mix": "Mezcla Principal (Stream)",
+        "headphones_submix": "Mis Auriculares (Submezcla)",
+        "submix_banner_main": "🔴 Mezcla de Transmisión en Vivo: Ajustando el audio que escucha la audiencia y graba el master.",
+        "submix_banner_hp": "🎧 Submezcla de Auriculares: Ajusta tu volumen personal de monitoreo sin alterar la transmisión en vivo.",
+        "linked_to_main": "Vinculado al Stream",
+        "independent_mix": "Monitoreo Personalizado",
+        "reset_submix": "Restablecer a Principal",
+        "dual_mix_title": "Modo Submezclas / Dual Mix",
     },
     "en": {
         "settings": "Settings",
@@ -309,6 +318,15 @@ TRANSLATIONS = {
         "no_microsd_desc": "The MicroSD card slot on your RØDECaster is empty. Insert a MicroSD card to record takes and transfer them to your PC.",
         "no_recordings_title": "No recordings on card",
         "no_recordings_desc": "Recordings made with the REC button on your RØDECaster will appear here.",
+        "submixes": "Submixes",
+        "main_mix": "Main Mix (Stream)",
+        "headphones_submix": "My Headphones (Submix)",
+        "submix_banner_main": "🔴 Live Broadcast Mix: Adjusting volume heard by your stream audience and master recording.",
+        "submix_banner_hp": "🎧 Headphones Submix: Adjust your personal listening volume without altering the live stream.",
+        "linked_to_main": "Linked to Stream",
+        "independent_mix": "Custom Monitor Mix",
+        "reset_submix": "Reset to Main",
+        "dual_mix_title": "Dual Mix / Submix Mode",
     }
 }
 
@@ -325,12 +343,14 @@ class StateManager(QObject):
     deviceConfigChanged = pyqtSignal()
     recordingsChanged = pyqtSignal()
     devicesChanged = pyqtSignal()
+    activeMixTargetChanged = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.settings = QSettings("CasterManager", "CasterManager")
         self._language = self.settings.value("language", "es")
         self._current_view = "home"
+        self._active_mix_target = "main"
         self._devices = []
         self._selected_device_index = 0
         self._connected = False
@@ -425,7 +445,7 @@ class StateManager(QObject):
 
     def _init_default_faders(self):
         if getattr(self, "_is_streamer_x", False):
-            return [
+            raw = [
                 {"index": 0, "name": "Mic / Line", "color": "#FF3C3C", "icon": "mic", "level": 70, "mute": False, "listen": False, "is_virtual": False},
                 {"index": 1, "name": "Headset", "color": "#28C850", "icon": "mic", "level": 70, "mute": False, "listen": False, "is_virtual": False},
                 {"index": 2, "name": "USB 1", "color": "#FF8C28", "icon": "usb", "level": 70, "mute": False, "listen": False, "is_virtual": False},
@@ -434,7 +454,7 @@ class StateManager(QObject):
                 {"index": 5, "name": "HDMI Audio", "color": "#3C96FF", "icon": "usb", "level": 70, "mute": False, "listen": False, "is_virtual": True},
             ]
         elif self._is_duo:
-            return [
+            raw = [
                 {"index": 0, "name": "Mic 1", "color": "#FF3C3C", "icon": "mic", "level": 70, "mute": False, "listen": False, "is_virtual": False},
                 {"index": 1, "name": "Mic 2 / Chat", "color": "#28C850", "icon": "chat", "level": 70, "mute": False, "listen": False, "is_virtual": False},
                 {"index": 2, "name": "USB 1", "color": "#FF8C28", "icon": "usb", "level": 70, "mute": False, "listen": False, "is_virtual": False},
@@ -443,7 +463,7 @@ class StateManager(QObject):
                 {"index": 5, "name": "Bluetooth", "color": "#3C96FF", "icon": "bluetooth", "level": 70, "mute": False, "listen": False, "is_virtual": True},
             ]
         else:
-            return [
+            raw = [
                 {"index": 0, "name": "Mic 1", "color": "#FF3C3C", "icon": "mic", "level": 70, "mute": False, "listen": False, "is_virtual": False},
                 {"index": 1, "name": "Mic 2", "color": "#28C850", "icon": "mic", "level": 70, "mute": False, "listen": False, "is_virtual": False},
                 {"index": 2, "name": "Mic 3", "color": "#FF9600", "icon": "mic", "level": 70, "mute": False, "listen": False, "is_virtual": False},
@@ -454,6 +474,11 @@ class StateManager(QObject):
                 {"index": 7, "name": "Bluetooth", "color": "#3C96FF", "icon": "bluetooth", "level": 70, "mute": False, "listen": False, "is_virtual": True},
                 {"index": 8, "name": "Virtual", "color": "#A050E6", "icon": "usb", "level": 70, "mute": False, "listen": False, "is_virtual": True},
             ]
+        for f in raw:
+            f.setdefault("submix_level", f["level"])
+            f.setdefault("submix_linked", True)
+            f.setdefault("submix_mute", False)
+        return raw
 
     def _init_empty_banks(self):
         banks = []
@@ -1839,22 +1864,59 @@ class StateManager(QObject):
         else:
             self.toastMessage.emit(f"Sonido {filename} no encontrado")
 
-    # Faders & Mixer
+    # Faders & Submixes Mixer
+    @pyqtProperty(str, notify=activeMixTargetChanged)
+    def activeMixTarget(self):
+        return self._active_mix_target
+
+    @pyqtSlot(str)
+    def setActiveMixTarget(self, target):
+        if target in ("main", "headphones") and target != self._active_mix_target:
+            self._active_mix_target = target
+            self.activeMixTargetChanged.emit()
+            self.fadersChanged.emit()
+
     @pyqtProperty(QVariant, notify=fadersChanged)
     def faders(self):
-        return self._faders
+        result = []
+        is_hp = (self._active_mix_target == "headphones")
+        for f in self._faders:
+            f_copy = dict(f)
+            # Level and mute according to active mix
+            f_copy["main_level"] = f.get("level", 70)
+            f_copy["submix_level"] = f.get("submix_level", f.get("level", 70))
+            f_copy["submix_linked"] = f.get("submix_linked", True)
+            f_copy["submix_mute"] = f.get("submix_mute", False)
+            f_copy["is_submix_mode"] = is_hp
+
+            if is_hp:
+                f_copy["level"] = f_copy["submix_level"]
+                f_copy["mute"] = f_copy["submix_mute"]
+            else:
+                f_copy["level"] = f_copy["main_level"]
+                f_copy["mute"] = f.get("mute", False)
+
+            result.append(f_copy)
+        return result
 
     @pyqtSlot(int)
     def toggleFaderMute(self, index):
         if 0 <= index < len(self._faders):
-            new_mute = not self._faders[index]["mute"]
-            self._faders[index]["mute"] = new_mute
-            self.fadersChanged.emit()
-            if self._connected and not self._permission_error:
-                action = "on" if new_mute else "off"
-                self.executor.submit(self.bridge.run_cmd, ["fader", "mute", str(index), action])
-            msg = f"{self._faders[index]['name']}: " + ("Mute" if new_mute else "Unmute")
-            self.toastMessage.emit(msg)
+            if self._active_mix_target == "headphones":
+                new_mute = not self._faders[index].get("submix_mute", False)
+                self._faders[index]["submix_mute"] = new_mute
+                self.fadersChanged.emit()
+                msg = f"{self._faders[index]['name']} (Auriculares): " + ("Mute" if new_mute else "Unmute")
+                self.toastMessage.emit(msg)
+            else:
+                new_mute = not self._faders[index]["mute"]
+                self._faders[index]["mute"] = new_mute
+                self.fadersChanged.emit()
+                if self._connected and not self._permission_error:
+                    action = "on" if new_mute else "off"
+                    self.executor.submit(self.bridge.run_cmd, ["fader", "mute", str(index), action])
+                msg = f"{self._faders[index]['name']}: " + ("Mute" if new_mute else "Unmute")
+                self.toastMessage.emit(msg)
 
     @pyqtSlot(int)
     def toggleFaderListen(self, index):
@@ -1872,10 +1934,53 @@ class StateManager(QObject):
     def setFaderLevel(self, index, level):
         if 0 <= index < len(self._faders):
             clamped = max(0, min(100, level))
-            self._faders[index]["level"] = clamped
+            if self._active_mix_target == "main":
+                self._faders[index]["level"] = clamped
+                if self._faders[index].get("submix_linked", True):
+                    self._faders[index]["submix_level"] = clamped
+                self.fadersChanged.emit()
+                self._pending_fader_levels[index] = clamped
+                self._fader_timer.start()
+            else:
+                # Submix target: independent headphone monitoring
+                self._faders[index]["submix_level"] = clamped
+                self._faders[index]["submix_linked"] = False
+                self.fadersChanged.emit()
+                self._apply_submix_hardware(index, clamped)
+
+    @pyqtSlot(int)
+    def toggleSubmixLink(self, index):
+        if 0 <= index < len(self._faders):
+            curr = self._faders[index].get("submix_linked", True)
+            new_linked = not curr
+            self._faders[index]["submix_linked"] = new_linked
+            if new_linked:
+                self._faders[index]["submix_level"] = self._faders[index]["level"]
+                self._apply_submix_hardware(index, self._faders[index]["level"])
             self.fadersChanged.emit()
-            self._pending_fader_levels[index] = clamped
-            self._fader_timer.start()
+            msg = f"{self._faders[index]['name']}: " + ("Vinculado al Stream" if new_linked else "Monitoreo Personalizado")
+            self.toastMessage.emit(msg)
+
+    @pyqtSlot()
+    def resetSubmix(self):
+        for f in self._faders:
+            f["submix_level"] = f["level"]
+            f["submix_linked"] = True
+            f["submix_mute"] = False
+        self.fadersChanged.emit()
+        self.toastMessage.emit("Submezcla de auriculares sincronizada con la mezcla principal")
+
+    def _apply_submix_hardware(self, index, level):
+        # Optional PipeWire sink volume for Streamer X virtual channels
+        if getattr(self, "_is_streamer_x", False):
+            channels = ["streamerx_game", "streamerx_chat", "streamerx_music", "streamerx_system"]
+            if 0 <= index < len(channels):
+                sink = channels[index]
+                self.executor.submit(
+                    subprocess.run,
+                    ["pactl", "set-sink-volume", sink, f"{level}%"],
+                    capture_output=True, timeout=2
+                )
 
     def _flush_faders_hardware(self):
         if not self._connected or self._permission_error or not self._pending_fader_levels:
