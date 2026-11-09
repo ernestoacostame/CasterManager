@@ -558,11 +558,8 @@ class StateManager(QObject):
         self.bridge.target_serial = info.get("serial")
 
         # Re-initialize banks and faders for the active model geometry
-        if self._is_streamer_x:
-            self._current_bank = int(self.settings.value(f"current_bank_{self._model_type}", 0))
-            self._load_streamerx_banks()
-        else:
-            self._banks = self._init_empty_banks()
+        self._current_bank = int(self.settings.value(f"current_bank_{self._model_type}", 0))
+        self._banks = self._init_empty_banks()
         self._faders = self._init_default_faders()
 
         self.stateChanged.emit()
@@ -570,7 +567,7 @@ class StateManager(QObject):
         self.selectedPadChanged.emit()
         self.fadersChanged.emit()
 
-        if info.get("has_permission") and not self._is_streamer_x:
+        if info.get("has_permission"):
             self.executor.submit(self._sync_hardware_state)
 
     def _save_streamerx_banks(self):
