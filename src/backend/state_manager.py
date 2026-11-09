@@ -613,6 +613,15 @@ class StateManager(QObject):
         return raw
 
     def _init_empty_banks(self):
+        saved = self.settings.value(f"cached_banks_{self._model_type}", None)
+        if saved:
+            try:
+                cached = json.loads(saved)
+                if isinstance(cached, list) and len(cached) == 8 and len(cached[0]) == self._pads_per_bank:
+                    return cached
+            except Exception:
+                pass
+
         banks = []
         ppb = self._pads_per_bank
         for b in range(8):
@@ -962,6 +971,12 @@ class StateManager(QObject):
                             "fx_mode": int(p.get("padEffectTriggerMode", 1))
                         }
                         self._banks[bank][pos] = pad_entry
+
+                try:
+                    self.settings.setValue(f"cached_banks_{self._model_type}", json.dumps(self._banks))
+                    self.settings.sync()
+                except Exception as e:
+                    logger.debug(f"Error caching banks: {e}")
 
             # Populate DSP Channels from CHANNEL and INPUTSOURCE
             channel_nodes = [c for c in children if c.get("name") == "CHANNEL"]
