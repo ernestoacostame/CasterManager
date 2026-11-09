@@ -576,7 +576,7 @@ class StateManager(QObject):
         self.monitor.permission_issue.connect(self._on_permission_issue)
 
         # Initialize banks
-        self._banks = self._init_empty_banks()
+        self._banks = self._init_empty_banks(use_cache=True)
 
         # Start monitoring
         self.monitor.start()
@@ -668,8 +668,11 @@ class StateManager(QObject):
             f.setdefault("submix_mute", False)
         return raw
 
-    def _init_empty_banks(self):
-        saved = self.settings.value(f"cached_banks_{self._model_type}", None)
+    def _init_empty_banks(self, use_cache=False):
+        # The cache is only a placeholder for instant display at startup / device
+        # switch. A hardware sync must start from truly empty banks, otherwise
+        # pads deleted on the device are resurrected from the cache.
+        saved = self.settings.value(f"cached_banks_{self._model_type}", None) if use_cache else None
         if saved:
             try:
                 cached = json.loads(saved)
@@ -762,7 +765,7 @@ class StateManager(QObject):
 
         # Re-initialize banks and faders for the active model geometry
         self._current_bank = int(self.settings.value(f"current_bank_{self._model_type}", 0))
-        self._banks = self._init_empty_banks()
+        self._banks = self._init_empty_banks(use_cache=True)
         self._faders = self._init_default_faders()
         self._dsp_channels = self._init_default_dsp_channels()
         self._active_dsp_channel = 0
@@ -1547,7 +1550,10 @@ class StateManager(QObject):
                     logger.error(f"Error clearing pad: {err}")
                     self.toastMessage.emit(f"Error al limpiar: {err}")
                 else:
-                    logger.info("Pad cleared successfully on hardware")
+                    if removed:
+                        logger.info(f"Pad cleared on hardware (bank {b_idx}, pad {p_idx}, {removed} node(s) removed)")
+                    else:
+                        logger.info(f"Pad bank {b_idx} pad {p_idx} was already empty on hardware")
                     self.toastMessage.emit(f"Pad limpiado en la {self._model_name}")
                     self._sync_hardware_state()
 
