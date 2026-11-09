@@ -507,6 +507,8 @@ class StateManager(QObject):
         self._pad_cols = info["pad_cols"]
         self._pad_rows = info["pad_rows"]
         self._serial = info.get("serial", "")
+        if info.get("firmware_version"):
+            self._firmware = info["firmware_version"]
         self._permission_error = not info.get("has_permission", False)
         self._permission_path = info.get("hidraw_node", "")
 

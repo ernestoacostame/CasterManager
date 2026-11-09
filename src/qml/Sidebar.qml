@@ -158,8 +158,8 @@ Rectangle {
                                 }
 
                                 Text {
-                                    visible: devCard.isSelectedDevice || !devCard.hasRealDevice
-                                    text: (stateManager ? stateManager.strings.firmware : "Firmware") + " " + (stateManager ? stateManager.firmwareVersion : "1.7.7")
+                                    visible: true
+                                    text: (stateManager ? stateManager.strings.firmware : "Firmware") + " " + (devCard.hasRealDevice && modelData.firmware_version ? modelData.firmware_version : (stateManager ? stateManager.firmwareVersion : "1.0.0"))
                                     font.pixelSize: 10
                                     color: "#8E8E93"
                                 }

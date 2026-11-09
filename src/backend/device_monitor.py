@@ -91,6 +91,17 @@ class DeviceMonitor(QObject):
             d.stop()
         self._drainers.clear()
 
+    @staticmethod
+    def _parse_bcd_firmware(bcd_str: str) -> str:
+        """Converts USB bcdDevice string (e.g. '0121' -> '1.2.1', '0177' -> '1.7.7') into semver."""
+        bcd_str = bcd_str.strip()
+        if len(bcd_str) == 4 and bcd_str.isdigit():
+            major = int(bcd_str[:2])
+            minor = int(bcd_str[2])
+            patch = int(bcd_str[3])
+            return f"{major}.{minor}.{patch}"
+        return bcd_str or "1.0.0"
+
     def scan_devices(self):
         found_devices = []
 
@@ -109,10 +120,13 @@ class DeviceMonitor(QObject):
                         manufacturer_file = os.path.join(dev_path, "manufacturer")
                         product_file = os.path.join(dev_path, "product")
                         serial_file = os.path.join(dev_path, "serial")
+                        bcd_file = os.path.join(dev_path, "bcdDevice")
 
                         manufacturer = self._read_text(manufacturer_file, "RØDE")
                         product_name = self._read_text(product_file, "RØDECaster")
                         serial = self._read_text(serial_file, "")
+                        bcd_raw = self._read_text(bcd_file, "")
+                        firmware_version = self._parse_bcd_firmware(bcd_raw)
 
                         # Determine Model profile
                         if pid in DUO_PRODUCT_IDS:
@@ -192,6 +206,7 @@ class DeviceMonitor(QObject):
                             "product_name": product_name,
                             "manufacturer": manufacturer,
                             "serial": serial,
+                            "firmware_version": firmware_version,
                             "sysfs_path": dev_path,
                             "hidraw_node": hidraw_node,
                             "has_permission": has_permission,
