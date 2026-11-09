@@ -613,9 +613,17 @@ Item {
                                 Row {
                                     spacing: 8
                                     Rectangle {
-                                        width: 76; height: 32; radius: 6
+                                        width: (stateManager && stateManager.isStreamerX) ? 120 : 76
+                                        height: 32
+                                        radius: 6
                                         color: root.fxTargetChannel === 0 ? "#CBA158" : "#28282E"
-                                        Text { anchors.centerIn: parent; text: "Mic 1"; font.pixelSize: 11; font.bold: root.fxTargetChannel === 0; color: root.fxTargetChannel === 0 ? "#121214" : "#D0D0D0" }
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: (stateManager && stateManager.isStreamerX) ? "Micrófono" : "Mic 1"
+                                            font.pixelSize: 11
+                                            font.bold: root.fxTargetChannel === 0
+                                            color: root.fxTargetChannel === 0 ? "#121214" : "#D0D0D0"
+                                        }
                                         MouseArea {
                                             anchors.fill: parent
                                             cursorShape: Qt.PointingHandCursor
@@ -623,9 +631,18 @@ Item {
                                         }
                                     }
                                     Rectangle {
-                                        width: 76; height: 32; radius: 6
+                                        visible: !(stateManager && stateManager.isStreamerX)
+                                        width: 76
+                                        height: 32
+                                        radius: 6
                                         color: root.fxTargetChannel === 1 ? "#CBA158" : "#28282E"
-                                        Text { anchors.centerIn: parent; text: "Mic 2"; font.pixelSize: 11; font.bold: root.fxTargetChannel === 1; color: root.fxTargetChannel === 1 ? "#121214" : "#D0D0D0" }
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: "Mic 2"
+                                            font.pixelSize: 11
+                                            font.bold: root.fxTargetChannel === 1
+                                            color: root.fxTargetChannel === 1 ? "#121214" : "#D0D0D0"
+                                        }
                                         MouseArea {
                                             anchors.fill: parent
                                             cursorShape: Qt.PointingHandCursor
@@ -708,17 +725,34 @@ Item {
 
                                     Text { text: modelData.icon; font.pixelSize: 22 }
                                     ColumnLayout {
+                                        Layout.fillWidth: true
                                         spacing: 2
                                         Text { text: modelData.name; font.pixelSize: 13; font.bold: true; color: "#FFFFFF" }
-                                        Text { text: modelData.desc; font.pixelSize: 10; color: "#8E8E93" }
+                                        Text {
+                                            text: modelData.desc
+                                            font.pixelSize: 10
+                                            color: "#8E8E93"
+                                            elide: Text.ElideRight
+                                            Layout.fillWidth: true
+                                        }
                                     }
-                                    Item { Layout.fillWidth: true }
-                                    Text {
+                                    Rectangle {
                                         visible: root.selectedPad && root.selectedPad.fx_id === modelData.id && root.selectedPad.type === "fx"
-                                        text: "✓ Asignado"
-                                        font.pixelSize: 11
-                                        font.bold: true
-                                        color: "#CBA158"
+                                        implicitWidth: asigText.implicitWidth + 12
+                                        implicitHeight: 22
+                                        radius: 4
+                                        color: "#352A18"
+                                        border.color: "#CBA158"
+                                        border.width: 1
+
+                                        Text {
+                                            id: asigText
+                                            anchors.centerIn: parent
+                                            text: "✓ Asignado"
+                                            font.pixelSize: 10
+                                            font.bold: true
+                                            color: "#CBA158"
+                                        }
                                     }
                                 }
 
@@ -928,10 +962,75 @@ Item {
 
                 Item { height: 6 }
 
-                // The Pad Matrix (Duo 2x3, Pro II 2x4)
+                // The Pad Matrix (Duo 2x3, Pro II 2x4, Streamer X 2x2)
                 PadGrid {
                     Layout.alignment: Qt.AlignHCenter
                 }
+
+                // Bank Navigation (< Banco 4 de 8 >) grouped directly below pads
+                RowLayout {
+                    Layout.alignment: Qt.AlignHCenter
+                    spacing: 16
+
+                    Rectangle {
+                        width: 28
+                        height: 28
+                        radius: 14
+                        color: prevArea.containsMouse ? "#2E2E34" : "#202024"
+                        border.color: "#303038"
+                        border.width: 1
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: "‹"
+                            font.pixelSize: 22
+                            font.bold: true
+                            color: prevArea.containsMouse ? "#FFFFFF" : "#8E8E93"
+                        }
+
+                        MouseArea {
+                            id: prevArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: stateManager.prevBank()
+                        }
+                    }
+
+                    Text {
+                        text: (stateManager ? stateManager.strings.bank : "Banco") + " " + (stateManager ? stateManager.currentBankDisplay : 1) + " " + (stateManager ? stateManager.strings.of : "de") + " 8"
+                        font.pixelSize: 12
+                        font.bold: true
+                        color: "#E0E0E0"
+                    }
+
+                    Rectangle {
+                        width: 28
+                        height: 28
+                        radius: 14
+                        color: nextArea.containsMouse ? "#2E2E34" : "#202024"
+                        border.color: "#303038"
+                        border.width: 1
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: "›"
+                            font.pixelSize: 22
+                            font.bold: true
+                            color: nextArea.containsMouse ? "#FFFFFF" : "#8E8E93"
+                        }
+
+                        MouseArea {
+                            id: nextArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: stateManager.nextBank()
+                        }
+                    }
+                }
+
+                Item { height: 4 }
 
                 // Test / Trigger Button
                 Button {
@@ -961,65 +1060,6 @@ Item {
                 }
 
                 Item { Layout.fillHeight: true }
-
-                // Bank Navigation (< 4 >)
-                RowLayout {
-                    Layout.alignment: Qt.AlignHCenter
-                    spacing: 18
-
-                    Rectangle {
-                        width: 32
-                        height: 32
-                        radius: 16
-                        color: prevArea.containsMouse ? "#2E2E34" : "transparent"
-
-                        Text {
-                            anchors.centerIn: parent
-                            text: "‹"
-                            font.pixelSize: 26
-                            font.bold: true
-                            color: prevArea.containsMouse ? "#FFFFFF" : "#8E8E93"
-                        }
-
-                        MouseArea {
-                            id: prevArea
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: stateManager.prevBank()
-                        }
-                    }
-
-                    Text {
-                        text: (stateManager ? stateManager.strings.bank : "Banco") + " " + (stateManager ? stateManager.currentBankDisplay : 1) + " " + (stateManager ? stateManager.strings.of : "de") + " 8"
-                        font.pixelSize: 13
-                        font.bold: true
-                        color: "#E0E0E0"
-                    }
-
-                    Rectangle {
-                        width: 32
-                        height: 32
-                        radius: 16
-                        color: nextArea.containsMouse ? "#2E2E34" : "transparent"
-
-                        Text {
-                            anchors.centerIn: parent
-                            text: "›"
-                            font.pixelSize: 26
-                            font.bold: true
-                            color: nextArea.containsMouse ? "#FFFFFF" : "#8E8E93"
-                        }
-
-                        MouseArea {
-                            id: nextArea
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: stateManager.nextBank()
-                        }
-                    }
-                }
             }
         }
     }

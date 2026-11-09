@@ -325,7 +325,7 @@ Item {
                     onClicked: {
                         if (stateManager) {
                             if (stateManager.isStreamerX) {
-                                stateManager.navigateTo("config");
+                                stateManager.navigateTo("device_config");
                             } else {
                                 stateManager.navigateTo("recordings");
                             }

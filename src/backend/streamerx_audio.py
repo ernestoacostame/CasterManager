@@ -18,9 +18,39 @@ logger = logging.getLogger("CasterManager.streamerx_audio")
 PIPEWIRE_CONF_DIR = os.path.expanduser("~/.config/pipewire/pipewire.conf.d")
 STREAMERX_CONF_PATH = os.path.join(PIPEWIRE_CONF_DIR, "99-streamerx-unify.conf")
 
+ASOUNDRC_PATH = os.path.expanduser("~/.asoundrc")
+ASOUND_UNIFY_BLOCK = """# --- RODE UNIFY START ---
+pcm.StreamerX_Game {
+    type pulse
+    device "streamerx_game"
+    hint { show on description "RØDE Streamer X - Game (UNIFY)" }
+}
+pcm.StreamerX_Chat {
+    type pulse
+    device "streamerx_chat"
+    hint { show on description "RØDE Streamer X - Chat (UNIFY)" }
+}
+pcm.StreamerX_Music {
+    type pulse
+    device "streamerx_music"
+    hint { show on description "RØDE Streamer X - Music (UNIFY)" }
+}
+pcm.StreamerX_System {
+    type pulse
+    device "streamerx_system"
+    hint { show on description "RØDE Streamer X - System (UNIFY)" }
+}
+pcm.StreamerX_StreamMix {
+    type pulse
+    device "streamerx_stream_mix"
+    hint { show on description "RØDE Streamer X - Stream Mix (UNIFY OBS/DAW)" }
+}
+# --- RODE UNIFY END ---
+"""
+
 class StreamerXAudioRouter:
     """
-    Manages PipeWire routing and virtual audio sinks for RØDE Streamer X.
+    Manages PipeWire and ALSA routing and virtual audio sinks for RØDE Streamer X.
     """
 
     @staticmethod
@@ -72,9 +102,10 @@ context.modules = [
     {{
         name = libpipewire-module-loopback
         args = {{
-            node.description = "Streamer X - Game"
+            node.description = "Streamer X - Game (UNIFY)"
             capture.props = {{
                 node.name = "streamerx_game"
+                node.description = "Streamer X - Game (UNIFY)"
                 media.class = "Audio/Sink"
                 audio.position = [ FL FR ]
             }}
@@ -90,9 +121,10 @@ context.modules = [
     {{
         name = libpipewire-module-loopback
         args = {{
-            node.description = "Streamer X - Chat"
+            node.description = "Streamer X - Chat (UNIFY)"
             capture.props = {{
                 node.name = "streamerx_chat"
+                node.description = "Streamer X - Chat (UNIFY)"
                 media.class = "Audio/Sink"
                 audio.position = [ FL FR ]
             }}
@@ -108,9 +140,10 @@ context.modules = [
     {{
         name = libpipewire-module-loopback
         args = {{
-            node.description = "Streamer X - Music"
+            node.description = "Streamer X - Music (UNIFY)"
             capture.props = {{
                 node.name = "streamerx_music"
+                node.description = "Streamer X - Music (UNIFY)"
                 media.class = "Audio/Sink"
                 audio.position = [ FL FR ]
             }}
@@ -126,9 +159,10 @@ context.modules = [
     {{
         name = libpipewire-module-loopback
         args = {{
-            node.description = "Streamer X - System"
+            node.description = "Streamer X - System (UNIFY)"
             capture.props = {{
                 node.name = "streamerx_system"
+                node.description = "Streamer X - System (UNIFY)"
                 media.class = "Audio/Sink"
                 audio.position = [ FL FR ]
             }}
@@ -140,11 +174,11 @@ context.modules = [
         }}
     }}
 
-    # 5. Virtual Source: Stream Mix (Broadcast submix for OBS Studio)
+    # 5. Virtual Source: Stream Mix (Broadcast submix for OBS Studio and DAWs)
     {{
         name = libpipewire-module-loopback
         args = {{
-            node.description = "Streamer X - Stream Mix (OBS Broadcast)"
+            node.description = "Streamer X - Stream Mix (UNIFY OBS/DAW)"
             capture.props = {{
                 node.name = "streamerx_stream_mix_in"
                 audio.position = [ FL FR ]
@@ -152,6 +186,7 @@ context.modules = [
             }}
             playback.props = {{
                 node.name = "streamerx_stream_mix"
+                node.description = "Streamer X - Stream Mix (UNIFY OBS/DAW)"
                 media.class = "Audio/Source"
                 audio.position = [ FL FR ]
             }}
@@ -163,20 +198,35 @@ context.modules = [
 
     @classmethod
     def install_unify_profile(cls) -> bool:
-        """Installs the PipeWire configuration and optionally reloads user service."""
+        """Installs the PipeWire and ALSA configurations and reloads user services."""
         try:
             nodes = cls.get_streamer_x_nodes()
             hw_sink = nodes.get("sink") or "alsa_output.usb-RODE_Streamer_X_HT0004996-00.analog-stereo"
             hw_source = nodes.get("source") or "alsa_input.usb-RODE_Streamer_X_HT0004996-00.analog-stereo"
 
+            # 1. PipeWire configuration
             os.makedirs(PIPEWIRE_CONF_DIR, exist_ok=True)
             content = cls.generate_pipewire_config(hw_sink, hw_source)
             with open(STREAMERX_CONF_PATH, "w", encoding="utf-8") as f:
                 f.write(content)
 
             logger.info(f"Streamer X PipeWire profile written to {STREAMERX_CONF_PATH}")
-            # Restart user PipeWire daemon to activate
-            subprocess.run(["systemctl", "--user", "restart", "pipewire"], check=False)
+
+            # 2. ALSA configuration (~/.asoundrc for DAWs like Reaper, Ardour, Bitwig)
+            try:
+                existing_asound = ""
+                if os.path.isfile(ASOUNDRC_PATH):
+                    with open(ASOUNDRC_PATH, "r", encoding="utf-8") as af:
+                        existing_asound = af.read()
+                if "# --- RODE UNIFY START ---" not in existing_asound:
+                    with open(ASOUNDRC_PATH, "a", encoding="utf-8") as af:
+                        af.write("\n" + ASOUND_UNIFY_BLOCK)
+                    logger.info("Added RØDE UNIFY virtual devices to ~/.asoundrc")
+            except Exception as ae:
+                logger.warning(f"Could not update ~/.asoundrc: {ae}")
+
+            # 3. Reload PipeWire, WirePlumber and PipeWire-Pulse to expose nodes
+            subprocess.run(["systemctl", "--user", "restart", "pipewire", "pipewire-pulse", "wireplumber"], check=False)
             return True
         except Exception as e:
             logger.error(f"Failed to install PipeWire profile: {e}")
@@ -184,12 +234,27 @@ context.modules = [
 
     @classmethod
     def remove_unify_profile(cls) -> bool:
-        """Removes the PipeWire configuration and reloads."""
+        """Removes the PipeWire and ALSA configurations and reloads."""
         try:
             if os.path.exists(STREAMERX_CONF_PATH):
                 os.remove(STREAMERX_CONF_PATH)
                 logger.info(f"Removed {STREAMERX_CONF_PATH}")
-                subprocess.run(["systemctl", "--user", "restart", "pipewire"], check=False)
+
+            # Remove from ~/.asoundrc
+            try:
+                if os.path.isfile(ASOUNDRC_PATH):
+                    with open(ASOUNDRC_PATH, "r", encoding="utf-8") as af:
+                        asound_content = af.read()
+                    if "# --- RODE UNIFY START ---" in asound_content:
+                        import re
+                        cleaned = re.sub(r"# --- RODE UNIFY START ---[\s\S]*?# --- RODE UNIFY END ---\n?", "", asound_content)
+                        with open(ASOUNDRC_PATH, "w", encoding="utf-8") as af:
+                            af.write(cleaned.strip() + "\n" if cleaned.strip() else "")
+                        logger.info("Removed RØDE UNIFY devices from ~/.asoundrc")
+            except Exception as ae:
+                logger.warning(f"Could not clean ~/.asoundrc: {ae}")
+
+            subprocess.run(["systemctl", "--user", "restart", "pipewire", "pipewire-pulse", "wireplumber"], check=False)
             return True
         except Exception as e:
             logger.error(f"Failed to remove PipeWire profile: {e}")
