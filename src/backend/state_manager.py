@@ -529,7 +529,7 @@ DSP_PRESETS = {
     },
     "podcast": {
         "hpf_on": True, "hpf_frequency": 0.35,
-        "noise_gate_on": True, "noise_gate_threshold": 0.25, "noise_gate_range": 0.35,
+        "noise_gate_on": True, "noise_gate_threshold": 0.25, "noise_gate_range": 0.6,
         "noise_gate_attack": 0.5, "noise_gate_release": 0.5, "noise_gate_hold": 0.1,
         "deesser_on": True, "deesser_threshold": 0.65, "deesser_ratio": 0.45,
         "compressor_on": True, "compressor_threshold": 0.7, "compressor_ratio": 0.38, "compressor_gain": 0.15,
