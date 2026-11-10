@@ -1273,6 +1273,7 @@ class StateManager(QObject):
                             "gain": float(p.get("padGain", 0.0)),
                             "file": p.get("padFilePath", ""),
                             "fx_id": int(p.get("padTriggerControl", 8)),
+                            "mixer_mode": int(p.get("padMixerMode", 0)),
                             "fx_channel": int(p.get("padEffectInput", 0)),
                             "fx_mode": int(p.get("padEffectTriggerMode", 1)),
                             "_raw": {k: v for k, v in p.items() if isinstance(v, (int, float, str, bool))}
@@ -1344,6 +1345,19 @@ class StateManager(QObject):
 
                 # The device has no notion of "voice profile": infer it from the real values
                 dsp["active_preset"] = detect_dsp_preset(dsp)
+
+            # Streamer X channel strips are hard-wired (Mic, Headset, Wireless, Pads, USB 1,
+            # USB 2/Chat, HDMI). Older builds could retarget a strip to an unused analog
+            # input (e.g. source 4), which leaks an ungated mic signal into the headphones.
+            if self._is_streamer_x:
+                factory = [0, 1, 2, 11, 7, 8, 9]
+                ch_nodes = [ci for ci, c in enumerate(children) if c.get("name") == "CHANNEL"]
+                for strip, want in zip(ch_nodes, factory):
+                    have = children[strip].get("properties", {}).get("channelInputSource", {}).get("U32")
+                    if have is not None and have != want:
+                        logger.warning(f"Streamer X CHANNEL {strip} had source {have}; restoring factory source {want}")
+                        self.bridge.run_cmd(["set-property", str(strip), "channelInputSource", f"u32:{want}"])
+                        children[strip].setdefault("properties", {})["channelInputSource"] = {"U32": want}
 
             # Map child node indices dynamically
             for child_idx, c in enumerate(children):
@@ -3426,6 +3440,51 @@ class StateManager(QObject):
                 self._send_pad_props(b_str, p_str, props, raw)
             self.executor.submit(do_assign)
         self.toastMessage.emit(f"Efecto '{fx_name}' configurado")
+
+    # PAD.padMixerMode values, in the order the official RØDECaster App lists them
+    # (the factory "Censor" pad reads padType=3 / padMixerMode=0).
+    PAD_MIXER_MODES = {0: "Censor", 1: "Trash Talk", 2: "Fade In/Out", 3: "Back Channel", 4: "Ducking"}
+
+    @pyqtSlot(int)
+    def assignPadMixer(self, mode):
+        """Turn the current pad into a real mixer pad (padType 3) with the given mode."""
+        if mode not in self.PAD_MIXER_MODES:
+            return
+        pad = self._get_current_pad()
+        if not pad:
+            return
+        name = self.PAD_MIXER_MODES[mode]
+        col = {0: 4, 1: 6, 2: 8, 3: 10, 4: 2}.get(mode, 4)
+        pad["type"] = "mixer"
+        pad["name"] = name
+        pad["file"] = ""
+        pad["mixer_mode"] = mode
+        pad["color_idx"] = col
+        pad["color_hex"] = PAD_COLORS[col]["hex"]
+        self.padsChanged.emit()
+        self.selectedPadChanged.emit()
+
+        if self._connected and not self._permission_error:
+            b_str = str(self._current_bank)
+            p_str = str(self._selected_pad_index)
+            raw = pad.setdefault("_raw", {})
+            fade = "f64:3.0" if mode == 2 else "f64:0.0"
+            props = [
+                ("padType", "u32:3"),
+                ("padFilePath", "str:"),
+                ("padName", f"str:{name.replace(' ', '_')}"),
+                ("padColourIndex", f"u32:{col}"),
+                ("padMixerMode", f"u32:{mode}"),
+                # Same trigger settings as the factory Censor pad
+                ("padMixerTriggerMode", "u32:0"),
+                ("padPlayMode", "u32:1"),
+                ("padMixerFadeInSeconds", fade),
+                ("padMixerFadeOutSeconds", fade),
+                ("padActive", "bool:false"),
+            ]
+            self.executor.submit(self._send_pad_props, b_str, p_str, props, raw)
+        self.toastMessage.emit((f"Mixer pad '{name}' configured" if self._language == "en"
+                                else f"Pad de mezclador '{name}' configurado"))
 
     @pyqtSlot(str)
     def updatePadType(self, ptype):

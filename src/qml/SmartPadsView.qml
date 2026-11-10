@@ -826,10 +826,12 @@ Item {
                     visible: root.activeCategory === 2
 
                     Repeater {
+                        // mode = PAD.padMixerMode (Back Channel needs a per-channel picker, not offered yet)
                         model: [
-                            {"name": "Censor Bleep", "desc": (stateManager && stateManager.language === "en" ? "Plays a 1 kHz bleep tone and mutes selected microphones" : "Emite un pitido de censura de 1 kHz y silencia los micrófonos seleccionados"), "icon": "🔇"},
-                            {"name": "Trash Talk", "desc": (stateManager && stateManager.language === "en" ? "Mutes microphones to audience while keeping them in headphones" : "Silencia los micrófonos hacia los oyentes pero los mantiene en los auriculares"), "icon": "🗣️"},
-                            {"name": "Ducking", "desc": (stateManager && stateManager.language === "en" ? "Automatically ducks background audio while pad is pressed" : "Atenúa la música de fondo automáticamente mientras este pad está pulsado"), "icon": "📉"}
+                            {"mode": 0, "name": "Censor", "desc": (stateManager && stateManager.language === "en" ? "While pressed, a sound plays and all channels are muted" : "Mientras lo pulsas suena un pitido y se silencian todos los canales"), "icon": "🔇"},
+                            {"mode": 1, "name": "Trash Talk", "desc": (stateManager && stateManager.language === "en" ? "Mutes the audio sent to remote guests, so they can't hear you" : "Silencia el audio que se envía a los invitados remotos para que no te escuchen"), "icon": "🗣️"},
+                            {"mode": 2, "name": "Fade In/Out", "desc": (stateManager && stateManager.language === "en" ? "Fades all channels out; pressing again fades them back in" : "Funde todos los canales a silencio; al pulsarlo otra vez vuelven a entrar"), "icon": "🌗"},
+                            {"mode": 4, "name": "Ducking", "desc": (stateManager && stateManager.language === "en" ? "While active, other channels drop whenever the microphone picks up sound" : "Mientras está activo, baja los demás canales cada vez que el micrófono capta sonido"), "icon": "📉"}
                         ]
 
                         Rectangle {
@@ -860,7 +862,7 @@ Item {
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
                                 onClicked: {
-                                    if (stateManager) stateManager.updatePadName(modelData.name);
+                                    if (stateManager) stateManager.assignPadMixer(modelData.mode);
                                 }
                             }
                         }
@@ -895,8 +897,8 @@ Item {
                                     }
                                     Text {
                                         text: stateManager && stateManager.language === "en"
-                                              ? "How much the rest of the audio drops while a Ducking pad is held. Off = no attenuation."
-                                              : "Cuánto baja el resto del audio mientras mantienes un pad de Ducking. Desactivado = sin atenuación."
+                                              ? "How much the other channels drop when a Ducking pad is active and the microphone picks up sound. Off = no attenuation."
+                                              : "Cuánto bajan los demás canales cuando un pad de Ducking está activo y el micrófono capta sonido. Desactivado = sin atenuación."
                                         font.pixelSize: 11; color: "#9A9A9E"; wrapMode: Text.WordWrap; Layout.fillWidth: true
                                     }
                                 }
