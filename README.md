@@ -30,7 +30,7 @@
 
 ## Overview
 
-**CasterManager** is a native, modern, and comprehensive Linux desktop suite created for the **RØDECaster Duo** and **RØDECaster Pro II** audio production consoles. Built on Qt 6 (PyQt6 + QML) with a high-performance Rust protocol bridge (`rcp2-cli`), it delivers a complete management interface matching and extending official desktop utilities: live fader mixing, input routing, SMART Pads customization (sounds & hardware Voice FX), MicroSD recording transfers, and device configuration.
+**CasterManager** is a native, modern, and comprehensive Linux desktop suite created for the **RØDECaster Duo**, **RØDECaster Pro II** and **RØDE Streamer X** audio production devices. Built on Qt 6 (PyQt6 + QML) with a high-performance Rust protocol bridge (`rcp2-cli`), it delivers a complete management interface matching and extending official desktop utilities: live fader mixing, input routing, per-channel audio processing (APHEX®, compressor, gate, EQ, VoxLab), SMART Pads customization (sounds & hardware Voice FX), MicroSD recording transfers, and device configuration. Several RØDE devices can be connected at the same time and switched from the sidebar.
 
 ---
 
@@ -51,6 +51,25 @@
   - SMART Pads audio stream
   - TRRS Headset microphone
 
+### ✨ Audio Processing (DSP, APHEX® & VoxLab)
+- **Signal Chain Strip:** Preamp gain, +48V phantom power and phase flip per input.
+- **Full Channel Strip:** High-pass filter, Noise Gate, De-esser, 3-band EQ and Compressor, read from and written to the device in real time.
+- **APHEX® Processing:** Aural Exciter (mix & tune) and Big Bottom (drive & tune).
+- **VoxLab Mode:** Simplified *Depth / Sparkle / Punch* controls plus voice presets; the active voice profile is inferred from the real values stored on the device.
+
+### 📺 RØDE Streamer X Support
+- **Hardware sync:** The input dial cycles Mic/Line → Headset → Wireless and moves the matching fader in the app (Mic/Line 0–76 dB, Headset 0–40 dB).
+- **Physical Mic Mute button** (`emergencyMuteActive`) mirrored bi-directionally with the on-screen MUTE.
+- **Clean UI:** Only the controls the Streamer X really has are shown (no LISTEN/Solo, no headphone submix selector). The headphone dial is an autonomous hardware control and is left to the device.
+- **Recording-friendly stream mix:** The USB 1 loopback is cut from the capture mix so PC audio no longer leaks into your microphone track in a DAW.
+- **UNIFY-style virtual devices for PipeWire:** Game, Chat, Music, System and Stream Mix sinks/sources, so each source can be recorded on its own track (e.g. in a DAW: Voice from `Streamer X Analog Stereo`, music from `UNIFY-Music`, jingles from `UNIFY-Game`).
+- **4 SMART Pads per bank** with sounds and Voice FX.
+
+### 🔀 Multiple Devices
+- Connect a RØDECaster and a Streamer X simultaneously and switch between them from the sidebar.
+- Each device keeps its own node layout, faders, DSP and pads; queued writes and in-flight syncs from the previous device are discarded on switch.
+- A device without USB permission no longer blocks the one you are controlling.
+
 ### 🎛️ SMART Pads Customizer (Sounds & Voice FX)
 - **Interactive Matrix View:** 2x3 (Duo) and 2x4 (Pro II) grid layouts across all 8 banks (up to 48 / 64 total pads).
 - **Sound Playback Management:**
@@ -66,7 +85,7 @@
 
 ### 🎙️ MicroSD Recording Management & USB Transfer
 - **Real-Time Storage Monitoring:** Displays MicroSD capacity, used space, and free space (supports 32 GB, 64 GB, 128 GB, 256 GB+ cards).
-- **One-Click USB Mass Storage Mode:** Automatically switches the console to transfer mode and mounts the MicroSD partition (`/dev/sdX1`) in Linux.
+- **One-Click USB Mass Storage Mode:** Automatically switches the console to transfer mode and mounts the MicroSD partition in Linux. Only partitions that physically belong to a RØDE USB device are mounted/unmounted — your own drives are never touched.
 - **Podcast Take Browser:** Parses `Meta.xml` metadata for recorded episodes, showing take name, date, time, duration, channel format (Stereo Mix vs. 24-bit Multichannel), and file size.
 - **Quick Folder Access:** Open any take folder directly in your default file manager (Dolphin, Nautilus, Nemo, Thunar) with one click.
 - **Quick Eject (`⏏`):** Safely unmounts the card and returns the console to live audio mode.
@@ -147,6 +166,12 @@ Launch CasterManager from your application menu or start it from terminal:
 | :--- | :---: | :---: | :---: | :---: |
 | **RØDECaster Duo** | Yes | 4 Faders, 2 Pots | 2 Software Faders | 6 per bank (2x3) |
 | **RØDECaster Pro II** | Yes | 6 Faders, 4 Pots | 3 Software Faders | 8 per bank (2x4) |
+| **RØDE Streamer X** | Yes | Input dial, Headphone dial, Mic Mute | Stream mix levels | 4 per bank (2x2) |
+
+### Known Limitations
+- The independent headphone **submix** is applied to the hardware only on the Streamer X path; on Duo/Pro II it is currently kept in the app.
+- The SMART Pads **MIDI** tab and Reverb/Echo pad effects are not yet written to the hardware.
+- The Streamer X headphone dial is not reported by the firmware, so it is not shown in the app.
 
 ---
 
@@ -233,7 +258,7 @@ This project is licensed under the [MIT License](LICENSE).
 
 ## Descripción
 
-**CasterManager** es una suite de escritorio nativa, moderna y completa para Linux, diseñada para las consolas de producción de audio **RØDECaster Duo** y **RØDECaster Pro II**. Construida con Qt 6 (PyQt6 + QML) y respaldada por un puente de protocolo en Rust (`rcp2-cli`), proporciona una suite completa equivalente y superior a las herramientas de escritorio oficiales: mezclador de faders en vivo, matriz de enrutamiento, personalización de SMART Pads (sonidos y efectos de voz por hardware), transferencia de tomas grabadas en la MicroSD y configuración general del hardware.
+**CasterManager** es una suite de escritorio nativa, moderna y completa para Linux, diseñada para los dispositivos de producción de audio **RØDECaster Duo**, **RØDECaster Pro II** y **RØDE Streamer X**. Construida con Qt 6 (PyQt6 + QML) y respaldada por un puente de protocolo en Rust (`rcp2-cli`), proporciona una suite completa equivalente y superior a las herramientas de escritorio oficiales: mezclador de faders en vivo, matriz de enrutamiento, procesamiento de audio por canal (APHEX®, compresor, puerta de ruido, EQ, VoxLab), personalización de SMART Pads (sonidos y efectos de voz por hardware), transferencia de tomas grabadas en la MicroSD y configuración general del hardware. Puedes conectar varios dispositivos RØDE a la vez y cambiar entre ellos desde la barra lateral.
 
 ---
 
@@ -254,6 +279,25 @@ This project is licensed under the [MIT License](LICENSE).
   - Reproductor interno de SMART Pads
   - Micrófono de auriculares Headset TRRS
 
+### ✨ Procesamiento de Audio (DSP, APHEX® y VoxLab)
+- **Cadena de Señal:** Ganancia de preamplificador, alimentación Phantom +48V e inversión de fase por entrada.
+- **Tira de Canal Completa:** Filtro paso alto, Puerta de Ruido, De-esser, EQ de 3 bandas y Compresor, leídos y escritos en el dispositivo en tiempo real.
+- **Procesamiento APHEX®:** Aural Exciter (mezcla y sintonía) y Big Bottom (drive y sintonía).
+- **Modo VoxLab:** Controles simplificados *Profundidad / Brillo / Pegada* y presets de voz; el perfil activo se deduce de los valores reales guardados en el dispositivo.
+
+### 📺 Soporte para RØDE Streamer X
+- **Sincronización con el hardware:** El dial de entrada alterna Mic/Línea → Headset → Inalámbrico y mueve el fader correspondiente en la app (Mic/Línea 0–76 dB, Headset 0–40 dB).
+- **Botón físico de Mute del micrófono** (`emergencyMuteActive`) sincronizado en ambos sentidos con el MUTE en pantalla.
+- **Interfaz limpia:** Solo se muestran los controles que la Streamer X tiene (sin LISTEN/Solo ni selector de submezcla). El dial de auriculares es un control autónomo del hardware.
+- **Mezcla de captura apta para grabar:** Se corta el retorno de USB 1 en la mezcla de captura, así el audio del PC ya no se cuela en la pista del micrófono en tu DAW.
+- **Dispositivos virtuales estilo UNIFY para PipeWire:** Game, Chat, Music, System y Stream Mix, para grabar cada fuente en su propia pista (p. ej. en un DAW: Voz desde `Streamer X Analog Stereo`, música desde `UNIFY-Music`, jingles desde `UNIFY-Game`).
+- **4 SMART Pads por banco** con sonidos y efectos de voz.
+
+### 🔀 Varios Dispositivos a la Vez
+- Conecta una RØDECaster y una Streamer X simultáneamente y cambia entre ellas desde la barra lateral.
+- Cada dispositivo conserva su propio mapa de nodos, faders, DSP y pads; al cambiar se descartan las escrituras pendientes y las sincronizaciones en curso del dispositivo anterior.
+- Un dispositivo sin permisos USB ya no bloquea al que estás controlando.
+
 ### 🎛️ Gestor de SMART Pads (Sonidos y Efectos de Voz FX)
 - **Matriz Visual Interactiva:** Diseños 2x3 (Duo) y 2x4 (Pro II) en los 8 bancos (hasta 48 o 64 pads en total).
 - **Gestión de Pistas de Audio:**
@@ -269,7 +313,7 @@ This project is licensed under the [MIT License](LICENSE).
 
 ### 🎙️ Gestor de Grabaciones en MicroSD y Modo Transferencia USB
 - **Monitoreo de Almacenamiento en Tiempo Real:** Detección de tarjetas MicroSD (32 GB, 64 GB, 128 GB, 256 GB+), espacio usado y porcentaje disponible.
-- **Modo Transferencia de un Clic:** Pone la consola en modo de transferencia USB y monta automáticamente la partición exFAT de la MicroSD (`/dev/sdX1`) en el sistema Linux.
+- **Modo Transferencia de un Clic:** Pone la consola en modo de transferencia USB y monta automáticamente la partición exFAT de la MicroSD en el sistema Linux. Solo se montan/desmontan particiones que pertenecen físicamente a un dispositivo USB de RØDE: tus discos nunca se tocan.
 - **Explorador de Tomas Grabadas:** Lee el archivo `Meta.xml` de cada grabación y muestra el nombre del podcast, fecha, hora, duración exacta, formato (Estéreo o Multicanal de 24 bits) y tamaño en disco.
 - **Acceso Directo a Archivos:** Botón para abrir la carpeta de la grabación directamente en tu gestor de archivos favorito (Dolphin, Nautilus, Nemo, Thunar).
 - **Botón de Expulsión Rápida (`⏏`):** Desmonta la tarjeta y devuelve la consola al modo normal con un solo clic desde la barra lateral.
@@ -350,6 +394,12 @@ Puedes abrir CasterManager desde el menú de aplicaciones de tu entorno (KDE Pla
 | :--- | :---: | :---: | :---: | :---: |
 | **RØDECaster Duo** | Sí | 4 Faders, 2 Pots | 2 Faders Virtuales | 6 por banco (2x3) |
 | **RØDECaster Pro II** | Sí | 6 Faders, 4 Pots | 3 Faders Virtuales | 8 por banco (2x4) |
+| **RØDE Streamer X** | Sí | Dial de entrada, dial de auriculares, Mute de micro | Niveles de Stream Mix | 4 por banco (2x2) |
+
+### Limitaciones Conocidas
+- La **submezcla** independiente de auriculares solo se aplica al hardware en la Streamer X; en Duo/Pro II por ahora se mantiene en la app.
+- La pestaña **MIDI** de los SMART Pads y los efectos Reverb/Echo aún no se escriben en el hardware.
+- El firmware de la Streamer X no informa del dial de auriculares, por eso no se muestra en la app.
 
 ---
 

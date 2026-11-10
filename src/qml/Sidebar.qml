@@ -247,7 +247,7 @@ Rectangle {
                                         if (stateManager.hasMicroSD) {
                                             stateManager.navigateTo("recordings");
                                         } else {
-                                            stateManager.toastMessage.emit(stateManager.strings.no_microsd_title || "No hay tarjeta MicroSD instalada");
+                                            stateManager.toastMessage(stateManager.strings.no_microsd_title || "No hay tarjeta MicroSD instalada");
                                         }
                                     }
                                 }
@@ -376,7 +376,7 @@ Rectangle {
                             if (sdCardEntry.hasCard) {
                                 stateManager.navigateTo("recordings");
                             } else {
-                                stateManager.toastMessage.emit(stateManager.strings.no_microsd_title || "No hay tarjeta MicroSD instalada");
+                                stateManager.toastMessage(stateManager.strings.no_microsd_title || "No hay tarjeta MicroSD instalada");
                             }
                         }
                     }

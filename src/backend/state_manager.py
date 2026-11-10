@@ -615,6 +615,8 @@ class StateManager(QObject):
         self._fader_timer.setInterval(120)
         self._fader_timer.timeout.connect(self._flush_faders_hardware)
         self._pending_fader_levels = {}
+        self._poll_in_flight = False
+        self._device_generation = 0
 
         # Faders state
         self._faders = self._init_default_faders()
@@ -789,8 +791,9 @@ class StateManager(QObject):
         target_dev = device_list[self._selected_device_index]
         if (self._connected and 
             self._model_type == target_dev.get("model_type") and 
-            self._serial == target_dev.get("serial") and 
-            self.bridge.target_pid == target_dev.get("product_id")):
+            self.bridge.target_serial == target_dev.get("serial") and 
+            self.bridge.target_pid == target_dev.get("product_id") and
+            self._permission_error == (not target_dev.get("has_permission", False))):
             self.devicesChanged.emit()
             return
 
@@ -836,6 +839,17 @@ class StateManager(QObject):
         self._faders = self._init_default_faders()
         self._dsp_channels = self._init_default_dsp_channels()
         self._active_dsp_channel = 0
+        # Never carry queued writes from the previous device over to the new one
+        self._device_generation += 1
+        self._pending_fader_levels.clear()
+        self._pending_dsp_updates.clear()
+        self._copied_pad = None
+        if self._selected_pad_index >= self._pads_per_bank:
+            self._selected_pad_index = 0
+        # Streamer X has no headphone submix: the selector is hidden, so force the main mix
+        if self._is_streamer_x and self._active_mix_target != "main":
+            self._active_mix_target = "main"
+            self.activeMixTargetChanged.emit()
 
         self.stateChanged.emit()
         self.padsChanged.emit()
@@ -866,6 +880,13 @@ class StateManager(QObject):
         self.stateChanged.emit()
 
     def _on_permission_issue(self, hidpath):
+        # Only the active device's permission matters: a second unit without access
+        # must not block writes to the one currently selected.
+        active_dev = None
+        if 0 <= self._selected_device_index < len(self._devices):
+            active_dev = self._devices[self._selected_device_index]
+        if active_dev and active_dev.get("hidraw_node") and active_dev.get("hidraw_node") != hidpath:
+            return
         self._permission_error = True
         self._permission_path = hidpath
         self.stateChanged.emit()
@@ -894,9 +915,15 @@ class StateManager(QObject):
     def _sync_hardware_state_once(self):
         try:
             # 1. Query device full dump
+            gen = self._device_generation
             dump = self.bridge.dump_state()
             if not dump:
                 logger.warning("Could not dump hardware state")
+                return
+            if gen != self._device_generation:
+                # Active device changed while dumping: this tree may belong to the old unit
+                logger.info("Active device changed during sync, discarding stale dump")
+                self._resync_requested = True
                 return
 
             def find_node(node, name):
@@ -1080,7 +1107,6 @@ class StateManager(QObject):
             else:
                 fout, _ = self.bridge.run_cmd(["fader", "list", "--json"])
                 if fout:
-                    import json
                     try:
                         f_list = json.loads(fout)
                         for item in f_list:
@@ -1292,7 +1318,7 @@ class StateManager(QObject):
                 self._apply_device_config(self._devices[index])
                 if getattr(self, "_is_streamer_x", False) and self._current_view == "recordings":
                     self._current_view = "home"
-                    self.currentViewChanged.emit()
+                    self.viewChanged.emit()
                 self.devicesChanged.emit()
                 self.toastMessage.emit(f"Cambiado a {self._devices[index].get('display_name', 'RØDECaster')}")
 
@@ -1822,10 +1848,12 @@ class StateManager(QObject):
         self.transferStateChanged.emit()
 
         if self._connected and not self._permission_error:
+            exp_bank, exp_pad = str(self._current_bank), str(self._selected_pad_index)
+
             def do_export():
                 try:
                     out, err = self.bridge.run_cmd(
-                        ["pad", "export", str(self._current_bank), str(self._selected_pad_index), clean_path],
+                        ["pad", "export", exp_bank, exp_pad, clean_path],
                         timeout=90
                     )
                     if err:
@@ -2019,6 +2047,8 @@ class StateManager(QObject):
                                 pad["file"] = p_data.get("file", "")
                                 if "fx_name" in p_data:
                                     pad["fx_name"] = p_data["fx_name"]
+                                if "fx_id" in p_data:
+                                    pad["fx_id"] = p_data["fx_id"]
                                 if "fx_channel" in p_data:
                                     pad["fx_channel"] = p_data["fx_channel"]
                                 if "fx_mode" in p_data:
@@ -2030,14 +2060,21 @@ class StateManager(QObject):
 
                 # Sync hardware pads if connected
                 if self._connected and not self._permission_error:
+                    order = STREAMER_X_PHYSICAL_ORDER if self._is_streamer_x else (DUO_PHYSICAL_ORDER if self._is_duo else PRO_II_PHYSICAL_ORDER)
+                    # Snapshot now: the closure must not read state that may change before it runs
+                    snapshot = [[dict(p) for p in bank] for bank in self._banks[:8]]
+
                     def do_sync_pads():
-                        for b in range(min(len(self._banks), 8)):
-                            for p in range(len(self._banks[b])):
-                                cur = self._banks[b][p]
+                        for b, bank in enumerate(snapshot):
+                            for p, cur in enumerate(bank):
+                                # Writing to an empty slot creates a PAD node: only touch real pads
+                                if not cur.get("name") and cur.get("type", "empty") == "empty":
+                                    continue
+                                disp = order.index(p) if p in order else p
                                 if cur.get("name"):
-                                    self.bridge.run_cmd(["pad", "set-prop", str(b), str(p), "padName", f"str:{cur['name']}"])
+                                    self.bridge.run_cmd(["pad", "set-prop", str(b), str(disp), "padName", f"str:{cur['name']}"])
                                 if "color_idx" in cur:
-                                    self.bridge.run_cmd(["pad", "set-prop", str(b), str(p), "padColourIndex", f"u32:{cur['color_idx']}"])
+                                    self.bridge.run_cmd(["pad", "set-prop", str(b), str(disp), "padColourIndex", f"u32:{cur['color_idx']}"])
                     self.executor.submit(do_sync_pads)
 
             # 3. Update Faders
@@ -2311,16 +2348,36 @@ class StateManager(QObject):
                     else:
                         self.toastMessage.emit(f"Error al procesar con ffmpeg: {res.stderr.decode()[:60]}")
                 else:
-                    # Simulated mock file export
-                    import time
-                    time.sleep(1)
-                    filename = os.path.basename(clean_dest)
-                    self.toastMessage.emit(f"¡Grabación exportada con éxito como {filename}!")
+                    self.toastMessage.emit("No se encontró el archivo de la grabación" if self._language == "es" else "Recording file not found")
             except Exception as e:
                 logger.error(f"Error exporting recording: {e}")
                 self.toastMessage.emit(f"Error al exportar: {e}")
 
         self.executor.submit(do_export)
+
+    @staticmethod
+    def _find_rode_partitions():
+        """Block partitions whose USB ancestor is a RØDE device (vendor 19f7).
+
+        Never touch arbitrary /dev/sdX nodes: they may be the user's own drives."""
+        parts = []
+        try:
+            for name in sorted(os.listdir("/sys/class/block")):
+                sys_path = os.path.join("/sys/class/block", name)
+                if not os.path.exists(os.path.join(sys_path, "partition")):
+                    continue
+                cur = os.path.realpath(sys_path)
+                while cur and cur != "/":
+                    vid_file = os.path.join(cur, "idVendor")
+                    if os.path.isfile(vid_file):
+                        with open(vid_file) as f:
+                            if f.read().strip().lower() == "19f7":
+                                parts.append(f"/dev/{name}")
+                        break
+                    cur = os.path.dirname(cur)
+        except Exception as e:
+            logger.debug(f"Could not scan block devices: {e}")
+        return parts
 
     @pyqtSlot()
     def enterTransferMode(self):
@@ -2336,7 +2393,14 @@ class StateManager(QObject):
             time.sleep(2)
 
             mount_path = ""
-            for dev in ["/dev/sda1", "/dev/sdb1", "/dev/sdc1"]:
+            # The storage takes a moment to enumerate after switching to transfer mode
+            rode_parts = []
+            for _ in range(10):
+                rode_parts = self._find_rode_partitions()
+                if rode_parts:
+                    break
+                time.sleep(0.5)
+            for dev in rode_parts:
                 if os.path.exists(dev):
                     out = subprocess.run(["udisksctl", "mount", "-b", dev], capture_output=True, text=True)
                     if "Mounted" in out.stdout:
@@ -2368,7 +2432,7 @@ class StateManager(QObject):
 
         def do_exit():
             import subprocess
-            for dev in ["/dev/sda1", "/dev/sdb1", "/dev/sdc1"]:
+            for dev in self._find_rode_partitions():
                 if os.path.exists(dev):
                     subprocess.run(["udisksctl", "unmount", "-b", dev], capture_output=True, text=True)
 
@@ -2489,11 +2553,12 @@ class StateManager(QObject):
                         if index == 0:
                             self.executor.submit(self.bridge.run_cmd, ["set-property", "5", "emergencyMuteActive", f"bool:{str(new_mute).lower()}"])
                             self.executor.submit(self.bridge.run_cmd, ["set-property", "28", "channelOutputMute", f"bool:{str(new_mute).lower()}"])
-                            lvl = 0.0 if new_mute else (self._faders[0].get("level", 70) / 100.0)
+                            # Fader 0 level is the preamp gain, not the stream-mix level: restore the mix to unity
+                            lvl = 0.0 if new_mute else 0.71
                             self.executor.submit(self.bridge.run_cmd, ["set-property", "179", "streammixmixLevel", f"f64:{lvl:.4f}"])
                         elif index == 1:
                             self.executor.submit(self.bridge.run_cmd, ["set-property", "29", "channelOutputMute", f"bool:{str(new_mute).lower()}"])
-                            lvl = 0.0 if new_mute else (self._faders[1].get("level", 70) / 100.0)
+                            lvl = 0.0 if new_mute else 0.71
                             self.executor.submit(self.bridge.run_cmd, ["set-property", "180", "streammixmixLevel", f"f64:{lvl:.4f}"])
                         else:
                             sx_map = {2: 182, 3: 184, 4: 187, 5: 188}
@@ -2816,13 +2881,12 @@ class StateManager(QObject):
                 if changed:
                     self.fadersChanged.emit()
 
-            self.executor.submit(do_poll_streamerx)
+            self._submit_poll(do_poll_streamerx)
             return
 
         def do_poll():
             fout, _ = self.bridge.run_cmd(["fader", "list", "--json"], timeout=2)
             if fout:
-                import json
                 try:
                     f_list = json.loads(fout)
                     changed = False
@@ -2844,14 +2908,33 @@ class StateManager(QObject):
                 except Exception:
                     pass
 
-            rout, _ = self.bridge.run_cmd(["record", "status"], timeout=2)
+            rout, _ = self.bridge.run_cmd(["record", "status", "--json"], timeout=2)
             if rout:
-                rec_now = "RECORDING" in rout.upper()
+                try:
+                    rec_now = json.loads(rout).get("state") == "recording"
+                except Exception:
+                    rec_now = rout.strip().upper().startswith("REC")
                 if rec_now != self._is_recording:
                     self._is_recording = rec_now
                     self.recordingChanged.emit()
 
-        self.executor.submit(do_poll)
+        self._submit_poll(do_poll)
+
+    def _submit_poll(self, fn):
+        """Run a live poll in the executor, skipping the tick if the previous one is still running."""
+        if self._poll_in_flight:
+            return
+        self._poll_in_flight = True
+
+        def wrapper():
+            try:
+                fn()
+            except Exception as e:
+                logger.debug(f"Live poll failed: {e}")
+            finally:
+                self._poll_in_flight = False
+
+        self.executor.submit(wrapper)
 
     @pyqtProperty(int, notify=deviceConfigChanged)
     def headphone1Type(self):
