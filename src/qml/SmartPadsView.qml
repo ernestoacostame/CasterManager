@@ -867,6 +867,39 @@ Item {
                             }
                         }
                     }
+                    // Fade In/Out pad option: exclude the host microphone from the fade
+                    Rectangle {
+                        visible: Boolean(root.selectedPad && root.selectedPad.type === "mixer" && root.selectedPad.mixer_mode === 2)
+                        Layout.fillWidth: true
+                        height: 60
+                        radius: 10
+                        color: "#202024"
+                        border.color: "#2E2E36"
+                        border.width: 1
+                        RowLayout {
+                            anchors.fill: parent
+                            anchors.margins: 14
+                            spacing: 12
+                            Text { text: "🎙️"; font.pixelSize: 20 }
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                spacing: 2
+                                Text {
+                                    text: stateManager && stateManager.language === "en" ? "Exclude microphone from the fade" : "Excluir el micrófono del fundido"
+                                    font.pixelSize: 13; font.bold: true; color: "#FFFFFF"
+                                }
+                                Text {
+                                    text: stateManager && stateManager.language === "en" ? "Your voice stays live while everything else fades out" : "Tu voz sigue sonando mientras todo lo demás se funde a silencio"
+                                    font.pixelSize: 11; color: "#9A9A9E"
+                                }
+                            }
+                            Switch {
+                                checked: Boolean(root.selectedPad && root.selectedPad.fade_exclude_host)
+                                onToggled: if (stateManager) stateManager.setPadFadeExcludeHost(checked)
+                            }
+                        }
+                    }
+
                     // Ducking depth (DUCKER.duckerDepth): how much other audio drops while a Ducking pad is held
                     Rectangle {
                         Layout.fillWidth: true

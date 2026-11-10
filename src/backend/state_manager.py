@@ -1274,6 +1274,7 @@ class StateManager(QObject):
                             "file": p.get("padFilePath", ""),
                             "fx_id": int(p.get("padTriggerControl", 8)),
                             "mixer_mode": int(p.get("padMixerMode", 0)),
+                            "fade_exclude_host": bool(p.get("padMixerFadeExcludeHost", False)),
                             "fx_channel": int(p.get("padEffectInput", 0)),
                             "fx_mode": int(p.get("padEffectTriggerMode", 1)),
                             "_raw": {k: v for k, v in p.items() if isinstance(v, (int, float, str, bool))}
@@ -3480,11 +3481,26 @@ class StateManager(QObject):
                 ("padPlayMode", "u32:1"),
                 ("padMixerFadeInSeconds", fade),
                 ("padMixerFadeOutSeconds", fade),
+                ("padMixerFadeExcludeHost", f"bool:{str(bool(pad.get('fade_exclude_host', False))).lower()}"),
                 ("padActive", "bool:false"),
             ]
             self.executor.submit(self._send_pad_props, b_str, p_str, props, raw)
         self.toastMessage.emit((f"Mixer pad '{name}' configured" if self._language == "en"
                                 else f"Pad de mezclador '{name}' configurado"))
+
+    @pyqtSlot(bool)
+    def setPadFadeExcludeHost(self, exclude):
+        """Fade In/Out pads: keep the host microphone live while everything else fades."""
+        pad = self._get_current_pad()
+        if not pad:
+            return
+        pad["fade_exclude_host"] = bool(exclude)
+        self.padsChanged.emit()
+        self.selectedPadChanged.emit()
+        if self._connected and not self._permission_error:
+            raw = pad.setdefault("_raw", {})
+            self.executor.submit(self._send_pad_props, str(self._current_bank), str(self._selected_pad_index),
+                                 [("padMixerFadeExcludeHost", f"bool:{str(bool(exclude)).lower()}")], raw)
 
     @pyqtSlot(str)
     def updatePadType(self, ptype):
