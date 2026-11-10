@@ -395,8 +395,9 @@ ApplicationWindow {
                         }
                     }
 
-                    // MicroSD Storage Shortcuts if available
+                    // MicroSD Storage Shortcuts if available (Streamer X has no RØDECaster MicroSD workflow)
                     Rectangle {
+                        visible: !(stateManager && stateManager.isStreamerX)
                         Layout.fillWidth: true
                         implicitHeight: 36
                         radius: 6
