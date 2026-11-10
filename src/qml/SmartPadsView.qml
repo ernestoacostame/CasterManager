@@ -594,143 +594,64 @@ Item {
                     spacing: 16
                     visible: root.activeCategory === 1
 
-                    // Target Channel & Trigger Mode Selectors
+                    // Trigger mode + (Duo / Pro II) target microphone
                     Rectangle {
                         Layout.fillWidth: true
-                        implicitHeight: controlsLayout.implicitHeight + 24
+                        implicitHeight: fxCtl.implicitHeight + 24
                         radius: 8
                         color: "#1C1C1F"
                         border.color: "#2C2C32"
 
                         Flow {
-                            id: controlsLayout
+                            id: fxCtl
                             anchors.left: parent.left
                             anchors.right: parent.right
                             anchors.top: parent.top
                             anchors.margins: 12
                             spacing: 24
 
-                            // Target Channel Card / Selector
-                            RowLayout {
-                                spacing: 10
-
-                                Text {
-                                    text: "Canal Destino:"
-                                    font.pixelSize: 12
-                                    font.bold: true
-                                    color: "#FFFFFF"
-                                }
-
-                                Rectangle {
-                                    height: 32
-                                    radius: 6
-                                    color: "#26262C"
-                                    implicitWidth: (stateManager && stateManager.isStreamerX) ? 96 : 140
-
-                                    RowLayout {
-                                        anchors.fill: parent
-                                        anchors.margins: 3
-                                        spacing: 3
-
-                                        Rectangle {
-                                            Layout.fillWidth: true
-                                            Layout.fillHeight: true
-                                            radius: 4
-                                            color: root.fxTargetChannel === 0 ? "#CBA158" : "transparent"
-                                            Text {
-                                                anchors.centerIn: parent
-                                                text: (stateManager && stateManager.isStreamerX) ? (stateManager && stateManager.language === "es" ? "Micrófono" : "Microphone") : "Mic 1"
-                                                font.pixelSize: 11
-                                                font.bold: root.fxTargetChannel === 0
-                                                color: root.fxTargetChannel === 0 ? "#121214" : "#D0D0D0"
-                                            }
-                                            MouseArea {
-                                                anchors.fill: parent
-                                                cursorShape: Qt.PointingHandCursor
-                                                onClicked: root.fxTargetChannel = 0
-                                            }
-                                        }
-
-                                        Rectangle {
-                                            visible: !(stateManager && stateManager.isStreamerX)
-                                            Layout.fillWidth: true
-                                            Layout.fillHeight: true
-                                            radius: 4
-                                            color: root.fxTargetChannel === 1 ? "#CBA158" : "transparent"
-                                            Text {
-                                                anchors.centerIn: parent
-                                                text: "Mic 2"
-                                                font.pixelSize: 11
-                                                font.bold: root.fxTargetChannel === 1
-                                                color: root.fxTargetChannel === 1 ? "#121214" : "#D0D0D0"
-                                            }
-                                            MouseArea {
-                                                anchors.fill: parent
-                                                cursorShape: Qt.PointingHandCursor
-                                                onClicked: root.fxTargetChannel = 1
-                                            }
-                                        }
+                            Repeater {
+                                // One segmented selector per row: trigger mode, and microphone on Duo / Pro II
+                                model: (stateManager && stateManager.isStreamerX) ? ["trigger"] : ["trigger", "input"]
+                                RowLayout {
+                                    readonly property bool isTrigger: modelData === "trigger"
+                                    spacing: 10
+                                    Text {
+                                        text: parent.isTrigger
+                                              ? (stateManager && stateManager.language === "en" ? "Mode:" : "Modo:")
+                                              : (stateManager && stateManager.language === "en" ? "Microphone:" : "Micrófono:")
+                                        font.pixelSize: 12; font.bold: true; color: "#FFFFFF"
                                     }
-                                }
-                            }
-
-                            // Trigger Mode (Latch vs Hold)
-                            RowLayout {
-                                spacing: 10
-
-                                Text {
-                                    text: "Comportamiento:"
-                                    font.pixelSize: 12
-                                    font.bold: true
-                                    color: "#FFFFFF"
-                                }
-
-                                Rectangle {
-                                    height: 32
-                                    radius: 6
-                                    color: "#26262C"
-                                    implicitWidth: 140
-
-                                    RowLayout {
-                                        anchors.fill: parent
-                                        anchors.margins: 3
-                                        spacing: 3
-
-                                        Rectangle {
-                                            Layout.fillWidth: true
-                                            Layout.fillHeight: true
-                                            radius: 4
-                                            color: root.fxTriggerMode === 1 ? "#CBA158" : "transparent"
-                                            Text {
-                                                anchors.centerIn: parent
-                                                text: "Latch"
-                                                font.pixelSize: 11
-                                                font.bold: root.fxTriggerMode === 1
-                                                color: root.fxTriggerMode === 1 ? "#121214" : "#D0D0D0"
-                                            }
-                                            MouseArea {
-                                                anchors.fill: parent
-                                                cursorShape: Qt.PointingHandCursor
-                                                onClicked: root.fxTriggerMode = 1
-                                            }
-                                        }
-
-                                        Rectangle {
-                                            Layout.fillWidth: true
-                                            Layout.fillHeight: true
-                                            radius: 4
-                                            color: root.fxTriggerMode === 0 ? "#CBA158" : "transparent"
-                                            Text {
-                                                anchors.centerIn: parent
-                                                text: "Hold"
-                                                font.pixelSize: 11
-                                                font.bold: root.fxTriggerMode === 0
-                                                color: root.fxTriggerMode === 0 ? "#121214" : "#D0D0D0"
-                                            }
-                                            MouseArea {
-                                                anchors.fill: parent
-                                                cursorShape: Qt.PointingHandCursor
-                                                onClicked: root.fxTriggerMode = 0
+                                    Row {
+                                        spacing: 4
+                                        Repeater {
+                                            model: parent.parent.isTrigger
+                                                ? [{"v": 1, "t": stateManager && stateManager.language === "en" ? "Latching" : "Enclavado"}, {"v": 0, "t": stateManager && stateManager.language === "en" ? "Momentary" : "Momentáneo"}]
+                                                : [{"v": 0, "t": "Mic 1"}, {"v": 1, "t": "Mic 2"}]
+                                            Rectangle {
+                                                readonly property bool trig: parent.parent.isTrigger
+                                                readonly property bool sel: trig ? root.fxTriggerMode === modelData.v : root.fxTargetChannel === modelData.v
+                                                width: segText.implicitWidth + 24
+                                                height: 30
+                                                radius: 6
+                                                color: sel ? "#CBA158" : "#26262C"
+                                                Text {
+                                                    id: segText
+                                                    anchors.centerIn: parent
+                                                    text: modelData.t
+                                                    font.pixelSize: 11
+                                                    font.bold: parent.sel
+                                                    color: parent.sel ? "#121214" : "#D0D0D0"
+                                                }
+                                                MouseArea {
+                                                    anchors.fill: parent
+                                                    cursorShape: Qt.PointingHandCursor
+                                                    onClicked: {
+                                                        if (!stateManager) return;
+                                                        if (parent.trig) stateManager.setPadFxTrigger(modelData.v);
+                                                        else stateManager.setPadFxInput(modelData.v);
+                                                    }
+                                                }
                                             }
                                         }
                                     }
@@ -739,7 +660,17 @@ Item {
                         }
                     }
 
-                    // FX Grid Cards (Native RØDECaster Voice FX Presets)
+                    Text {
+                        Layout.fillWidth: true
+                        wrapMode: Text.WordWrap
+                        font.pixelSize: 11
+                        color: "#8E8E93"
+                        text: stateManager && stateManager.language === "en"
+                              ? "Turn on one or several effects: they all apply together while the pad is active."
+                              : "Activa uno o varios efectos: se aplican todos juntos mientras el pad está activo."
+                    }
+
+                    // Stackable voice effects (PADEFFECTS / EFFECTS_PARAMETERS of this pad)
                     GridLayout {
                         Layout.fillWidth: true
                         columns: 2
@@ -748,68 +679,82 @@ Item {
 
                         Repeater {
                             model: [
-                                {"id": 8, "name": "Voice Disguise", "desc": (stateManager && stateManager.language === "en" ? "Deep anonymous pitch alteration" : "Tono anónimo profundo / Pitch bajo"), "icon": "🎭"},
-                                {"id": 9, "name": "Megaphone", "desc": (stateManager && stateManager.language === "en" ? "Radio and megaphone bandpass filter" : "Filtro paso banda radio / megáfono"), "icon": "📢"},
-                                {"id": 10, "name": "Large Robot", "desc": (stateManager && stateManager.language === "en" ? "Robotic synthesizer vocoder" : "Sintetizador vocoder robótico"), "icon": "🤖"},
-                                {"id": 12, "name": "Pitch Shift", "desc": (stateManager && stateManager.language === "en" ? "High pitch shift (Pitch Up)" : "Transporte tonal agudo (Pitch Up)"), "icon": "🎼"},
-                                {"id": 13, "name": "Monster", "desc": (stateManager && stateManager.language === "en" ? "Dark deep guttural voice" : "Voz gutural oscura y pesada"), "icon": "👹"},
-                                {"id": 14, "name": "Small Robot", "desc": (stateManager && stateManager.language === "en" ? "Synthesized electronic vocoder" : "Vocoder electrónico sintetizado"), "icon": "🦾"}
+                                {"on": "reverbOn", "name": "Reverb", "icon": "🏛️", "params": [
+                                    {"p": "reverbMix", "l": "Level", "lEs": "Nivel", "d": 0.5, "f": 0, "t": 1, "k": "pct"},
+                                    {"p": "reverbModel", "l": "Size", "lEs": "Tamaño", "d": 0.6, "f": 0, "t": 1, "k": "size"}]},
+                                {"on": "echoOn", "name": "Echo", "icon": "🔊", "params": [
+                                    {"p": "echoMix", "l": "Level", "lEs": "Nivel", "d": 0.5, "f": 0, "t": 1, "k": "pct"},
+                                    {"p": "echoDelay", "l": "Delay", "lEs": "Retardo", "d": 0.165, "f": 0, "t": 1, "k": "pct"},
+                                    {"p": "echoDecay", "l": "Decay", "lEs": "Caída", "d": 0.5, "f": 0, "t": 1, "k": "pct"}]},
+                                {"on": "distortionOn", "name": "Megaphone", "icon": "📢", "params": [
+                                    {"p": "distortionIntensity", "l": "Intensity", "lEs": "Intensidad", "d": 0.7, "f": 0, "t": 1, "k": "pct"}]},
+                                {"on": "robotOn", "name": "Robot", "icon": "🤖", "params": []},
+                                {"on": "voiceDisguiseOn", "name": "Voice Disguise", "icon": "🎭", "params": []},
+                                {"on": "pitchShiftOn", "name": "Pitch Shift", "icon": "🎼", "params": [
+                                    {"p": "pitchShiftSemitones", "l": "Semitones", "lEs": "Semitonos", "d": 7, "f": -12, "t": 12, "k": "st"}]}
                             ]
 
                             Rectangle {
+                                id: fxCard
+                                readonly property var fx: (root.selectedPad && root.selectedPad.type === "fx" && root.selectedPad.fx) ? root.selectedPad.fx : ({})
+                                readonly property bool active: Boolean(fx[modelData.on])
+                                readonly property var cardData: modelData
                                 Layout.fillWidth: true
-                                height: 68
+                                Layout.alignment: Qt.AlignTop
+                                implicitHeight: fxCardCol.implicitHeight + 24
                                 radius: 8
-                                color: fxCardArea.containsMouse ? "#2A2A30" : ((root.selectedPad && root.selectedPad.fx_id === modelData.id && root.selectedPad.type === "fx") ? "#2D2820" : "#202024")
-                                border.color: (root.selectedPad && root.selectedPad.fx_id === modelData.id && root.selectedPad.type === "fx") ? "#CBA158" : (fxCardArea.containsMouse ? "#CBA158" : "#2E2E36")
-                                border.width: (root.selectedPad && root.selectedPad.fx_id === modelData.id && root.selectedPad.type === "fx") ? 2 : 1
+                                color: active ? "#2D2820" : "#202024"
+                                border.color: active ? "#CBA158" : "#2E2E36"
+                                border.width: active ? 2 : 1
 
-                                RowLayout {
-                                    anchors.fill: parent
+                                ColumnLayout {
+                                    id: fxCardCol
+                                    anchors.left: parent.left
+                                    anchors.right: parent.right
+                                    anchors.top: parent.top
                                     anchors.margins: 12
-                                    spacing: 12
+                                    spacing: 6
 
-                                    Text { text: modelData.icon; font.pixelSize: 22 }
-                                    ColumnLayout {
+                                    RowLayout {
                                         Layout.fillWidth: true
-                                        spacing: 2
-                                        Text { text: modelData.name; font.pixelSize: 13; font.bold: true; color: "#FFFFFF" }
-                                        Text {
-                                            text: modelData.desc
-                                            font.pixelSize: 10
-                                            color: "#8E8E93"
-                                            elide: Text.ElideRight
+                                        spacing: 10
+                                        Text { text: fxCard.cardData.icon; font.pixelSize: 20 }
+                                        Text { text: fxCard.cardData.name; font.pixelSize: 13; font.bold: true; color: "#FFFFFF"; Layout.fillWidth: true }
+                                        Switch {
+                                            checked: fxCard.active
+                                            onToggled: if (stateManager) stateManager.setPadFxParam(fxCard.cardData.on, checked)
+                                        }
+                                    }
+
+                                    Repeater {
+                                        model: fxCard.cardData.params
+                                        RowLayout {
                                             Layout.fillWidth: true
-                                        }
-                                    }
-                                    Rectangle {
-                                        visible: root.selectedPad && root.selectedPad.fx_id === modelData.id && root.selectedPad.type === "fx"
-                                        implicitWidth: asigText.implicitWidth + 12
-                                        implicitHeight: 22
-                                        radius: 4
-                                        color: "#352A18"
-                                        border.color: "#CBA158"
-                                        border.width: 1
-
-                                        Text {
-                                            id: asigText
-                                            anchors.centerIn: parent
-                                            text: "✓ Asignado"
-                                            font.pixelSize: 10
-                                            font.bold: true
-                                            color: "#CBA158"
-                                        }
-                                    }
-                                }
-
-                                MouseArea {
-                                    id: fxCardArea
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: {
-                                        if (stateManager) {
-                                            stateManager.assignPadEffect(modelData.id, modelData.name, root.fxTargetChannel, root.fxTriggerMode);
+                                            spacing: 8
+                                            enabled: fxCard.active
+                                            opacity: enabled ? 1.0 : 0.4
+                                            Text {
+                                                text: stateManager && stateManager.language === "en" ? modelData.l : modelData.lEs
+                                                font.pixelSize: 11; color: "#9A9A9E"
+                                                Layout.preferredWidth: 70
+                                            }
+                                            Slider {
+                                                id: fxSlider
+                                                Layout.fillWidth: true
+                                                from: modelData.f
+                                                to: modelData.t
+                                                stepSize: modelData.k === "st" ? 0.5 : (modelData.k === "size" ? 0.25 : 0.01)
+                                                snapMode: Slider.SnapAlways
+                                                value: fxCard.fx[modelData.p] !== undefined ? fxCard.fx[modelData.p] : modelData.d
+                                                onMoved: if (stateManager) stateManager.setPadFxParam(modelData.p, value)
+                                            }
+                                            Text {
+                                                font.pixelSize: 11; font.bold: true; color: "#CBA158"
+                                                Layout.preferredWidth: 46
+                                                text: modelData.k === "st" ? ((fxSlider.value > 0 ? "+" : "") + fxSlider.value.toFixed(1))
+                                                      : modelData.k === "size" ? ["S", "M", "L", "XL", "XXL"][Math.round(fxSlider.value * 4)]
+                                                      : Math.round(fxSlider.value * 100) + "%"
+                                            }
                                         }
                                     }
                                 }
@@ -824,6 +769,41 @@ Item {
                     anchors.horizontalCenter: parent ? parent.horizontalCenter : undefined
                     spacing: 16
                     visible: root.activeCategory === 2
+
+                    // Mixer pad trigger: Latching / Momentary (padMixerTriggerMode)
+                    Row {
+                        visible: Boolean(root.selectedPad && root.selectedPad.type === "mixer")
+                        spacing: 4
+                        Text {
+                            text: stateManager && stateManager.language === "en" ? "Mode:  " : "Modo:  "
+                            font.pixelSize: 12; font.bold: true; color: "#FFFFFF"
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
+                        Repeater {
+                            model: [{"v": 1, "t": stateManager && stateManager.language === "en" ? "Latching" : "Enclavado"},
+                                    {"v": 0, "t": stateManager && stateManager.language === "en" ? "Momentary" : "Momentáneo"}]
+                            Rectangle {
+                                readonly property bool sel: Boolean(root.selectedPad) && (root.selectedPad.mixer_trigger === undefined ? 0 : root.selectedPad.mixer_trigger) === modelData.v
+                                width: mtText.implicitWidth + 24
+                                height: 30
+                                radius: 6
+                                color: sel ? "#CBA158" : "#26262C"
+                                Text {
+                                    id: mtText
+                                    anchors.centerIn: parent
+                                    text: modelData.t
+                                    font.pixelSize: 11
+                                    font.bold: parent.sel
+                                    color: parent.sel ? "#121214" : "#D0D0D0"
+                                }
+                                MouseArea {
+                                    anchors.fill: parent
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: if (stateManager) stateManager.setPadMixerTrigger(modelData.v)
+                                }
+                            }
+                        }
+                    }
 
                     Repeater {
                         // mode = PAD.padMixerMode. Back Channel (3) is not offered: on the Streamer X it

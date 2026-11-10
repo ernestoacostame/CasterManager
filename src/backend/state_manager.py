@@ -1223,6 +1223,9 @@ class StateManager(QObject):
                     except Exception:
                         pass
 
+            # Per-pad voice FX live in PADEFFECTS/EFFECTS_PARAMETERS (effectsIdx == padIdx)
+            self._pad_fx_nodes = self._map_pad_fx_nodes(dump)
+
             # Populate Pads from SOUNDPADS
             soundpads_node = find_node(dump, "SOUNDPADS")
             if soundpads_node:
@@ -1274,6 +1277,8 @@ class StateManager(QObject):
                             "file": p.get("padFilePath", ""),
                             "fx_id": int(p.get("padTriggerControl", 8)),
                             "mixer_mode": int(p.get("padMixerMode", 0)),
+                            "mixer_trigger": int(p.get("padMixerTriggerMode", 0)),
+                            "fx": dict(self._pad_fx_nodes.get(idx, {}).get("values", {})),
                             "fade_exclude_host": bool(p.get("padMixerFadeExcludeHost", False)),
                             "back_channel": {k: bool(p.get(f"padMixerBackChannel{k}", False)) for k in self.BACK_CHANNEL_KEYS},
                             "fx_channel": int(p.get("padEffectInput", 0)),
@@ -3443,6 +3448,152 @@ class StateManager(QObject):
             self.executor.submit(do_assign)
         self.toastMessage.emit(f"Efecto '{fx_name}' configurado")
 
+    # ------------------------------------------------------------------
+    # Voice FX pads (padType 2). As in RØDE Unify / RØDECaster App, a pad can stack
+    # several effects; each has an On flag plus parameters in its own
+    # PADEFFECTS/EFFECTS_PARAMETERS node, matched by effectsIdx == padIdx.
+    # (padTriggerControl is the pad's MIDI CC number, not an effect id.)
+    # ------------------------------------------------------------------
+    PAD_FX_PROPS = {
+        "reverbOn", "reverbMix", "reverbModel", "reverbLowCut", "reverbHighCut",
+        "echoOn", "echoMix", "echoDelay", "echoDecay", "echoLowCut", "echoHighCut",
+        "distortionOn", "distortionIntensity",
+        "robotOn", "robotMix", "robotLevel",
+        "voiceDisguiseOn",
+        "pitchShiftOn", "pitchShiftSemitones",
+    }
+
+    @staticmethod
+    def _map_pad_fx_nodes(dump):
+        """{padIdx: {"path": "PADEFFECTS,child", "values": {prop: value}}}"""
+        res = {}
+        for ti, top in enumerate(dump.get("children", [])):
+            if top.get("name") != "PADEFFECTS":
+                continue
+            for ci, node in enumerate(top.get("children", [])):
+                props = {k: list(v.values())[0] for k, v in node.get("properties", {}).items()}
+                if "effectsIdx" in props:
+                    res[int(props["effectsIdx"])] = {"path": f"{ti},{ci}", "values": props}
+        return res
+
+    def _pad_fx_path(self, pad_idx):
+        info = getattr(self, "_pad_fx_nodes", {}).get(pad_idx)
+        if info:
+            return info["path"]
+        dump = self.bridge.dump_state()  # worker thread: node may have just been created
+        if dump:
+            self._pad_fx_nodes = self._map_pad_fx_nodes(dump)
+            info = self._pad_fx_nodes.get(pad_idx)
+            return info["path"] if info else None
+        return None
+
+    def _ensure_fx_pad(self, pad):
+        """Turn the current pad into a voice-FX pad (no effect enabled yet)."""
+        if pad.get("type") == "fx":
+            return []
+        col = 7
+        pad["type"] = "fx"
+        pad["file"] = ""
+        pad["name"] = "Voice FX"
+        pad["color_idx"] = col
+        pad["color_hex"] = PAD_COLORS[col]["hex"]
+        pad.setdefault("fx_mode", 1)
+        pad.setdefault("fx", {})
+        fx_input = 7 if self._is_streamer_x else int(pad.get("fx_channel", 0))
+        pad["fx_channel"] = fx_input
+        return [
+            ("padType", "u32:2"),
+            ("padFilePath", "str:"),
+            ("padName", "str:Voice_FX"),
+            ("padColourIndex", f"u32:{col}"),
+            ("padEffectTriggerMode", f"u32:{int(pad.get('fx_mode', 1))}"),
+            ("padEffectInput", f"u32:{fx_input}"),
+            ("padActive", "bool:false"),
+        ]
+
+    @staticmethod
+    def _fx_val_str(prop, value):
+        if prop.endswith("On"):
+            return f"bool:{str(bool(value)).lower()}"
+        return f"f64:{float(value):.4f}"
+
+    @pyqtSlot(str, "QVariant")
+    def setPadFxParam(self, prop, value):
+        """Set one effect flag / parameter on the selected pad (converts it to an FX pad)."""
+        if prop not in self.PAD_FX_PROPS:
+            return
+        pad = self._get_current_pad()
+        if not pad:
+            return
+        pad_props = self._ensure_fx_pad(pad)
+        fx = dict(pad.get("fx") or {})
+        fx[prop] = bool(value) if prop.endswith("On") else float(value)
+        pad["fx"] = fx
+        self.padsChanged.emit()
+        self.selectedPadChanged.emit()
+        if not (self._connected and not self._permission_error):
+            return
+        b_str, p_str = str(self._current_bank), str(self._selected_pad_index)
+        pad_idx = int(pad.get("idx", self._current_bank * self._pads_per_bank + self._selected_pad_index))
+        val = self._fx_val_str(prop, value)
+        self._pending_fx_writes = getattr(self, "_pending_fx_writes", {})
+        self._pending_fx_writes[(pad_idx, prop)] = val
+
+        def do_set():
+            if pad_props:
+                self._send_pad_props(b_str, p_str, pad_props, pad.setdefault("_raw", {}))
+            v = self._pending_fx_writes.pop((pad_idx, prop), None)
+            if v is None:
+                return  # a newer value for the same control is already queued
+            path = self._pad_fx_path(pad_idx)
+            if not path:
+                logger.warning(f"No PADEFFECTS node for pad {pad_idx}; cannot set {prop}")
+                return
+            _, err = self.bridge.run_cmd(["set-property", path, prop, v])
+            logger.info(f"Pad FX {pad_idx} [{path}] {prop}={v}" + (f" FAILED: {err.strip()}" if err else ""))
+        self.executor.submit(do_set)
+
+    @pyqtSlot(int)
+    def setPadFxTrigger(self, mode):
+        """1 = Latching, 0 = Momentary (padEffectTriggerMode)."""
+        pad = self._get_current_pad()
+        if not pad:
+            return
+        pad_props = self._ensure_fx_pad(pad)
+        pad["fx_mode"] = 1 if mode else 0
+        self.padsChanged.emit()
+        self.selectedPadChanged.emit()
+        if self._connected and not self._permission_error:
+            props = pad_props + [("padEffectTriggerMode", f"u32:{pad['fx_mode']}")]
+            self.executor.submit(self._send_pad_props, str(self._current_bank), str(self._selected_pad_index),
+                                 props, pad.setdefault("_raw", {}))
+
+    @pyqtSlot(int)
+    def setPadFxInput(self, ch):
+        """Duo / Pro II: which microphone the pad's effects apply to."""
+        pad = self._get_current_pad()
+        if not pad or self._is_streamer_x:
+            return
+        pad["fx_channel"] = int(ch)
+        self.padsChanged.emit()
+        self.selectedPadChanged.emit()
+        if self._connected and not self._permission_error and pad.get("type") == "fx":
+            self.executor.submit(self._send_pad_props, str(self._current_bank), str(self._selected_pad_index),
+                                 [("padEffectInput", f"u32:{int(ch)}")], pad.setdefault("_raw", {}))
+
+    @pyqtSlot(int)
+    def setPadMixerTrigger(self, mode):
+        """Mixer pads: 1 = Latching, 0 = Momentary (padMixerTriggerMode)."""
+        pad = self._get_current_pad()
+        if not pad or pad.get("type") != "mixer":
+            return
+        pad["mixer_trigger"] = 1 if mode else 0
+        self.padsChanged.emit()
+        self.selectedPadChanged.emit()
+        if self._connected and not self._permission_error:
+            self.executor.submit(self._send_pad_props, str(self._current_bank), str(self._selected_pad_index),
+                                 [("padMixerTriggerMode", f"u32:{pad['mixer_trigger']}")], pad.setdefault("_raw", {}))
+
     # PAD.padMixerMode values, in the order the official RØDECaster App lists them
     # (the factory "Censor" pad reads padType=3 / padMixerMode=0).
     PAD_MIXER_MODES = {0: "Censor", 1: "Trash Talk", 2: "Fade In/Out", 3: "Back Channel", 4: "Ducking"}
@@ -3472,6 +3623,7 @@ class StateManager(QObject):
         pad["name"] = name
         pad["file"] = ""
         pad["mixer_mode"] = mode
+        pad["mixer_trigger"] = 0 if mode == 0 else 1
         pad["color_idx"] = col
         pad["color_hex"] = PAD_COLORS[col]["hex"]
         self.padsChanged.emit()
@@ -3492,8 +3644,8 @@ class StateManager(QObject):
                 ("padMixerFadeOutSeconds", fade),
                 ("padMixerFadeExcludeHost", f"bool:{str(bool(pad.get('fade_exclude_host', False))).lower()}"),
                 ("padMixerMode", f"u32:{mode}"),
-                # Same trigger settings as the factory Censor pad
-                ("padMixerTriggerMode", "u32:0"),
+                # Censor is momentary, Fade / Ducking latch (RØDE Unify defaults)
+                ("padMixerTriggerMode", f"u32:{0 if mode == 0 else 1}"),
                 ("padPlayMode", "u32:1"),
                 ("padActive", "bool:false"),
             ]
