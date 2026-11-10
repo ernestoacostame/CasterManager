@@ -828,12 +828,13 @@ Item {
                     Repeater {
                         // mode = PAD.padMixerMode. Back Channel (3) is not offered: on the Streamer X it
                         // fired the Censor tone and reset the unit, and it is untested on Duo / Pro II.
+                        // Streamer X (RØDE Unify): Censor, Fade In/Out and Ducking only
                         model: [
                             {"mode": 0, "name": "Censor", "desc": (stateManager && stateManager.language === "en" ? "While pressed, a sound plays and all channels are muted" : "Mientras lo pulsas suena un pitido y se silencian todos los canales"), "icon": "🔇"},
                             {"mode": 1, "name": "Trash Talk", "desc": (stateManager && stateManager.language === "en" ? "Mutes the audio sent to remote guests, so they can't hear you" : "Silencia el audio que se envía a los invitados remotos para que no te escuchen"), "icon": "🗣️"},
                             {"mode": 2, "name": "Fade In/Out", "desc": (stateManager && stateManager.language === "en" ? "Fades all channels out; pressing again fades them back in" : "Funde todos los canales a silencio; al pulsarlo otra vez vuelven a entrar"), "icon": "🌗"},
                             {"mode": 4, "name": "Ducking", "desc": (stateManager && stateManager.language === "en" ? "While active, other channels drop whenever the microphone picks up sound" : "Mientras está activo, baja los demás canales cada vez que el micrófono capta sonido"), "icon": "📉"}
-                        ]
+                        ].filter(function(m) { return !(stateManager && stateManager.isStreamerX && m.mode === 1); })
 
                         Rectangle {
                             Layout.fillWidth: true

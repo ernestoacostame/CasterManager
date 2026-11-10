@@ -3452,6 +3452,10 @@ class StateManager(QObject):
         """Turn the current pad into a real mixer pad (padType 3) with the given mode."""
         if mode not in self.PAD_MIXER_MODES:
             return
+        if mode == 1 and self._is_streamer_x:
+            # RØDE Unify only offers Censor, Fade In/Out and Ducking on the Streamer X
+            logger.warning("Trash Talk is not available on the Streamer X")
+            return
         if mode == 3:
             # Back Channel: on the Streamer X this produced the Censor tone and reset the
             # unit; not verified on Duo / Pro II either, so refuse it until it is.
