@@ -3503,14 +3503,13 @@ class StateManager(QObject):
             mode = int(pad.get("mixer_mode", 2))
             excl = f"bool:{str(bool(exclude)).lower()}"
             def do_set():
-                run = self.bridge.run_cmd
-                run(["pad", "set-prop", b_str, p_str, "padMixerFadeExcludeHost", excl])
-                # The firmware only picks up the option when the mixer mode is (re)set, so re-arm it
-                run(["pad", "set-prop", b_str, p_str, "padMixerMode", "u32:0"])
-                run(["pad", "set-prop", b_str, p_str, "padMixerMode", f"u32:{mode}"])
-                raw = pad.setdefault("_raw", {})
-                raw["padMixerFadeExcludeHost"] = bool(exclude)
-                raw["padMixerMode"] = mode
+                # The firmware applies this live on a Fade pad: no need to touch the mode
+                # (re-arming through mode 0 briefly turned the pad into a Censor pad).
+                _, err = self.bridge.run_cmd(["pad", "set-prop", b_str, p_str, "padMixerFadeExcludeHost", excl])
+                logger.info(f"Pad {b_str}/{p_str} (mode {mode}): padMixerFadeExcludeHost={excl}"
+                            + (f" FAILED: {err.strip()}" if err else ""))
+                if not err:
+                    pad.setdefault("_raw", {})["padMixerFadeExcludeHost"] = bool(exclude)
             self.executor.submit(do_set)
 
     @pyqtSlot(str)
