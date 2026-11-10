@@ -1275,6 +1275,7 @@ class StateManager(QObject):
                             "fx_id": int(p.get("padTriggerControl", 8)),
                             "mixer_mode": int(p.get("padMixerMode", 0)),
                             "fade_exclude_host": bool(p.get("padMixerFadeExcludeHost", False)),
+                            "back_channel": {k: bool(p.get(f"padMixerBackChannel{k}", False)) for k in self.BACK_CHANNEL_KEYS},
                             "fx_channel": int(p.get("padEffectInput", 0)),
                             "fx_mode": int(p.get("padEffectTriggerMode", 1)),
                             "_raw": {k: v for k, v in p.items() if isinstance(v, (int, float, str, bool))}
@@ -3456,6 +3457,8 @@ class StateManager(QObject):
             return
         name = self.PAD_MIXER_MODES[mode]
         col = {0: 4, 1: 6, 2: 8, 3: 10, 4: 2}.get(mode, 4)
+        if mode == 3 and not pad.get("back_channel"):
+            pad["back_channel"] = {k: False for k in self.BACK_CHANNEL_KEYS}
         pad["type"] = "mixer"
         pad["name"] = name
         pad["file"] = ""
@@ -3488,6 +3491,32 @@ class StateManager(QObject):
             self.executor.submit(self._send_pad_props, b_str, p_str, props, raw)
         self.toastMessage.emit((f"Mixer pad '{name}' configured" if self._language == "en"
                                 else f"Pad de mezclador '{name}' configurado"))
+
+    # PAD.padMixerBackChannel<key> flags (Duo / Pro II). The Streamer X has no picker:
+    # its Back Channel always pulls every audio device and Chat out of the stream mix.
+    BACK_CHANNEL_KEYS = ("Mic2", "Mic3", "Mic4", "Usb1Comms", "Usb2Main", "Bluetooth")
+
+    @pyqtSlot(str, bool)
+    def setPadBackChannel(self, key, enabled):
+        if key not in self.BACK_CHANNEL_KEYS:
+            return
+        pad = self._get_current_pad()
+        if not pad:
+            return
+        bc = dict(pad.get("back_channel") or {})
+        bc[key] = bool(enabled)
+        pad["back_channel"] = bc
+        self.padsChanged.emit()
+        self.selectedPadChanged.emit()
+        if self._connected and not self._permission_error:
+            b_str, p_str = str(self._current_bank), str(self._selected_pad_index)
+            prop, val = f"padMixerBackChannel{key}", f"bool:{str(bool(enabled)).lower()}"
+            def do_set():
+                _, err = self.bridge.run_cmd(["pad", "set-prop", b_str, p_str, prop, val])
+                logger.info(f"Pad {b_str}/{p_str}: {prop}={val}" + (f" FAILED: {err.strip()}" if err else ""))
+                if not err:
+                    pad.setdefault("_raw", {})[prop] = bool(enabled)
+            self.executor.submit(do_set)
 
     @pyqtSlot(bool)
     def setPadFadeExcludeHost(self, exclude):

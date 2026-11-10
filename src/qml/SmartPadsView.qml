@@ -826,11 +826,14 @@ Item {
                     visible: root.activeCategory === 2
 
                     Repeater {
-                        // mode = PAD.padMixerMode (Back Channel needs a per-channel picker, not offered yet)
+                        // mode = PAD.padMixerMode
                         model: [
                             {"mode": 0, "name": "Censor", "desc": (stateManager && stateManager.language === "en" ? "While pressed, a sound plays and all channels are muted" : "Mientras lo pulsas suena un pitido y se silencian todos los canales"), "icon": "🔇"},
                             {"mode": 1, "name": "Trash Talk", "desc": (stateManager && stateManager.language === "en" ? "Mutes the audio sent to remote guests, so they can't hear you" : "Silencia el audio que se envía a los invitados remotos para que no te escuchen"), "icon": "🗣️"},
                             {"mode": 2, "name": "Fade In/Out", "desc": (stateManager && stateManager.language === "en" ? "Fades all channels out; pressing again fades them back in" : "Funde todos los canales a silencio; al pulsarlo otra vez vuelven a entrar"), "icon": "🌗"},
+                            {"mode": 3, "name": "Back Channel", "desc": (stateManager && stateManager.isStreamerX)
+                                ? (stateManager.language === "en" ? "While pressed, all audio devices and Chat are removed from the stream, so the audience can't hear the conversation" : "Mientras lo pulsas, todos los dispositivos de audio y el Chat salen del stream: la audiencia no oye la conversación")
+                                : (stateManager && stateManager.language === "en" ? "While pressed, creates a private mix between Microphone 1 and the channels you pick below" : "Mientras lo pulsas, crea una mezcla privada entre el Micrófono 1 y los canales que elijas abajo"), "icon": "🔁"},
                             {"mode": 4, "name": "Ducking", "desc": (stateManager && stateManager.language === "en" ? "While active, other channels drop whenever the microphone picks up sound" : "Mientras está activo, baja los demás canales cada vez que el micrófono capta sonido"), "icon": "📉"}
                         ]
 
@@ -867,6 +870,60 @@ Item {
                             }
                         }
                     }
+                    // Back Channel pad (Duo / Pro II): which channels join the private mix with Mic 1
+                    Rectangle {
+                        visible: Boolean(root.selectedPad && root.selectedPad.type === "mixer" && root.selectedPad.mixer_mode === 3
+                                         && stateManager && !stateManager.isStreamerX)
+                        Layout.fillWidth: true
+                        height: bcCol.height + 28
+                        radius: 10
+                        color: "#202024"
+                        border.color: "#2E2E36"
+                        border.width: 1
+                        ColumnLayout {
+                            id: bcCol
+                            anchors.top: parent.top
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.margins: 14
+                            spacing: 8
+                            Text {
+                                text: stateManager && stateManager.language === "en" ? "Back Channel participants (Microphone 1 is always included)" : "Participantes del Back Channel (el Micrófono 1 siempre está incluido)"
+                                font.pixelSize: 13; font.bold: true; color: "#FFFFFF"
+                                wrapMode: Text.WordWrap; Layout.fillWidth: true
+                            }
+                            Flow {
+                                Layout.fillWidth: true
+                                spacing: 8
+                                Repeater {
+                                    model: (stateManager && stateManager.isDuo)
+                                        ? [{"key": "Mic2", "label": "Mic 2"}, {"key": "Usb1Comms", "label": "USB 1 Chat"}, {"key": "Usb2Main", "label": "USB 2 Main"}, {"key": "Bluetooth", "label": "Bluetooth"}]
+                                        : [{"key": "Mic2", "label": "Mic 2"}, {"key": "Mic3", "label": "Mic 3"}, {"key": "Mic4", "label": "Mic 4"}, {"key": "Usb1Comms", "label": "USB 1 Chat"}, {"key": "Usb2Main", "label": "USB 2 Main"}, {"key": "Bluetooth", "label": "Bluetooth"}]
+                                    Rectangle {
+                                        readonly property bool on: Boolean(root.selectedPad && root.selectedPad.back_channel && root.selectedPad.back_channel[modelData.key])
+                                        width: bcLabel.implicitWidth + 28
+                                        height: 30
+                                        radius: 6
+                                        color: on ? "#CBA158" : "#28282E"
+                                        Text {
+                                            id: bcLabel
+                                            anchors.centerIn: parent
+                                            text: modelData.label
+                                            font.pixelSize: 11
+                                            font.bold: parent.on
+                                            color: parent.on ? "#121214" : "#D0D0D0"
+                                        }
+                                        MouseArea {
+                                            anchors.fill: parent
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: if (stateManager) stateManager.setPadBackChannel(modelData.key, !parent.on)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     // Fade In/Out pad option: exclude the host microphone from the fade
                     Rectangle {
                         visible: Boolean(root.selectedPad && root.selectedPad.type === "mixer" && root.selectedPad.mixer_mode === 2)
