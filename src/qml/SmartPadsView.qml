@@ -15,7 +15,7 @@ Item {
         id: fileDialog
         title: stateManager ? stateManager.strings.sound_dialog_title : "Seleccionar archivo de sonido para el Pad"
         nameFilters: (stateManager && stateManager.isStreamerX)
-            ? ["Archivos de audio Streamer X (*.wav *.mp3)", "Todos los archivos (*)"]
+            ? (stateManager && stateManager.language === "en" ? ["Streamer X Audio files (*.wav *.mp3)", "All files (*)"] : ["Archivos de audio Streamer X (*.wav *.mp3)", "Todos los archivos (*)"])
             : [stateManager ? stateManager.strings.audio_files_filter : "Archivos de audio (*.wav *.mp3 *.ogg *.flac *.aac)", stateManager ? stateManager.strings.all_files_filter : "Todos los archivos (*)"]
         onAccepted: {
             if (stateManager && selectedFile) {
@@ -639,7 +639,7 @@ Item {
                                             color: root.fxTargetChannel === 0 ? "#CBA158" : "transparent"
                                             Text {
                                                 anchors.centerIn: parent
-                                                text: (stateManager && stateManager.isStreamerX) ? "Micrófono" : "Mic 1"
+                                                text: (stateManager && stateManager.isStreamerX) ? (stateManager && stateManager.language === "es" ? "Micrófono" : "Microphone") : "Mic 1"
                                                 font.pixelSize: 11
                                                 font.bold: root.fxTargetChannel === 0
                                                 color: root.fxTargetChannel === 0 ? "#121214" : "#D0D0D0"
@@ -827,9 +827,9 @@ Item {
 
                     Repeater {
                         model: [
-                            {"name": "Censor Bleep", "desc": "Emite un pitido de censura de 1 kHz y silencia los micrófonos seleccionados", "icon": "🔇"},
-                            {"name": "Trash Talk", "desc": "Silencia los micrófonos hacia los oyentes pero los mantiene en los auriculares", "icon": "🗣️"},
-                            {"name": "Ducking", "desc": "Atenúa la música de fondo automáticamente mientras este pad está pulsado", "icon": "📉"}
+                            {"name": "Censor Bleep", "desc": (stateManager && stateManager.language === "en" ? "Plays a 1 kHz bleep tone and mutes selected microphones" : "Emite un pitido de censura de 1 kHz y silencia los micrófonos seleccionados"), "icon": "🔇"},
+                            {"name": "Trash Talk", "desc": (stateManager && stateManager.language === "en" ? "Mutes microphones to audience while keeping them in headphones" : "Silencia los micrófonos hacia los oyentes pero los mantiene en los auriculares"), "icon": "🗣️"},
+                            {"name": "Ducking", "desc": (stateManager && stateManager.language === "en" ? "Automatically ducks background audio while pad is pressed" : "Atenúa la música de fondo automáticamente mientras este pad está pulsado"), "icon": "📉"}
                         ]
 
                         Rectangle {
@@ -890,24 +890,24 @@ Item {
                             anchors.margins: 14
                             spacing: 14
 
-                            Text { text: "Comando MIDI USB"; font.pixelSize: 14; font.bold: true; color: "#FFFFFF" }
+                            Text { text: (stateManager && stateManager.language === "en" ? "USB MIDI Command" : "Comando MIDI USB"); font.pixelSize: 14; font.bold: true; color: "#FFFFFF" }
 
                             RowLayout {
-                                Text { text: "Tipo de Mensaje:"; font.pixelSize: 12; color: "#8E8E93"; Layout.preferredWidth: 140 }
+                                Text { text: (stateManager && stateManager.language === "en" ? "Message Type:" : "Tipo de Mensaje:"); font.pixelSize: 12; color: "#8E8E93"; Layout.preferredWidth: 140 }
                                 Row {
                                     spacing: 8
                                     Rectangle { width: 90; height: 30; radius: 6; color: "#CBA158"; Text { anchors.centerIn: parent; text: "Control (CC)"; font.pixelSize: 11; font.bold: true; color: "#121214" } }
-                                    Rectangle { width: 90; height: 30; radius: 6; color: "#28282E"; Text { anchors.centerIn: parent; text: "Nota (Note)"; font.pixelSize: 11; color: "#D0D0D0" } }
+                                    Rectangle { width: 90; height: 30; radius: 6; color: "#28282E"; Text { anchors.centerIn: parent; text: (stateManager && stateManager.language === "en" ? "Note" : "Nota (Note)"); font.pixelSize: 11; color: "#D0D0D0" } }
                                 }
                             }
 
                             RowLayout {
-                                Text { text: "Canal MIDI (1-16):"; font.pixelSize: 12; color: "#8E8E93"; Layout.preferredWidth: 140 }
-                                Text { text: "Canal 1"; font.pixelSize: 12; font.bold: true; color: "#FFFFFF" }
+                                Text { text: (stateManager && stateManager.language === "en" ? "MIDI Channel (1-16):" : "Canal MIDI (1-16):"); font.pixelSize: 12; color: "#8E8E93"; Layout.preferredWidth: 140 }
+                                Text { text: (stateManager && stateManager.language === "en" ? "Channel 1" : "Canal 1"); font.pixelSize: 12; font.bold: true; color: "#FFFFFF" }
                             }
 
                             RowLayout {
-                                Text { text: "Control / Nota:"; font.pixelSize: 12; color: "#8E8E93"; Layout.preferredWidth: 140 }
+                                Text { text: (stateManager && stateManager.language === "en" ? "Control / Note:" : "Control / Nota:"); font.pixelSize: 12; color: "#8E8E93"; Layout.preferredWidth: 140 }
                                 Text { text: "#" + (stateManager ? (stateManager.selectedPadIndex + 1) : 1); font.pixelSize: 12; font.bold: true; color: "#CBA158" }
                             }
                         }

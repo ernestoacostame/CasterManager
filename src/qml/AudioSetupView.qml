@@ -44,7 +44,7 @@ Item {
 
             // Submix Switcher Pill (Stream / Broadcast vs Headphones / Monitor)
             Rectangle {
-                visible: !stateManager || !stateManager.isStreamerX
+                visible: true
                 height: 36
                 width: 360
                 radius: 18
@@ -582,7 +582,7 @@ Item {
                 }
                 Item { Layout.fillWidth: true }
                 Text {
-                    text: "Haz clic en una fuente para asignarla al " + (stateManager && stateManager.faders[root.selectedChannelIndex] ? stateManager.faders[root.selectedChannelIndex].name : "Canal " + (root.selectedChannelIndex + 1))
+                    text: (stateManager && stateManager.language === "en" ? "Click a source to assign it to " : "Haz clic en una fuente para asignarla al ") + (stateManager && stateManager.faders[root.selectedChannelIndex] ? stateManager.faders[root.selectedChannelIndex].name : (stateManager && stateManager.language === "en" ? "Channel " : "Canal ") + (root.selectedChannelIndex + 1))
                     font.pixelSize: 11
                     color: "#CBA158"
                 }
@@ -598,14 +598,14 @@ Item {
                     model: [
                         {"id": 0, "name": "Input 1 (Mic / Inst)", "desc": "Neutrik Combo XLR", "icon": "🎙️", "tag": "+48V"},
                         {"id": 1, "name": "Input 2 (Mic / Inst)", "desc": "Neutrik Combo XLR", "icon": "🎙️", "tag": "+48V"},
-                        {"id": 2, "name": "Wireless 1", "desc": "Receptor 2.4 GHz dual", "icon": "📡", "tag": ""},
-                        {"id": 3, "name": "Wireless 2", "desc": "Receptor 2.4 GHz dual", "icon": "📡", "tag": ""},
-                        {"id": 7, "name": "USB 1 Audio (Main)", "desc": "Multicanal 24-bit / 48kHz", "icon": "💻", "tag": ""},
-                        {"id": 8, "name": "USB 1 Chat", "desc": "Mix-minus automático", "icon": "💬", "tag": ""},
-                        {"id": 9, "name": "USB 2 Audio", "desc": "Secundario / Smartphone", "icon": "📱", "tag": ""},
-                        {"id": 10, "name": "Bluetooth Stereo", "desc": "A2DP y llamadas de voz", "icon": "📶", "tag": ""},
-                        {"id": 11, "name": "SMART Pads Audio", "desc": "Reproductor interno", "icon": "🎛️", "tag": ""},
-                        {"id": 4, "name": "Headset TRRS", "desc": "Micrófono de auriculares", "icon": "🎧", "tag": ""}
+                        {"id": 2, "name": "Wireless 1", "desc": (stateManager && stateManager.language === "en" ? "Dual 2.4 GHz receiver" : "Receptor 2.4 GHz dual"), "icon": "📡", "tag": ""},
+                        {"id": 3, "name": "Wireless 2", "desc": (stateManager && stateManager.language === "en" ? "Dual 2.4 GHz receiver" : "Receptor 2.4 GHz dual"), "icon": "📡", "tag": ""},
+                        {"id": 7, "name": "USB 1 Audio (Main)", "desc": (stateManager && stateManager.language === "en" ? "Multichannel 24-bit / 48kHz" : "Multicanal 24-bit / 48kHz"), "icon": "💻", "tag": ""},
+                        {"id": 8, "name": "USB 1 Chat", "desc": (stateManager && stateManager.language === "en" ? "Automatic mix-minus" : "Mix-minus automático"), "icon": "💬", "tag": ""},
+                        {"id": 9, "name": "USB 2 Audio", "desc": (stateManager && stateManager.language === "en" ? "Secondary / Smartphone" : "Secundario / Smartphone"), "icon": "📱", "tag": ""},
+                        {"id": 10, "name": "Bluetooth Stereo", "desc": (stateManager && stateManager.language === "en" ? "A2DP and voice calls" : "A2DP y llamadas de voz"), "icon": "📶", "tag": ""},
+                        {"id": 11, "name": "SMART Pads Audio", "desc": (stateManager && stateManager.language === "en" ? "Internal sound player" : "Reproductor interno"), "icon": "🎛️", "tag": ""},
+                        {"id": 4, "name": "Headset TRRS", "desc": (stateManager && stateManager.language === "en" ? "Headset microphone" : "Micrófono de auriculares"), "icon": "🎧", "tag": ""}
                     ]
 
                     Rectangle {

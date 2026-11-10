@@ -67,8 +67,8 @@ Item {
         fileMode: FileDialog.SaveFile
         defaultSuffix: formatCombo.currentText.toLowerCase()
         nameFilters: [
-            "Archivos de Audio (*." + formatCombo.currentText.toLowerCase() + ")",
-            "Todos los archivos (*)"
+            (stateManager && stateManager.language === "en" ? "Audio Files (*." : "Archivos de Audio (*.") + formatCombo.currentText.toLowerCase() + ")",
+            (stateManager && stateManager.language === "en" ? "All Files (*)" : "Todos los archivos (*)")
         ]
         onAccepted: {
             if (stateManager && root.activeRecording && selectedFile) {
@@ -1063,7 +1063,7 @@ Item {
                     text: (stateManager && stateManager.hasMicroSD)
                           ? (stateManager.transferModeActive 
                              ? (stateManager.strings ? stateManager.strings.no_recordings_desc : "Las grabaciones realizadas con el botón REC en tu RØDECaster aparecerán aquí.")
-                             : "Activa el modo de transferencia para que tu sistema monte la tarjeta MicroSD y puedas explorar tus tomas.")
+                             : (stateManager && stateManager.language === "en" ? "Enable transfer mode so your system mounts the MicroSD card to explore your takes." : "Activa el modo de transferencia para que tu sistema monte la tarjeta MicroSD y puedas explorar tus tomas."))
                           : (stateManager && stateManager.strings ? stateManager.strings.no_microsd_desc : "La ranura de tarjeta MicroSD de tu RØDECaster está vacía. Inserta una tarjeta MicroSD para grabar tomas y transferirlas a tu PC.")
                     font.pixelSize: 12
                     color: "#8E8E93"
@@ -1084,7 +1084,7 @@ Item {
 
                     Text {
                         anchors.centerIn: parent
-                        text: "Activar Transferencia USB"
+                        text: stateManager && stateManager.language === "en" ? "Enable USB Transfer" : "Activar Transferencia USB"
                         font.pixelSize: 12
                         font.bold: true
                         color: "#121214"

@@ -50,7 +50,7 @@ Item {
 
                         Text {
                             anchors.centerIn: parent
-                            text: (stateManager && stateManager.isStreamerX) ? "Audio & UNIFY" : (stateManager ? stateManager.strings.tab_output : "Salida")
+                            text: (stateManager && stateManager.isStreamerX) ? (stateManager ? stateManager.strings.tab_audio_unify : "Audio & UNIFY") : (stateManager ? stateManager.strings.tab_output : "Salida")
                             font.pixelSize: 12
                             font.bold: true
                             color: root.activeTab === 0 ? "#121214" : "#AAAAAA"
@@ -189,7 +189,7 @@ Item {
                                     RowLayout {
                                         spacing: 10
                                         Text {
-                                            text: "RØDE UNIFY (PipeWire Linux)"
+                                            text: stateManager ? stateManager.strings.unify_title : "RØDE UNIFY (PipeWire Linux)"
                                             font.pixelSize: 16
                                             font.bold: true
                                             color: "#FFFFFF"
@@ -203,7 +203,7 @@ Item {
                                             border.width: 1
                                             Text {
                                                 anchors.centerIn: parent
-                                                text: (stateManager && stateManager.streamerXUnifyInstalled) ? "● MULTIPISTA ACTIVA" : "○ STEREO ESTÁNDAR"
+                                                text: (stateManager && stateManager.streamerXUnifyInstalled) ? (stateManager ? stateManager.strings.unify_active_mt : "● MULTIPISTA ACTIVA") : (stateManager ? stateManager.strings.unify_active_stereo : "○ STEREO ESTÁNDAR")
                                                 font.pixelSize: 9
                                                 font.bold: true
                                                 color: (stateManager && stateManager.streamerXUnifyInstalled) ? "#28C850" : "#8E8E98"
@@ -212,7 +212,7 @@ Item {
                                     }
 
                                     Text {
-                                        text: "Crea dispositivos virtuales independientes en PipeWire (Game, Chat, Music, System y Stream Mix) con enrutamiento automático hacia auriculares y OBS Studio."
+                                        text: stateManager ? stateManager.strings.unify_desc : "Crea dispositivos virtuales independientes en PipeWire (Game, Chat, Music, System y Stream Mix) con enrutamiento automático hacia auriculares y OBS Studio."
                                         font.pixelSize: 11
                                         color: "#9A9AA2"
                                         Layout.preferredWidth: root.width - 340
@@ -232,8 +232,8 @@ Item {
 
                                         Text {
                                             text: (stateManager && stateManager.streamerXMultitrack)
-                                                  ? "Multipista USB activa: Micrófono, Headset, Wireless, SMART Pads y canales 6-9 como entradas separadas para tu DAW"
-                                                  : "Multipista USB (9 canales): graba cada entrada de la Streamer X en su propia pista"
+                                                  ? (stateManager ? stateManager.strings.unify_mt_active_desc : "Multipista USB activa: Micrófono, Headset, Wireless, SMART Pads y canales 6-9 como entradas separadas para tu DAW")
+                                                  : (stateManager ? stateManager.strings.unify_mt_inactive_desc : "Multipista USB (9 canales): graba cada entrada de la Streamer X en su propia pista")
                                             font.pixelSize: 11
                                             color: (stateManager && stateManager.streamerXMultitrack) ? "#28C850" : "#C8C8D0"
                                             Layout.preferredWidth: root.width - 400
@@ -243,7 +243,7 @@ Item {
                                 }
 
                                 Button {
-                                    text: (stateManager && stateManager.streamerXUnifyInstalled) ? "Desactivar UNIFY" : "Activar UNIFY en Linux"
+                                    text: (stateManager && stateManager.streamerXUnifyInstalled) ? (stateManager ? stateManager.strings.unify_btn_deactivate : "Desactivar UNIFY") : (stateManager ? stateManager.strings.unify_btn_activate : "Activar UNIFY en Linux")
                                     HoverHandler { cursorShape: Qt.PointingHandCursor }
                                     contentItem: Text {
                                         text: parent.text
@@ -274,11 +274,11 @@ Item {
 
                                 Repeater {
                                     model: [
-                                        {"name": "GAME", "node": "streamerx_game", "desc": "Juegos / Steam", "color": "#3B82F6"},
-                                        {"name": "CHAT", "node": "streamerx_chat", "desc": "Discord / Teams", "color": "#10B981"},
-                                        {"name": "MUSIC", "node": "streamerx_music", "desc": "Spotify / Media", "color": "#F59E0B"},
-                                        {"name": "SYSTEM", "node": "streamerx_system", "desc": "Alertas del SO", "color": "#8B5CF6"},
-                                        {"name": "STREAM MIX", "node": "streamerx_stream_mix", "desc": "Mezcla Maestra OBS", "color": "#EF4444"}
+                                        {"name": "GAME", "node": "streamerx_game", "desc": stateManager ? stateManager.strings.unify_game_desc : "Juegos / Steam", "color": "#3B82F6"},
+                                        {"name": "CHAT", "node": "streamerx_chat", "desc": stateManager ? stateManager.strings.unify_chat_desc : "Discord / Teams", "color": "#10B981"},
+                                        {"name": "MUSIC", "node": "streamerx_music", "desc": stateManager ? stateManager.strings.unify_music_desc : "Spotify / Media", "color": "#F59E0B"},
+                                        {"name": "SYSTEM", "node": "streamerx_system", "desc": stateManager ? stateManager.strings.unify_system_desc : "Alertas del SO", "color": "#8B5CF6"},
+                                        {"name": "STREAM MIX", "node": "streamerx_stream_mix", "desc": stateManager ? stateManager.strings.unify_stream_mix_desc : "Mezcla Maestra OBS", "color": "#EF4444"}
                                     ]
 
                                     Rectangle {
@@ -381,7 +381,7 @@ Item {
 
                                         Text {
                                             anchors.centerIn: parent
-                                            text: "OBS & DAWs"
+                                            text: stateManager ? stateManager.strings.unify_tip_badge : "OBS & DAWs"
                                             font.pixelSize: 10
                                             font.bold: true
                                             color: "#CBA158"
@@ -389,7 +389,7 @@ Item {
                                     }
 
                                     Text {
-                                        text: "Los 5 canales virtuales aparecen de inmediato en PipeWire para capturar en pistas independientes (1-6) sin solapamiento."
+                                        text: stateManager ? stateManager.strings.unify_tip_text : "Los 5 canales virtuales aparecen de inmediato en PipeWire para capturar en pistas independientes (1-6) sin solapamiento."
                                         font.pixelSize: 11
                                         color: "#A2A2AC"
                                         elide: Text.ElideRight
@@ -419,7 +419,7 @@ Item {
 
                             Text {
                                 text: "🎧 " + (stateManager && stateManager.isStreamerX 
-                                      ? "Salida de Auriculares (Frontal TRRS 3.5mm)" 
+                                      ? (stateManager ? stateManager.strings.hp_front_output : "Salida de Auriculares (Frontal TRRS 3.5mm)") 
                                       : (stateManager ? stateManager.strings.headphones : "Auriculares"))
                                 font.pixelSize: 15
                                 font.bold: true
@@ -432,7 +432,7 @@ Item {
                                 spacing: 14
 
                                 Text {
-                                    text: (stateManager && stateManager.isStreamerX) ? "Auricular" : "Headphone 1"
+                                    text: (stateManager && stateManager.isStreamerX) ? (stateManager ? stateManager.strings.headphone : "Auricular") : (stateManager ? stateManager.strings.headphone_1 : "Headphone 1")
                                     font.pixelSize: 13
                                     color: "#E0E0E0"
                                     Layout.preferredWidth: 120
@@ -477,7 +477,7 @@ Item {
                                 spacing: 14
 
                                 Text {
-                                    text: "Headphone 2"
+                                    text: stateManager ? stateManager.strings.headphone_2 : "Headphone 2"
                                     font.pixelSize: 13
                                     color: "#E0E0E0"
                                     Layout.preferredWidth: 120
@@ -517,8 +517,9 @@ Item {
                         }
                     }
 
-                    // 2. Monitor & Routing Options Card
+                    // 2. Monitor & Routing Options Card (Hidden for Streamer X: no monitor speakers or solo buttons)
                 Rectangle {
+                    visible: Boolean(stateManager && !stateManager.isStreamerX)
                     Layout.fillWidth: true
                     height: monCol.height + 36
                     radius: 12
@@ -553,7 +554,7 @@ Item {
                                     color: "#E0E0E0"
                                 }
                                 Text {
-                                    text: "Evita retroalimentación acústica al hablar por los micrófonos"
+                                    text: stateManager ? stateManager.strings.auto_mute_output_desc : "Evita retroalimentación acústica al hablar por los micrófonos"
                                     font.pixelSize: 11
                                     color: "#8E8E93"
                                 }
@@ -584,7 +585,7 @@ Item {
                                     color: "#E0E0E0"
                                 }
                                 Text {
-                                    text: "Atenúa la salida bluetooth mientras hablas"
+                                    text: stateManager ? stateManager.strings.auto_mute_bt_desc : "Atenúa la salida bluetooth mientras hablas"
                                     font.pixelSize: 11
                                     color: "#8E8E93"
                                 }
@@ -614,7 +615,7 @@ Item {
                                     color: "#E0E0E0"
                                 }
                                 Text {
-                                    text: "Pre-fader (PFL) o After-fader (AFL) para los botones Listen"
+                                    text: stateManager ? stateManager.strings.listen_desc : "Pre-fader (PFL) o After-fader (AFL) para los botones Listen"
                                     font.pixelSize: 11
                                     color: "#8E8E93"
                                 }
@@ -675,7 +676,7 @@ Item {
                                     color: "#E0E0E0"
                                 }
                                 Text {
-                                    text: "Graba canales individuales independientes en la tarjeta MicroSD"
+                                    text: stateManager ? stateManager.strings.multitrack_desc : "Graba canales individuales independientes en la tarjeta MicroSD"
                                     font.pixelSize: 11
                                     color: "#8E8E93"
                                 }
@@ -807,7 +808,7 @@ Item {
                                     color: "#E0E0E0"
                                 }
                                 Text {
-                                    text: "Ajustar el sensor de luz ambiental automáticamente"
+                                    text: stateManager ? stateManager.strings.auto_brightness_desc : "Ajustar el sensor de luz ambiental automáticamente"
                                     font.pixelSize: 11
                                     color: "#8E8E93"
                                 }
@@ -863,7 +864,7 @@ Item {
                                             Item { Layout.fillWidth: true }
                                             Text {
                                                 visible: Boolean(stateManager && !stateManager.broadcastMeters)
-                                                text: "✓ Activo"
+                                                text: stateManager && stateManager.language === "es" ? "✓ Activo" : "✓ Active"
                                                 font.pixelSize: 11
                                                 font.bold: true
                                                 color: "#34C759"
@@ -871,7 +872,7 @@ Item {
                                         }
 
                                         Text {
-                                            text: "Los vúmetros incluyen marcadores a intervalos regulares e indican el nivel de ganancia unitario estándar."
+                                            text: stateManager ? stateManager.strings.metering_standard_desc : "Los vúmetros incluyen marcadores a intervalos regulares e indican el nivel de ganancia unitario estándar."
                                             font.pixelSize: 11
                                             color: "#9A9A9E"
                                             wrapMode: Text.WordWrap
@@ -910,7 +911,7 @@ Item {
                                             Item { Layout.fillWidth: true }
                                             Text {
                                                 visible: Boolean(stateManager && stateManager.broadcastMeters)
-                                                text: "✓ Activo"
+                                                text: stateManager && stateManager.language === "es" ? "✓ Activo" : "✓ Active"
                                                 font.pixelSize: 11
                                                 font.bold: true
                                                 color: "#34C759"
@@ -918,7 +919,7 @@ Item {
                                         }
 
                                         Text {
-                                            text: "Los vúmetros incluyen marcadores precisos de escala dBFS en cada canal y medidores de reducción de ganancia (compresor)."
+                                            text: stateManager ? stateManager.strings.metering_broadcast_desc : "Los vúmetros incluyen marcadores precisos de escala dBFS en cada canal y medidores de reducción de ganancia (compresor)."
                                             font.pixelSize: 11
                                             color: "#9A9A9E"
                                             wrapMode: Text.WordWrap
@@ -948,7 +949,7 @@ Item {
                                     color: "#E0E0E0"
                                 }
                                 Text {
-                                    text: "Vibración al tocar los pads y controles táctiles"
+                                    text: stateManager ? stateManager.strings.haptics_desc : "Vibración al tocar los pads y controles táctiles"
                                     font.pixelSize: 11
                                     color: "#8E8E93"
                                 }
@@ -1015,7 +1016,7 @@ Item {
 
                         RowLayout {
                             Layout.fillWidth: true
-                            Text { text: "Dispositivo"; font.pixelSize: 13; color: "#8E8E93"; Layout.preferredWidth: 150 }
+                            Text { text: stateManager ? stateManager.strings.device_label : "Dispositivo"; font.pixelSize: 13; color: "#8E8E93"; Layout.preferredWidth: 150 }
                             Text { text: stateManager ? stateManager.modelName : "RØDECaster Duo"; font.pixelSize: 13; font.bold: true; color: "#FFFFFF" }
                         }
 

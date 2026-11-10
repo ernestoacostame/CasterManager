@@ -239,6 +239,35 @@ TRANSLATIONS = {
         "low": "Graves",
         "mid": "Medios",
         "high": "Agudos",
+        "tab_audio_unify": "Audio & UNIFY",
+        "unify_title": "RØDE UNIFY (PipeWire Linux)",
+        "unify_desc": "Crea dispositivos virtuales independientes en PipeWire (Game, Chat, Music, System y Stream Mix) con enrutamiento automático hacia auriculares y OBS Studio.",
+        "unify_active_mt": "● MULTIPISTA ACTIVA",
+        "unify_active_stereo": "○ STEREO ESTÁNDAR",
+        "unify_btn_deactivate": "Desactivar UNIFY",
+        "unify_btn_activate": "Activar UNIFY en Linux",
+        "unify_mt_active_desc": "Multipista USB activa: Micrófono, Headset, Wireless, SMART Pads y canales 6-9 como entradas separadas para tu DAW",
+        "unify_mt_inactive_desc": "Multipista USB (9 canales): graba cada entrada de la Streamer X en su propia pista",
+        "unify_game_desc": "Juegos / Steam",
+        "unify_chat_desc": "Discord / Teams",
+        "unify_music_desc": "Spotify / Media",
+        "unify_system_desc": "Alertas del SO",
+        "unify_stream_mix_desc": "Mezcla Maestra OBS",
+        "unify_tip_badge": "OBS & DAWs",
+        "unify_tip_text": "Los 5 canales virtuales aparecen de inmediato en PipeWire para capturar en pistas independientes (1-6) sin solapamiento.",
+        "hp_front_output": "Salida de Auriculares (Frontal TRRS 3.5mm)",
+        "headphone": "Auricular",
+        "headphone_1": "Auricular 1",
+        "headphone_2": "Auricular 2",
+        "auto_mute_output_desc": "Evita retroalimentación acústica al hablar por los micrófonos",
+        "auto_mute_bt_desc": "Atenúa la salida bluetooth mientras hablas",
+        "listen_desc": "Pre-fader (PFL) o After-fader (AFL) para los botones Listen",
+        "metering_standard_desc": "Los vúmetros incluyen marcadores a intervalos regulares e indican el nivel de ganancia unitario estándar.",
+        "metering_broadcast_desc": "Los vúmetros incluyen marcadores precisos de escala dBFS en cada canal y medidores de reducción de ganancia (compresor).",
+        "multitrack_desc": "Graba canales individuales independientes en la tarjeta MicroSD",
+        "auto_brightness_desc": "Ajustar el sensor de luz ambiental automáticamente",
+        "haptics_desc": "Vibración al tocar los pads y controles táctiles",
+        "device_label": "Dispositivo",
     },
     "en": {
         "settings": "Settings",
@@ -450,6 +479,35 @@ TRANSLATIONS = {
         "low": "Low",
         "mid": "Mid",
         "high": "High",
+        "tab_audio_unify": "Audio & UNIFY",
+        "unify_title": "RØDE UNIFY (PipeWire Linux)",
+        "unify_desc": "Creates independent virtual devices in PipeWire (Game, Chat, Music, System and Stream Mix) with automated routing to headphones and OBS Studio.",
+        "unify_active_mt": "● MULTITRACK ACTIVE",
+        "unify_active_stereo": "○ STANDARD STEREO",
+        "unify_btn_deactivate": "Disable UNIFY",
+        "unify_btn_activate": "Enable UNIFY in Linux",
+        "unify_mt_active_desc": "USB Multitrack active: Microphone, Headset, Wireless, SMART Pads and channels 6-9 as isolated tracks for your DAW",
+        "unify_mt_inactive_desc": "USB Multitrack (9 channels): records each Streamer X input on its own isolated DAW track",
+        "unify_game_desc": "Games / Steam",
+        "unify_chat_desc": "Discord / Teams",
+        "unify_music_desc": "Spotify / Media",
+        "unify_system_desc": "OS Alerts / Desktop",
+        "unify_stream_mix_desc": "OBS Master Mix",
+        "unify_tip_badge": "OBS & DAWs",
+        "unify_tip_text": "The 5 virtual channels appear immediately in PipeWire to capture separate audio tracks (1-6) with zero crosstalk.",
+        "hp_front_output": "Headphones Output (Front TRRS 3.5mm)",
+        "headphone": "Headphones",
+        "headphone_1": "Headphone 1",
+        "headphone_2": "Headphone 2",
+        "auto_mute_output_desc": "Prevents acoustic feedback when speaking into microphones",
+        "auto_mute_bt_desc": "Ducks Bluetooth output while speaking into microphones",
+        "listen_desc": "Pre-fader (PFL) or After-fader (AFL) for Listen buttons",
+        "metering_standard_desc": "Meters include regular intervals and indicate standard unity gain level.",
+        "metering_broadcast_desc": "Meters include precise dBFS scale markers on each channel and gain reduction (compressor) meters.",
+        "multitrack_desc": "Record separate individual channels to MicroSD card",
+        "auto_brightness_desc": "Automatically adjust to ambient light sensor",
+        "haptics_desc": "Vibration feedback when tapping pads and touch controls",
+        "device_label": "Device",
     }
 }
 
@@ -653,19 +711,23 @@ class StateManager(QObject):
         # Start monitoring
         self.monitor.start()
 
-    def _init_default_dsp_channels(self):
+    def _localized_dsp_channel_name(self, idx):
+        is_en = (getattr(self, "_language", "es") == "en")
         if getattr(self, "_is_streamer_x", False):
-            names = ["Micrófono XLR", "Auriculares TRRS", "Inalámbrico"]
+            names = ["XLR Microphone", "TRRS Headset", "Wireless"] if is_en else ["Micrófono XLR", "Auriculares TRRS", "Inalámbrico"]
         elif getattr(self, "_is_duo", True):
-            names = ["Micrófono 1", "Micrófono 2", "Wireless 1", "Wireless 2"]
+            names = ["Microphone 1", "Microphone 2", "Wireless 1", "Wireless 2"] if is_en else ["Micrófono 1", "Micrófono 2", "Inalámbrico 1", "Inalámbrico 2"]
         else:
-            names = ["Micrófono 1", "Micrófono 2", "Micrófono 3", "Micrófono 4"]
+            names = ["Microphone 1", "Microphone 2", "Microphone 3", "Microphone 4"] if is_en else ["Micrófono 1", "Micrófono 2", "Micrófono 3", "Micrófono 4"]
+        return names[idx] if idx < len(names) else f"Mic {idx + 1}"
 
+    def _init_default_dsp_channels(self):
+        count = 3 if getattr(self, "_is_streamer_x", False) else 4
         channels = []
-        for i, name in enumerate(names):
+        for i in range(count):
             channels.append({
                 "id": i,
-                "name": name,
+                "name": self._localized_dsp_channel_name(i),
                 "channel_idx": 28 + i,
                 "input_idx": 191 + i,
                 "preamp_gain": 45,
@@ -852,10 +914,6 @@ class StateManager(QObject):
         self._copied_pad = None
         if self._selected_pad_index >= self._pads_per_bank:
             self._selected_pad_index = 0
-        # Streamer X has no headphone submix: the selector is hidden, so force the main mix
-        if self._is_streamer_x and self._active_mix_target != "main":
-            self._active_mix_target = "main"
-            self.activeMixTargetChanged.emit()
 
         self.stateChanged.emit()
         self.padsChanged.emit()
@@ -1283,7 +1341,7 @@ class StateManager(QObject):
             self.recordingChanged.emit()
             self.deviceConfigChanged.emit()
             self.dspChanged.emit()
-            self.toastMessage.emit(f"Sincronizado con {self._model_name}")
+            self.toastMessage.emit(f"Synced with {self._model_name}" if self._language == "en" else f"Sincronizado con {self._model_name}")
 
         except Exception as e:
             logger.exception(f"Error parsing hardware state: {e}")
@@ -1314,7 +1372,10 @@ class StateManager(QObject):
         if lang in ("es", "en") and lang != self._language:
             self._language = lang
             self.settings.setValue("language", lang)
+            for i, ch in enumerate(self._dsp_channels):
+                ch["name"] = self._localized_dsp_channel_name(i)
             self.languageChanged.emit()
+            self.dspChanged.emit()
             msg = "Idioma cambiado a Español" if lang == "es" else "Language changed to English"
             self.toastMessage.emit(msg)
 
@@ -1336,7 +1397,8 @@ class StateManager(QObject):
                     self._current_view = "home"
                     self.viewChanged.emit()
                 self.devicesChanged.emit()
-                self.toastMessage.emit(f"Cambiado a {self._devices[index].get('display_name', 'RØDECaster')}")
+                dev_disp = self._devices[index].get('display_name', 'RØDECaster')
+                self.toastMessage.emit(f"Switched to {dev_disp}" if self._language == "en" else f"Cambiado a {dev_disp}")
 
     @pyqtProperty(str, notify=stateChanged)
     def modelName(self):
@@ -2659,7 +2721,7 @@ class StateManager(QObject):
                     # Back to "Main Mix" on this headphone output
                     self.bridge.run_cmd(["set-property", str(mm[bus]), "outputMixMinus", "u32:0"])
             self.executor.submit(do_reset)
-        self.toastMessage.emit("Submezcla de auriculares sincronizada con la mezcla principal")
+        self.toastMessage.emit("Headphones submix reset to main mix" if self._language == "en" else "Submezcla de auriculares sincronizada con la mezcla principal")
 
     # ------------------------------------------------------------------
     # Headphone submix (RØDECaster Duo / Pro II)
@@ -2673,10 +2735,14 @@ class StateManager(QObject):
     MIX_BUSES = 13
 
     def _build_mix_layout(self, children):
-        if self._is_streamer_x:
-            return None
         mix_nodes = [i for i, c in enumerate(children) if c.get("name") == "MIX"]
         mm_nodes = [i for i, c in enumerate(children) if c.get("name") == "MIXMINUSES"]
+        if self._is_streamer_x:
+            if len(mix_nodes) < 10 or not mm_nodes:
+                return None
+            # Streamer X faders: 0 (Mic), 1 (Headset), 2 (USB 1), 3 (USB 2), 4 (Pads), 5 (HDMI)
+            sources = [0, 1, 7, 8, 11, 9]
+            return {"mix_nodes": mix_nodes, "mixminus_nodes": mm_nodes, "sources": sources, "buses_per_source": 10}
         if len(mix_nodes) < self.MIX_BUSES or not mm_nodes:
             return None
         sources = []
@@ -2684,7 +2750,7 @@ class StateManager(QObject):
             if c.get("name") == "CHANNEL":
                 src = c.get("properties", {}).get("channelInputSource", {}).get("U32")
                 sources.append(src if src is not None and src < 1000 else None)
-        return {"mix_nodes": mix_nodes, "mixminus_nodes": mm_nodes, "sources": sources}
+        return {"mix_nodes": mix_nodes, "mixminus_nodes": mm_nodes, "sources": sources, "buses_per_source": self.MIX_BUSES}
 
     def _submix_node(self, bus, fader_idx):
         lay = self._mix_layout
@@ -2693,7 +2759,8 @@ class StateManager(QObject):
         src = lay["sources"][fader_idx]
         if src is None:
             return None
-        k = src * self.MIX_BUSES + bus
+        buses = lay.get("buses_per_source", self.MIX_BUSES)
+        k = src * buses + bus
         return lay["mix_nodes"][k] if k < len(lay["mix_nodes"]) else None
 
     def _read_submix_state(self, children):
@@ -2753,7 +2820,7 @@ class StateManager(QObject):
     @pyqtProperty(int, notify=stateChanged)
     def headphoneBusCount(self):
         if self._is_streamer_x:
-            return 0
+            return 1
         return 2 if self._is_duo else 4
 
     @pyqtSlot(int)
@@ -2770,20 +2837,8 @@ class StateManager(QObject):
                 self.executor.submit(do_reload)
 
     def _apply_submix_hardware(self, index, level):
-        if not getattr(self, "_is_streamer_x", False):
-            if self._mix_layout and self._connected and not self._permission_error:
-                self.executor.submit(self._write_submix, self._submix_bus, index, level, None, None)
-            return
-        # Optional PipeWire sink volume for Streamer X virtual channels
-        if getattr(self, "_is_streamer_x", False):
-            channels = ["streamerx_game", "streamerx_chat", "streamerx_music", "streamerx_system"]
-            if 0 <= index < len(channels):
-                sink = channels[index]
-                self.executor.submit(
-                    subprocess.run,
-                    ["pactl", "set-sink-volume", sink, f"{level}%"],
-                    capture_output=True, timeout=2
-                )
+        if self._mix_layout and self._connected and not self._permission_error:
+            self.executor.submit(self._write_submix, self._submix_bus, index, level, None, None)
 
     def _flush_faders_hardware(self):
         if not self._connected or self._permission_error or not self._pending_fader_levels:
@@ -3328,7 +3383,7 @@ class StateManager(QObject):
         self.monitor.scan_devices()
         if self._connected and not self._permission_error:
             self.executor.submit(self._sync_hardware_state)
-        self.toastMessage.emit("Sincronizando...")
+        self.toastMessage.emit("Syncing..." if self._language == "en" else "Sincronizando...")
 
     @pyqtProperty(bool, notify=deviceConfigChanged)
     def streamerXUnifyInstalled(self):
@@ -3338,10 +3393,10 @@ class StateManager(QObject):
     def toggleStreamerXUnifyProfile(self):
         if StreamerXAudioRouter.is_unify_profile_installed():
             res = StreamerXAudioRouter.remove_unify_profile()
-            self.toastMessage.emit("Perfil UNIFY (PipeWire) desactivado")
+            self.toastMessage.emit("UNIFY profile (PipeWire) disabled" if self._language == "en" else "Perfil UNIFY (PipeWire) desactivado")
         else:
             res = StreamerXAudioRouter.install_unify_profile()
-            self.toastMessage.emit("Perfil UNIFY (Multipista PipeWire) activado")
+            self.toastMessage.emit("UNIFY profile (Multitrack PipeWire) enabled" if self._language == "en" else "Perfil UNIFY (Multipista PipeWire) activado")
         self.deviceConfigChanged.emit()
         return res
 
@@ -3360,8 +3415,12 @@ class StateManager(QObject):
             return
         if enabled == self.streamerXMultitrack:
             return
-        self.toastMessage.emit("Cambiando la Streamer X a modo multipista USB..." if enabled
-                               else "Volviendo la Streamer X a modo estéreo USB...")
+        if self._language == "en":
+            self.toastMessage.emit("Switching Streamer X to USB multitrack mode..." if enabled
+                                   else "Switching Streamer X to USB stereo mode...")
+        else:
+            self.toastMessage.emit("Cambiando la Streamer X a modo multipista USB..." if enabled
+                                   else "Volviendo la Streamer X a modo estéreo USB...")
 
         def do_switch():
             import time
@@ -3377,8 +3436,10 @@ class StateManager(QObject):
             if StreamerXAudioRouter.is_unify_profile_installed():
                 StreamerXAudioRouter.install_unify_profile()
             self.deviceConfigChanged.emit()
-            self.toastMessage.emit("Modo multipista activo: 9 canales por USB" if enabled
-                                   else "Modo estéreo USB activo")
+            if self._language == "en":
+                self.toastMessage.emit("Multitrack mode active: 9 USB channels" if enabled else "Standard stereo USB mode active")
+            else:
+                self.toastMessage.emit("Modo multipista activo: 9 canales por USB" if enabled else "Modo estéreo USB activo")
 
         self.executor.submit(do_switch)
 
@@ -3386,7 +3447,7 @@ class StateManager(QObject):
     @pyqtProperty("QVariantList", notify=dspChanged)
     def dspChannels(self):
         return [
-            {"id": i, "name": ch["name"], "channel_idx": ch.get("channel_idx", 28 + i)}
+            {"id": i, "name": self._localized_dsp_channel_name(i), "channel_idx": ch.get("channel_idx", 28 + i)}
             for i, ch in enumerate(self._dsp_channels)
         ]
 
