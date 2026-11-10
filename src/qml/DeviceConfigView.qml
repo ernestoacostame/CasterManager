@@ -63,9 +63,8 @@ Item {
                         }
                     }
 
-                    // Tab 1: Display (Hidden for Streamer X since it has no LCD screen)
+                    // Tab 1: Display (Streamer X has no LCD: only the button lighting is shown)
                     Rectangle {
-                        visible: !(stateManager && stateManager.isStreamerX)
                         width: 90
                         height: 30
                         radius: 6
@@ -73,7 +72,7 @@ Item {
 
                         Text {
                             anchors.centerIn: parent
-                            text: stateManager ? stateManager.strings.tab_display : "Pantalla"
+                            text: (stateManager && stateManager.isStreamerX) ? stateManager.strings.brightness : (stateManager ? stateManager.strings.tab_display : "Pantalla")
                             font.pixelSize: 12
                             font.bold: true
                             color: root.activeTab === 1 ? "#121214" : "#AAAAAA"
@@ -743,6 +742,7 @@ Item {
 
                         // Screen Brightness Slider
                         RowLayout {
+                            visible: !(stateManager && stateManager.isStreamerX)
                             Layout.fillWidth: true
                             spacing: 14
                             Text {
@@ -795,10 +795,11 @@ Item {
                             }
                         }
 
-                        Rectangle { Layout.fillWidth: true; height: 1; color: "#28282E" }
+                        Rectangle { visible: !(stateManager && stateManager.isStreamerX); Layout.fillWidth: true; height: 1; color: "#28282E" }
 
                         // Auto Brightness
                         RowLayout {
+                            visible: !(stateManager && stateManager.isStreamerX)
                             Layout.fillWidth: true
                             ColumnLayout {
                                 spacing: 2
@@ -822,10 +823,11 @@ Item {
                             }
                         }
 
-                        Rectangle { Layout.fillWidth: true; height: 1; color: "#28282E" }
+                        Rectangle { visible: !(stateManager && stateManager.isStreamerX); Layout.fillWidth: true; height: 1; color: "#28282E" }
 
                         // Metering Cards (Default vs Broadcast)
                         ColumnLayout {
+                            visible: !(stateManager && stateManager.isStreamerX)
                             Layout.fillWidth: true
                             spacing: 12
 
@@ -936,10 +938,11 @@ Item {
                             }
                         }
 
-                        Rectangle { Layout.fillWidth: true; height: 1; color: "#28282E" }
+                        Rectangle { visible: !(stateManager && stateManager.isStreamerX); Layout.fillWidth: true; height: 1; color: "#28282E" }
 
                         // Haptic Feedback
                         RowLayout {
+                            visible: !(stateManager && stateManager.isStreamerX)
                             Layout.fillWidth: true
                             ColumnLayout {
                                 spacing: 2
