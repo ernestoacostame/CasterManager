@@ -51,9 +51,27 @@ Rectangle {
                 }
             }
             Switch {
+                id: toggleSw
                 visible: card.onProp !== ""
                 checked: card.isOn
                 onToggled: if (stateManager) stateManager.setDspParameter(card.onProp, checked)
+                indicator: Rectangle {
+                    implicitWidth: 38
+                    implicitHeight: 20
+                    radius: 10
+                    color: toggleSw.checked ? "#CBA158" : "#2A2A30"
+                    border.color: toggleSw.checked ? "#DFB666" : "#3C3C46"
+                    border.width: 1
+                    Rectangle {
+                        x: toggleSw.checked ? parent.width - width - 2 : 2
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 16
+                        height: 16
+                        radius: 8
+                        color: toggleSw.checked ? "#121214" : "#8E8E93"
+                        Behavior on x { NumberAnimation { duration: 120 } }
+                    }
+                }
             }
         }
 

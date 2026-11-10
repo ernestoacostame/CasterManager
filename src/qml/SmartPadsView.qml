@@ -748,12 +748,12 @@ Item {
 
                         Repeater {
                             model: [
-                                {"id": 8, "name": "Voice Disguise", "desc": "Tono anónimo profundo / Pitch bajo", "icon": "🎭"},
-                                {"id": 9, "name": "Megaphone", "desc": "Filtro paso banda radio / megáfono", "icon": "📢"},
-                                {"id": 10, "name": "Large Robot", "desc": "Sintetizador vocoder robótico", "icon": "🤖"},
-                                {"id": 12, "name": "Pitch Shift", "desc": "Transporte tonal agudo (Pitch Up)", "icon": "🎼"},
-                                {"id": 13, "name": "Monster", "desc": "Voz gutural oscura y pesada", "icon": "👹"},
-                                {"id": 14, "name": "Small Robot", "desc": "Vocoder electrónico sintetizado", "icon": "🦾"}
+                                {"id": 8, "name": "Voice Disguise", "desc": (stateManager && stateManager.language === "en" ? "Deep anonymous pitch alteration" : "Tono anónimo profundo / Pitch bajo"), "icon": "🎭"},
+                                {"id": 9, "name": "Megaphone", "desc": (stateManager && stateManager.language === "en" ? "Radio and megaphone bandpass filter" : "Filtro paso banda radio / megáfono"), "icon": "📢"},
+                                {"id": 10, "name": "Large Robot", "desc": (stateManager && stateManager.language === "en" ? "Robotic synthesizer vocoder" : "Sintetizador vocoder robótico"), "icon": "🤖"},
+                                {"id": 12, "name": "Pitch Shift", "desc": (stateManager && stateManager.language === "en" ? "High pitch shift (Pitch Up)" : "Transporte tonal agudo (Pitch Up)"), "icon": "🎼"},
+                                {"id": 13, "name": "Monster", "desc": (stateManager && stateManager.language === "en" ? "Dark deep guttural voice" : "Voz gutural oscura y pesada"), "icon": "👹"},
+                                {"id": 14, "name": "Small Robot", "desc": (stateManager && stateManager.language === "en" ? "Synthesized electronic vocoder" : "Vocoder electrónico sintetizado"), "icon": "🦾"}
                             ]
 
                             Rectangle {

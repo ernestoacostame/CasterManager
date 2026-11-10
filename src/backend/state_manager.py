@@ -222,6 +222,7 @@ TRANSLATIONS = {
         "equalizer": "Ecualizador (EQ)",
         "equalizer_desc": "Modela el perfil tonal en frecuencias graves, medias y agudas.",
         "preamp": "Preamplificador / Entrada",
+        "preamp_desc": "Revolution Preamp™ de ultra-bajo ruido",
         "preamp_gain": "Ganancia de Entrada",
         "phantom_power": "Phantom (+48V)",
         "phase_invert": "Invertir Fase (Ø)",
@@ -462,6 +463,7 @@ TRANSLATIONS = {
         "equalizer": "Equalizer (EQ)",
         "equalizer_desc": "Sculpts vocal tone by adjusting low, mid and high frequencies.",
         "preamp": "Preamplifier / Input",
+        "preamp_desc": "Revolution Preamp™ ultra-low noise",
         "preamp_gain": "Input Gain",
         "phantom_power": "Phantom (+48V)",
         "phase_invert": "Phase Invert (Ø)",
@@ -1271,6 +1273,14 @@ class StateManager(QObject):
                 if c_node:
                     dsp["_synced"] = True
                     cp = {k: list(v.values())[0] for k, v in c_node.get("properties", {}).items()}
+                    if "channelBypassProcessing" in cp:
+                        bypass = bool(cp["channelBypassProcessing"])
+                        dsp["bypass_processing"] = bypass
+                        if bypass and (dsp.get("noise_gate_on") or dsp.get("aphex_on") or dsp.get("compressor_on")):
+                            ch_node_idxs = [idx for idx, c in enumerate(children) if c.get("name") == "CHANNEL"]
+                            if i < len(ch_node_idxs):
+                                self.bridge.run_cmd(["set-property", str(ch_node_idxs[i]), "channelBypassProcessing", "bool:false"])
+                                dsp["bypass_processing"] = False
                     if "aphexOn" in cp: dsp["aphex_on"] = bool(cp["aphexOn"])
                     if "aphexAEMix" in cp: dsp["aphex_ae_mix"] = float(cp["aphexAEMix"])
                     if "aphexAETune" in cp: dsp["aphex_ae_tune"] = float(cp["aphexAETune"])
@@ -3504,6 +3514,7 @@ class StateManager(QObject):
             self._flush_dsp_hardware()
         else:
             prop_map = {
+                "bypass_processing": ("channelBypassProcessing", "bool"),
                 "aphex_on": ("aphexOn", "bool"),
                 "aphex_ae_mix": ("aphexAEMix", "f64"),
                 "aphex_ae_tune": ("aphexAETune", "f64"),
@@ -3531,6 +3542,9 @@ class StateManager(QObject):
                 "eq_high": ("eqHighGain", "f64"),
             }
             if name in prop_map:
+                if name != "bypass_processing" and ch.get("bypass_processing"):
+                    ch["bypass_processing"] = False
+                    self._pending_dsp_updates[(channel_node_idx, "channelBypassProcessing")] = "bool:false"
                 hw_prop, hw_type = prop_map[name]
                 if hw_type == "bool":
                     val_str = f"bool:{str(bool(value)).lower()}"

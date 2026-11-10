@@ -430,7 +430,7 @@ Item {
                     DspCard {
                         icon: "🎙️"
                         title: root.s("preamp", "Preamplificador / Entrada")
-                        description: "Revolution Preamp™ ultra-bajo ruido"
+                        description: root.s("preamp_desc", "Revolution Preamp™ ultra-bajo ruido")
                         focused: root.focusedEffect === "preamp"
 
                         RowLayout {

@@ -344,7 +344,7 @@ Item {
 
                                         Text {
                                             anchors.centerIn: parent
-                                            text: modelData.is_virtual ? "VIRT" : "FÍS"
+                                            text: modelData.is_virtual ? "VIRT" : (stateManager && stateManager.language === "en" ? "PHYS" : "FÍS")
                                             font.pixelSize: 8
                                             font.bold: true
                                             color: modelData.is_virtual ? "#CBA158" : "#8E8E93"
