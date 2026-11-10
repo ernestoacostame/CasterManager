@@ -3415,6 +3415,30 @@ class StateManager(QObject):
     # what RØDE UNIFY enables on macOS/Windows.
     STREAMER_X_MULTITRACK_PID = "0055"
 
+    def _restore_streamer_x_self_monitor(self, retries=10):
+        """Re-enumerating into/out of multitrack reloads the unit state and drops the
+        microphone (and headset) from the headphone mix, so you stop hearing yourself.
+        Put them back on headphone bus 0 (worker thread; USB capture is unaffected)."""
+        import time
+        for _ in range(retries):
+            dump = self.bridge.dump_state()
+            children = dump.get("children", []) if dump else []
+            mix_nodes = [i for i, c in enumerate(children) if c.get("name") == "MIX"]
+            if len(mix_nodes) >= 20:
+                for src in (0, 1):  # Mic, Headset (10 buses per source on Streamer X)
+                    node = mix_nodes[src * 10]
+                    props = children[node].get("properties", {})
+                    raw = str(list(props.get("mixLevelWithAnchor", {"": ""}).values())[0])
+                    try:
+                        lvl = float(raw.split("|")[0])
+                    except ValueError:
+                        lvl = -1.0
+                    if lvl <= 0.0:
+                        logger.info(f"Restoring Streamer X self-monitoring on MIX node {node}")
+                        self.bridge.run_cmd(["set-property", str(node), "mixLevelWithAnchor", "str:0.7|-1"])
+                return
+            time.sleep(1.0)
+
     @pyqtProperty(bool, notify=deviceConfigChanged)
     def streamerXMultitrack(self):
         return self._is_streamer_x and str(self.bridge.target_pid) == self.STREAMER_X_MULTITRACK_PID
@@ -3445,6 +3469,7 @@ class StateManager(QObject):
             # Virtual UNIFY devices point at the old ALSA nodes: rebuild them for the new layout
             if StreamerXAudioRouter.is_unify_profile_installed():
                 StreamerXAudioRouter.install_unify_profile()
+            self._restore_streamer_x_self_monitor()
             self.deviceConfigChanged.emit()
             if self._language == "en":
                 self.toastMessage.emit("Multitrack mode active: 9 USB channels" if enabled else "Standard stereo USB mode active")

@@ -69,7 +69,11 @@ fi
 
 # 3. Compile or copy Rust backend binary if needed
 echo "[3/6] Checking CasterManager backend engine..."
-if [ -f "$SCRIPT_DIR/Resources/rcp2-cli-main/target/release/rcp2-cli" ]; then
+# The bundled bin/rcp2-cli is authoritative (it carries Streamer X multitrack PID 0x0055
+# support); only fall back to a local build when it is missing, never overwrite it.
+if [ -x "$SCRIPT_DIR/bin/rcp2-cli" ]; then
+    echo "      Using bundled bin/rcp2-cli"
+elif [ -f "$SCRIPT_DIR/Resources/rcp2-cli-main/target/release/rcp2-cli" ]; then
     cp --remove-destination "$SCRIPT_DIR/Resources/rcp2-cli-main/target/release/rcp2-cli" "$SCRIPT_DIR/bin/rcp2-cli"
     chmod +x "$SCRIPT_DIR/bin/rcp2-cli"
 elif [ -f "$SCRIPT_DIR/Resources/rcp2-cli-main/target/debug/rcp2-cli" ]; then
