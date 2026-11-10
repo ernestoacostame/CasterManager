@@ -1,6 +1,6 @@
 # rcp2-cli patches
 
-`bin/rcp2-cli` is built from [rcp2-cli](https://github.com/x1h0/rcp2-cli) (MIT) plus
+`bin/rcp2-cli` is built from rcp2-cli (MIT, © x1h0) plus
 `rcp2-cli-streamerx-addchild.patch`, applied on top of the CasterManager pad/show commands:
 
 - RØDE Streamer X support (PIDs `0x0038` stereo and `0x0055` USB multitrack, HID interface 6).
