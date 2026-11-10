@@ -66,12 +66,12 @@ class StreamerXAudioRouter:
     # PipeWire source so a DAW can record every input on its own track.
     # (source name, description, multichannel positions, output positions)
     MULTITRACK_SOURCES = [
-        ("streamerx_mt_mic", "Streamer X - Micrófono", "aux0", "mono"),
-        ("streamerx_mt_headset", "Streamer X - Headset", "aux1", "mono"),
-        ("streamerx_mt_wireless", "Streamer X - Wireless", "aux2", "mono"),
-        ("streamerx_mt_pads", "Streamer X - SMART Pads", "aux3,aux4", "front-left,front-right"),
-        ("streamerx_mt_aux67", "Streamer X - Canales 6-7", "aux5,aux6", "front-left,front-right"),
-        ("streamerx_mt_aux89", "Streamer X - Canales 8-9", "aux7,aux8", "front-left,front-right"),
+        ("streamerx_mt_mic", "UNIFY-Mic", "aux0", "mono"),
+        ("streamerx_mt_headset", "UNIFY-Headset", "aux1", "mono"),
+        ("streamerx_mt_wireless", "UNIFY-Wireless", "aux2", "mono"),
+        ("streamerx_mt_pads", "UNIFY-Pads", "aux3,aux4", "front-left,front-right"),
+        ("streamerx_mt_aux67", "UNIFY-Aux6-7", "aux5,aux6", "front-left,front-right"),
+        ("streamerx_mt_aux89", "UNIFY-Aux8-9", "aux7,aux8", "front-left,front-right"),
     ]
 
     @staticmethod
@@ -302,6 +302,17 @@ context.modules = [
                     res_mic = subprocess.run(cmd_mic, capture_output=True, text=True, timeout=3)
                     if res_mic.returncode == 0 and res_mic.stdout.strip().isdigit():
                         loaded_ids.append(res_mic.stdout.strip())
+
+                    # Also loopback SMART Pads into Stream Mix so master stream includes pads
+                    if multitrack:
+                        cmd_pads = [
+                            "pactl", "load-module", "module-loopback",
+                            "source=streamerx_mt_pads",
+                            f"sink={ch_name}"
+                        ]
+                        res_pads = subprocess.run(cmd_pads, capture_output=True, text=True, timeout=3)
+                        if res_pads.returncode == 0 and res_pads.stdout.strip().isdigit():
+                            loaded_ids.append(res_pads.stdout.strip())
 
                 # C) Load virtual recording source (Input Device in OBS Studio, KutEditor & DAWs!)
                 cmd_src = [
