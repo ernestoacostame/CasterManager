@@ -1057,11 +1057,11 @@ class StateManager(QObject):
                     c0_props = children[28].get("properties", {})
                     if "channelOutputMute" in c0_props:
                         self._faders[0]["mute"] = bool(c0_props["channelOutputMute"].get("Bool", False))
-                # Fader 1: Headset Gain (Node 192)
+                # Fader 1: Headset Gain (Node 192, max 40 dB)
                 if 192 < len(children) and len(self._faders) > 1:
                     hg_prop = children[192].get("properties", {}).get("inputMicrophoneGain", {}).get("U32")
                     if hg_prop is not None:
-                        self._faders[1]["level"] = int(round((int(hg_prop) / 76.0) * 100))
+                        self._faders[1]["level"] = min(100, int(round((int(hg_prop) / 40.0) * 100)))
                 # Faders 2..5: Stream Mix
                 sx_map = {2: 182, 3: 184, 4: 187, 5: 188}
                 for f_idx, node_id in sx_map.items():
@@ -2577,7 +2577,7 @@ class StateManager(QObject):
         to_send = dict(self._pending_fader_levels)
         self._pending_fader_levels.clear()
         if self.isStreamerX:
-            sx_map = {1: 180, 2: 182, 3: 184, 4: 187, 5: 188}
+            sx_map = {2: 182, 3: 184, 4: 187, 5: 188}
             for idx, lvl in to_send.items():
                 if idx == 0:
                     gain_db = int(round((lvl / 100.0) * 76))
@@ -2587,6 +2587,15 @@ class StateManager(QObject):
                     )
                     if len(self._dsp_channels) > 0:
                         self._dsp_channels[0]["preamp_gain"] = gain_db
+                        self.dspChanged.emit()
+                elif idx == 1:
+                    gain_db = int(round((lvl / 100.0) * 40))
+                    self.executor.submit(
+                        self.bridge.run_cmd,
+                        ["set-property", "192", "inputMicrophoneGain", f"u32:{gain_db}"]
+                    )
+                    if len(self._dsp_channels) > 1:
+                        self._dsp_channels[1]["preamp_gain"] = gain_db
                         self.dspChanged.emit()
                 else:
                     node_id = sx_map.get(idx)
@@ -2756,12 +2765,12 @@ class StateManager(QObject):
                                 self._faders[0]["level"] = fader_lvl
                                 changed = True
 
-                # Input 1: Headset (Node 192)
+                # Input 1: Headset (Node 192, max 40 dB)
                 if 192 < len(children) and len(self._faders) > 1:
                     hs_val = children[192].get("properties", {}).get("inputMicrophoneGain", {}).get("U32")
                     if hs_val is not None and 1 not in self._pending_fader_levels:
                         hs_int = int(hs_val)
-                        hs_lvl = int(round((hs_int / 76.0) * 100))
+                        hs_lvl = min(100, int(round((hs_int / 40.0) * 100)))
                         if abs(self._faders[1].get("level", 0) - hs_lvl) > 1:
                             self._faders[1]["level"] = hs_lvl
                             changed = True
