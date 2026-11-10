@@ -865,6 +865,67 @@ Item {
                             }
                         }
                     }
+                    // Ducking depth (DUCKER.duckerDepth): how much other audio drops while a Ducking pad is held
+                    Rectangle {
+                        Layout.fillWidth: true
+                        height: duckCol.height + 28
+                        radius: 10
+                        color: "#202024"
+                        border.color: (stateManager && stateManager.duckingEnabled) ? "#CBA158" : "#2E2E36"
+                        border.width: 1
+
+                        ColumnLayout {
+                            id: duckCol
+                            anchors.top: parent.top
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.margins: 14
+                            spacing: 10
+
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 12
+                                Text { text: "🎚️"; font.pixelSize: 22 }
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 2
+                                    Text {
+                                        text: stateManager && stateManager.language === "en" ? "Ducking depth" : "Profundidad del Ducking"
+                                        font.pixelSize: 14; font.bold: true; color: "#FFFFFF"
+                                    }
+                                    Text {
+                                        text: stateManager && stateManager.language === "en"
+                                              ? "How much the rest of the audio drops while a Ducking pad is held. Off = no attenuation."
+                                              : "Cuánto baja el resto del audio mientras mantienes un pad de Ducking. Desactivado = sin atenuación."
+                                        font.pixelSize: 11; color: "#9A9A9E"; wrapMode: Text.WordWrap; Layout.fillWidth: true
+                                    }
+                                }
+                                Switch {
+                                    checked: stateManager ? stateManager.duckingEnabled : false
+                                    onToggled: if (stateManager) stateManager.setDuckingEnabled(checked)
+                                }
+                            }
+
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 12
+                                enabled: Boolean(stateManager && stateManager.duckingEnabled)
+                                opacity: enabled ? 1.0 : 0.4
+                                Slider {
+                                    id: duckSlider
+                                    Layout.fillWidth: true
+                                    from: -40; to: -1; stepSize: 1
+                                    value: stateManager ? stateManager.duckingDepth : -9
+                                    onMoved: if (stateManager) stateManager.setDuckingDepth(value)
+                                }
+                                Text {
+                                    text: Math.round(duckSlider.value) + " dB"
+                                    font.pixelSize: 12; font.bold: true; color: "#CBA158"
+                                    Layout.preferredWidth: 50
+                                }
+                            }
+                        }
+                    }
                 }
 
                 // TAB 3: MIDI

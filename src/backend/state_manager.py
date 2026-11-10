@@ -659,6 +659,12 @@ class StateManager(QObject):
         self._listen_prefader = False
         self._multitrack_mode = 2
         self._midi_control = False
+        # DUCKER.duckerDepth (dB, 0 = off). Used by SMART Pads in Ducking mode.
+        self._ducker_depth = -9.0
+        try:
+            self._ducker_last_depth = float(self.settings.value("ducker_last_depth", -9.0))
+        except (TypeError, ValueError):
+            self._ducker_last_depth = -9.0
 
         self.bridge = RcpBridge()
         self.executor = ThreadPoolExecutor(max_workers=2)
@@ -1070,6 +1076,18 @@ class StateManager(QObject):
                     else:
                         self._sd_used = "0 GB"
                     self._sd_percent = (used / cap) * 100.0 if cap > 0 else 0.0
+
+            # Ducker depth (same node on Duo, Pro II and Streamer X)
+            self._root_child_index = {}
+            for ci, cn in enumerate(dump.get("children", [])):
+                self._root_child_index.setdefault(cn.get("name"), ci)
+            ducker_node = find_node(dump, "DUCKER")
+            if ducker_node:
+                dval = ducker_node.get("properties", {}).get("duckerDepth", {}).get("F64")
+                if dval is not None:
+                    self._ducker_depth = float(dval)
+                    if self._ducker_depth < -0.5:
+                        self._ducker_last_depth = self._ducker_depth
 
             # GUI Settings (Brightness, Meters)
             gui_node = find_node(dump, "GUI")
@@ -3279,6 +3297,38 @@ class StateManager(QObject):
         self.deviceConfigChanged.emit()
         if self._connected and not self._permission_error:
             self.executor.submit(self.bridge.run_cmd, ["set-property", "15", "systemHapticSetting", f"u32:{val}"])
+
+    @pyqtProperty(bool, notify=deviceConfigChanged)
+    def duckingEnabled(self):
+        return self._ducker_depth < -0.5
+
+    @pyqtProperty(float, notify=deviceConfigChanged)
+    def duckingDepth(self):
+        return self._ducker_depth if self._ducker_depth < -0.5 else self._ducker_last_depth
+
+    def _write_ducker_depth(self, depth):
+        self._ducker_depth = depth
+        self.deviceConfigChanged.emit()
+        if self._connected and not self._permission_error:
+            node = self._find_root_child_index("DUCKER")
+            if node is not None:
+                self.executor.submit(self.bridge.run_cmd, ["set-property", str(node), "duckerDepth", f"f64:{depth:.1f}"])
+
+    @pyqtSlot(bool)
+    def setDuckingEnabled(self, enabled):
+        self._write_ducker_depth(self._ducker_last_depth if enabled else 0.0)
+
+    @pyqtSlot(float)
+    def setDuckingDepth(self, depth):
+        depth = max(-40.0, min(-1.0, round(float(depth))))
+        self._ducker_last_depth = depth
+        self.settings.setValue("ducker_last_depth", depth)
+        self._write_ducker_depth(depth)
+
+    def _find_root_child_index(self, name):
+        """Index of the first root child with this node name (layouts differ per model)."""
+        idx = getattr(self, "_root_child_index", {}).get(name)
+        return idx if idx is not None else {"DUCKER": 1}.get(name)
 
     @pyqtProperty(bool, notify=deviceConfigChanged)
     def midiControl(self):
