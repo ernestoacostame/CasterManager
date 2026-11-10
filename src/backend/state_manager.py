@@ -3487,10 +3487,24 @@ class StateManager(QObject):
             return info["path"] if info else None
         return None
 
+    # Defaults of a fresh EFFECTS_PARAMETERS block (as RØDE Unify creates it)
+    PAD_FX_DEFAULTS = [
+        ("reverbOn", "bool:false"), ("reverbMix", "f64:0.5"), ("reverbModel", "f64:0.6"),
+        ("reverbLowCut", "f64:0.6661"), ("reverbHighCut", "f64:0.3333"),
+        ("echoOn", "bool:false"), ("echoMix", "f64:0.5"), ("echoDelay", "f64:0.165"),
+        ("echoDecay", "f64:0.5"), ("echoLowCut", "f64:0.5"), ("echoHighCut", "f64:0.5"),
+        ("distortionOn", "bool:false"), ("distortionIntensity", "f64:0.7"),
+        ("robotOn", "bool:false"), ("robotMix", "f64:0.0"), ("robotLevel", "f64:0.0"),
+        ("voiceDisguiseOn", "bool:false"),
+        ("pitchShiftOn", "bool:false"), ("pitchShiftSemitones", "f64:7.0"),
+    ]
+
     def _ensure_fx_pad(self, pad):
-        """Turn the current pad into a voice-FX pad (no effect enabled yet)."""
-        if pad.get("type") == "fx":
-            return []
+        """Local state: turn the current pad into a voice-FX pad. Returns True if the
+        hardware still has to be converted (see _hw_make_fx_pad)."""
+        raw_type = (pad.get("_raw") or {}).get("padType")
+        if pad.get("type") == "fx" and raw_type == 2:
+            return False
         col = 7
         pad["type"] = "fx"
         pad["file"] = ""
@@ -3499,17 +3513,86 @@ class StateManager(QObject):
         pad["color_hex"] = PAD_COLORS[col]["hex"]
         pad.setdefault("fx_mode", 1)
         pad.setdefault("fx", {})
-        fx_input = 7 if self._is_streamer_x else int(pad.get("fx_channel", 0))
-        pad["fx_channel"] = fx_input
-        return [
-            ("padType", "u32:2"),
-            ("padFilePath", "str:"),
-            ("padName", "str:Voice_FX"),
-            ("padColourIndex", f"u32:{col}"),
-            ("padEffectTriggerMode", f"u32:{int(pad.get('fx_mode', 1))}"),
-            ("padEffectInput", f"u32:{fx_input}"),
-            ("padActive", "bool:false"),
-        ]
+        pad["fx_channel"] = 7 if self._is_streamer_x else int(pad.get("fx_channel", 0))
+        return True
+
+    _fx_create_lock = threading.Lock()
+
+    def _hw_ensure_fx_pad_locked(self, pad, b_str, p_str):
+        """Serialise pad creation: the executor has 2 workers and a burst of slider
+        moves must not create duplicate PAD / EFFECTS_PARAMETERS nodes."""
+        with self._fx_create_lock:
+            if (pad.get("_raw") or {}).get("padType") == 2 and int(pad.get("idx", -1)) in getattr(self, "_pad_fx_nodes", {}):
+                return True
+            return self._hw_make_fx_pad(pad, b_str, p_str)
+
+    def _hw_make_fx_pad(self, pad, b_str, p_str):
+        """Worker thread. Mirrors RØDE Unify: an FX pad needs its own
+        PADEFFECTS/EFFECTS_PARAMETERS block, which the device does not create by itself."""
+        pad_idx = int(pad.get("idx", 0))
+        dump = self.bridge.dump_state()
+        if not dump:
+            return False
+        children = dump.get("children", [])
+        sp_i = next((i for i, c in enumerate(children) if c.get("name") == "SOUNDPADS"), None)
+        pe_i = next((i for i, c in enumerate(children) if c.get("name") == "PADEFFECTS"), None)
+        if sp_i is None or pe_i is None:
+            logger.warning("SOUNDPADS / PADEFFECTS not found; cannot create FX pad")
+            return False
+
+        def pad_node(dmp):
+            for c in dmp["children"][sp_i].get("children", []):
+                pr = {k: list(v.values())[0] for k, v in c.get("properties", {}).items()}
+                if pr.get("padIdx") == pad_idx:
+                    return pr
+            return None
+
+        # 1. Effect block for this pad
+        fx_nodes = self._map_pad_fx_nodes(dump)
+        if pad_idx not in fx_nodes:
+            insert = len(children[pe_i].get("children", []))
+            props = [f"effectsIdx=u32:{pad_idx}"] + [f"{k}={v}" for k, v in self.PAD_FX_DEFAULTS]
+            _, err = self.bridge.run_cmd(["add-child", str(pe_i), str(insert), "EFFECTS_PARAMETERS"] + props, timeout=10)
+            logger.info(f"Created EFFECTS_PARAMETERS for pad {pad_idx}" + (f" FAILED: {err.strip()}" if err else ""))
+            if err:
+                return False
+
+        # 2. A pad of another type is removed first (changing its type in place deletes it)
+        existing = pad_node(dump)
+        if existing is not None and existing.get("padType") != 2:
+            self.bridge.clear_pad(b_str, p_str)
+            dump = self.bridge.dump_state() or dump
+            existing = pad_node(dump)
+
+        # 3. Create the FX pad node with the full property set
+        if existing is None:
+            insert = len(dump["children"][sp_i].get("children", []))
+            fx_input = int(pad.get("fx_channel", 7 if self._is_streamer_x else 0))
+            props = [
+                f"padIdx=u32:{pad_idx}", "padType=u32:2", "padName=str:Voice_FX", "padFilePath=str:",
+                f"padColourIndex=u32:{int(pad.get('color_idx', 7))}", "padGain=f64:-12.0",
+                "padLoop=bool:false", "padReplay=bool:false", "padActive=bool:false", "padPlayMode=u32:0",
+                "padTriggerMode=u32:1", "padTriggerType=u32:0", f"padTriggerControl=u32:{pad_idx}",
+                "padTriggerOn=u32:127", "padTriggerOff=u32:0", "padTriggerSend=u32:2",
+                "padTriggerChannel=u32:1", "padTriggerCustom=bool:false", "padIsInternal=bool:false",
+                f"padEffectInput=u32:{fx_input}", f"padEffectTriggerMode=u32:{int(pad.get('fx_mode', 1))}",
+                "padEnvStart=f64:0.0", "padEnvStop=f64:0.0", "padEnvFadeIn=f64:0.0", "padEnvFadeOut=f64:0.0",
+                "padMixerMode=u32:0", "padMixerTriggerMode=u32:0", "padMixerFadeInSeconds=f64:0.0",
+                "padMixerFadeOutSeconds=f64:0.0", "padMixerFadeExcludeHost=bool:false",
+                "padMixerCensorCustom=bool:false", "padMixerCensorFilePath=str:",
+            ]
+            _, err = self.bridge.run_cmd(["add-child", str(sp_i), str(insert), "PAD"] + props, timeout=10)
+            logger.info(f"Created FX PAD {pad_idx}" + (f" FAILED: {err.strip()}" if err else ""))
+            if err:
+                return False
+
+        dump = self.bridge.dump_state()
+        if dump:
+            self._pad_fx_nodes = self._map_pad_fx_nodes(dump)
+            hw = pad_node(dump)
+            if hw:
+                pad["_raw"] = {k: v for k, v in hw.items() if isinstance(v, (int, float, str, bool))}
+        return pad_idx in getattr(self, "_pad_fx_nodes", {})
 
     @staticmethod
     def _fx_val_str(prop, value):
@@ -3525,7 +3608,7 @@ class StateManager(QObject):
         pad = self._get_current_pad()
         if not pad:
             return
-        pad_props = self._ensure_fx_pad(pad)
+        needs_hw = self._ensure_fx_pad(pad)
         fx = dict(pad.get("fx") or {})
         fx[prop] = bool(value) if prop.endswith("On") else float(value)
         pad["fx"] = fx
@@ -3540,8 +3623,9 @@ class StateManager(QObject):
         self._pending_fx_writes[(pad_idx, prop)] = val
 
         def do_set():
-            if pad_props:
-                self._send_pad_props(b_str, p_str, pad_props, pad.setdefault("_raw", {}))
+            if needs_hw and not self._hw_ensure_fx_pad_locked(pad, b_str, p_str):
+                logger.warning(f"Could not create FX pad {pad_idx}")
+                return
             v = self._pending_fx_writes.pop((pad_idx, prop), None)
             if v is None:
                 return  # a newer value for the same control is already queued
@@ -3559,14 +3643,18 @@ class StateManager(QObject):
         pad = self._get_current_pad()
         if not pad:
             return
-        pad_props = self._ensure_fx_pad(pad)
+        needs_hw = self._ensure_fx_pad(pad)
         pad["fx_mode"] = 1 if mode else 0
         self.padsChanged.emit()
         self.selectedPadChanged.emit()
         if self._connected and not self._permission_error:
-            props = pad_props + [("padEffectTriggerMode", f"u32:{pad['fx_mode']}")]
-            self.executor.submit(self._send_pad_props, str(self._current_bank), str(self._selected_pad_index),
-                                 props, pad.setdefault("_raw", {}))
+            b_str, p_str = str(self._current_bank), str(self._selected_pad_index)
+            def do_set():
+                if needs_hw and not self._hw_ensure_fx_pad_locked(pad, b_str, p_str):
+                    return
+                self._send_pad_props(b_str, p_str, [("padEffectTriggerMode", f"u32:{pad['fx_mode']}")],
+                                     pad.setdefault("_raw", {}))
+            self.executor.submit(do_set)
 
     @pyqtSlot(int)
     def setPadFxInput(self, ch):
