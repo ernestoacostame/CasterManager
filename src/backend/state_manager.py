@@ -2804,17 +2804,6 @@ class StateManager(QObject):
                                 self._faders[f_idx]["level"] = lvl_val
                                 changed = True
 
-                # 3. Rotary Knob 2: Headphone Master Output (Node 13)
-                if 13 < len(children):
-                    out_props = children[13].get("properties", {})
-                    if "outputMonLevel" in out_props:
-                        mon_lvl = int(round(float(out_props["outputMonLevel"].get("F64", 0.25)) * 100))
-                        mon_mute = bool(out_props.get("outputMonMute", {}).get("Bool", False))
-                        if mon_lvl != self._headphone_volume or mon_mute != self._headphone_mute:
-                            self._headphone_volume = mon_lvl
-                            self._headphone_mute = mon_mute
-                            self.headphoneVolumeChanged.emit()
-
                 if changed:
                     self.fadersChanged.emit()
 
