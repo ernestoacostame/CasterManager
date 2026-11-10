@@ -617,6 +617,9 @@ class StateManager(QObject):
         self._pending_fader_levels = {}
         self._poll_in_flight = False
         self._device_generation = 0
+        self._mix_layout = None
+        self._submix_bus = 0
+        self._submix_custom = {}
 
         # Faders state
         self._faders = self._init_default_faders()
@@ -841,6 +844,9 @@ class StateManager(QObject):
         self._active_dsp_channel = 0
         # Never carry queued writes from the previous device over to the new one
         self._device_generation += 1
+        self._mix_layout = None
+        self._submix_bus = 0
+        self._submix_custom = {}
         self._pending_fader_levels.clear()
         self._pending_dsp_updates.clear()
         self._copied_pad = None
@@ -1115,6 +1121,7 @@ class StateManager(QObject):
                                 self._faders[idx]["mute"] = bool(item.get("mute", False))
                                 self._faders[idx]["listen"] = bool(item.get("listen", False))
                                 self._faders[idx]["level"] = int(round(float(item.get("level", 0.7)) * 100))
+                                self._faders[idx]["level_raw"] = float(item.get("level", 0.7))
                     except Exception as e:
                         logger.debug(f"Error parsing fader list: {e}")
 
@@ -1258,6 +1265,15 @@ class StateManager(QObject):
                     iid = c.get("properties", {}).get("inputId", {}).get("U32", 0)
                     if iid < len(self._dsp_channels):
                         self._dsp_channels[iid]["input_idx"] = child_idx
+
+            # Headphone submix layout (Duo / Pro II): MIX matrix + per-output mode
+            self._mix_layout = self._build_mix_layout(children)
+            if self._mix_layout:
+                self._submix_custom = {}
+                for b, mm_node in enumerate(self._mix_layout["mixminus_nodes"]):
+                    mode = children[mm_node].get("properties", {}).get("outputMixMinus", {}).get("U32", 0)
+                    self._submix_custom[b] = (mode == 2)
+                self._read_submix_state(children)
 
             logger.info("Successfully synced hardware state!")
             self.stateChanged.emit()
@@ -2520,8 +2536,9 @@ class StateManager(QObject):
             f_copy = dict(f)
             # Level and mute according to active mix
             f_copy["main_level"] = f.get("level", 70)
-            f_copy["submix_level"] = f.get("submix_level", f.get("level", 70))
             f_copy["submix_linked"] = f.get("submix_linked", True)
+            # A linked channel follows the main fader on the headphone bus
+            f_copy["submix_level"] = f_copy["main_level"] if f_copy["submix_linked"] else f.get("submix_level", f.get("level", 70))
             f_copy["submix_mute"] = f.get("submix_mute", False)
             f_copy["is_submix_mode"] = is_hp
 
@@ -2542,7 +2559,9 @@ class StateManager(QObject):
                 new_mute = not self._faders[index].get("submix_mute", False)
                 self._faders[index]["submix_mute"] = new_mute
                 self.fadersChanged.emit()
-                msg = f"{self._faders[index]['name']} (Auriculares): " + ("Mute" if new_mute else "Unmute")
+                if self._mix_layout and self._connected and not self._permission_error:
+                    self.executor.submit(self._write_submix, self._submix_bus, index, None, new_mute, None)
+                msg = f"{self._faders[index]['name']} (Auriculares {self._submix_bus + 1}): " + ("Mute" if new_mute else "Unmute")
                 self.toastMessage.emit(msg)
             else:
                 new_mute = not self._faders[index]["mute"]
@@ -2610,7 +2629,13 @@ class StateManager(QObject):
             self._faders[index]["submix_linked"] = new_linked
             if new_linked:
                 self._faders[index]["submix_level"] = self._faders[index]["level"]
-                self._apply_submix_hardware(index, self._faders[index]["level"])
+                if self._mix_layout and self._connected and not self._permission_error:
+                    self.executor.submit(self._write_submix, self._submix_bus, index, None, None, True)
+                else:
+                    self._apply_submix_hardware(index, self._faders[index]["level"])
+            elif self._mix_layout and self._connected and not self._permission_error:
+                self.executor.submit(self._write_submix, self._submix_bus, index,
+                                     self._faders[index].get("submix_level", self._faders[index]["level"]), None, None)
             self.fadersChanged.emit()
             msg = f"{self._faders[index]['name']}: " + ("Vinculado al Stream" if new_linked else "Monitoreo Personalizado")
             self.toastMessage.emit(msg)
@@ -2622,9 +2647,133 @@ class StateManager(QObject):
             f["submix_linked"] = True
             f["submix_mute"] = False
         self.fadersChanged.emit()
+        if self._mix_layout and self._connected and not self._permission_error:
+            bus = self._submix_bus
+            fader_ids = list(range(len(self._faders)))
+
+            def do_reset():
+                for i in fader_ids:
+                    self._write_submix(bus, i, link=True, mute=False)
+                mm = self._mix_layout["mixminus_nodes"]
+                if bus < len(mm):
+                    # Back to "Main Mix" on this headphone output
+                    self.bridge.run_cmd(["set-property", str(mm[bus]), "outputMixMinus", "u32:0"])
+            self.executor.submit(do_reset)
         self.toastMessage.emit("Submezcla de auriculares sincronizada con la mezcla principal")
 
+    # ------------------------------------------------------------------
+    # Headphone submix (RØDECaster Duo / Pro II)
+    #
+    # The root holds one MIX node per source and bus (13 buses per source, in
+    # tree order). Bus N is "Headphone N+1". MIXMINUSES[bus].outputMixMinus
+    # selects that output's mode: 0 Main Mix, 1 Mix Minus, 2 Custom.
+    # A per-bus level only sticks with mixLink=false; mixLevelWithAnchor is
+    # "<bus level>|<anchor>" (the firmware keeps the anchor = fader level).
+    # ------------------------------------------------------------------
+    MIX_BUSES = 13
+
+    def _build_mix_layout(self, children):
+        if self._is_streamer_x:
+            return None
+        mix_nodes = [i for i, c in enumerate(children) if c.get("name") == "MIX"]
+        mm_nodes = [i for i, c in enumerate(children) if c.get("name") == "MIXMINUSES"]
+        if len(mix_nodes) < self.MIX_BUSES or not mm_nodes:
+            return None
+        sources = []
+        for c in children:
+            if c.get("name") == "CHANNEL":
+                src = c.get("properties", {}).get("channelInputSource", {}).get("U32")
+                sources.append(src if src is not None and src < 1000 else None)
+        return {"mix_nodes": mix_nodes, "mixminus_nodes": mm_nodes, "sources": sources}
+
+    def _submix_node(self, bus, fader_idx):
+        lay = self._mix_layout
+        if not lay or fader_idx >= len(lay["sources"]):
+            return None
+        src = lay["sources"][fader_idx]
+        if src is None:
+            return None
+        k = src * self.MIX_BUSES + bus
+        return lay["mix_nodes"][k] if k < len(lay["mix_nodes"]) else None
+
+    def _read_submix_state(self, children):
+        """Load the selected headphone bus levels/mutes/links into the faders."""
+        if not self._mix_layout:
+            return
+        bus = self._submix_bus
+        for i, f in enumerate(self._faders):
+            node = self._submix_node(bus, i)
+            if node is None or node >= len(children):
+                continue
+            props = {k: list(v.values())[0] for k, v in children[node].get("properties", {}).items()}
+            linked = bool(props.get("mixLink", True))
+            raw = str(props.get("mixLevelWithAnchor", ""))
+            lvl_txt = raw.split("|")[0] if "|" in raw else raw
+            try:
+                lvl = float(lvl_txt)
+            except ValueError:
+                lvl = -1.0
+            f["submix_linked"] = linked
+            f["submix_mute"] = bool(props.get("mixMute", False))
+            if linked or not (0.0 <= lvl <= 1.0):
+                f["submix_level"] = f.get("level", 70)
+            else:
+                f["submix_level"] = int(round(lvl * 100))
+
+    def _write_submix(self, bus, fader_idx, level=None, mute=None, link=None):
+        """Blocking hardware write for one channel on one headphone bus (worker thread)."""
+        node = self._submix_node(bus, fader_idx)
+        if node is None:
+            return
+        run = self.bridge.run_cmd
+        # The firmware keeps its own anchor (the main fader level); use the exact value when known
+        f = self._faders[fader_idx] if fader_idx < len(self._faders) else {}
+        anchor = round(float(f.get("level_raw", f.get("level", 70) / 100.0)), 6)
+        if link is False or level is not None or mute is not None:
+            # A custom value only applies when the output is in Custom mode
+            mm = self._mix_layout["mixminus_nodes"]
+            if bus < len(mm) and not self._submix_custom.get(bus):
+                run(["set-property", str(mm[bus]), "outputMixMinus", "u32:2"])
+                self._submix_custom[bus] = True
+        if link is True:
+            # Clear the custom value while unlinked, then hand control back to the fader
+            run(["set-property", str(node), "mixLink", "bool:false"])
+            run(["set-property", str(node), "mixLevelWithAnchor", f"str:{anchor}|{anchor}"])
+            run(["set-property", str(node), "mixLink", "bool:true"])
+        elif level is not None:
+            run(["set-property", str(node), "mixLink", "bool:false"])
+            run(["set-property", str(node), "mixLevelWithAnchor", f"str:{round(level / 100.0, 6)}|{anchor}"])
+        if mute is not None:
+            run(["set-property", str(node), "mixMute", f"bool:{str(bool(mute)).lower()}"])
+
+    @pyqtProperty(int, notify=activeMixTargetChanged)
+    def headphoneBus(self):
+        return self._submix_bus
+
+    @pyqtProperty(int, notify=stateChanged)
+    def headphoneBusCount(self):
+        if self._is_streamer_x:
+            return 0
+        return 2 if self._is_duo else 4
+
+    @pyqtSlot(int)
+    def setHeadphoneBus(self, bus):
+        if 0 <= bus < self.headphoneBusCount and bus != self._submix_bus:
+            self._submix_bus = bus
+            self.activeMixTargetChanged.emit()
+            if self._connected and not self._permission_error and self._mix_layout:
+                def do_reload():
+                    dump = self.bridge.dump_state()
+                    if dump and bus == self._submix_bus:
+                        self._read_submix_state(dump.get("children", []))
+                        self.fadersChanged.emit()
+                self.executor.submit(do_reload)
+
     def _apply_submix_hardware(self, index, level):
+        if not getattr(self, "_is_streamer_x", False):
+            if self._mix_layout and self._connected and not self._permission_error:
+                self.executor.submit(self._write_submix, self._submix_bus, index, level, None, None)
+            return
         # Optional PipeWire sink volume for Streamer X virtual channels
         if getattr(self, "_is_streamer_x", False):
             channels = ["streamerx_game", "streamerx_chat", "streamerx_music", "streamerx_system"]
@@ -2896,6 +3045,7 @@ class StateManager(QObject):
                             new_mute = bool(item.get("mute", False))
                             new_listen = bool(item.get("listen", False))
                             new_lvl = int(round(float(item.get("level", 0.7)) * 100))
+                            self._faders[idx]["level_raw"] = float(item.get("level", 0.7))
                             if (self._faders[idx]["mute"] != new_mute or 
                                 self._faders[idx]["listen"] != new_listen or 
                                 abs(self._faders[idx]["level"] - new_lvl) > 1):

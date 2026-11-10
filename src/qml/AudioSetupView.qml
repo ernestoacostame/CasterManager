@@ -191,6 +191,40 @@ Item {
                     elide: Text.ElideRight
                 }
 
+                // Headphone output selector (HP1 / HP2 on Duo, HP1-4 on Pro II)
+                Row {
+                    visible: stateManager && stateManager.activeMixTarget === "headphones" && stateManager.headphoneBusCount > 1
+                    spacing: 4
+
+                    Repeater {
+                        model: stateManager ? stateManager.headphoneBusCount : 0
+
+                        Rectangle {
+                            property bool active: stateManager && stateManager.headphoneBus === index
+                            width: 46
+                            height: 24
+                            radius: 5
+                            color: active ? "#CBA158" : "#2E2618"
+                            border.color: "#CBA158"
+                            border.width: 1
+
+                            Text {
+                                anchors.centerIn: parent
+                                text: "🎧 " + (index + 1)
+                                font.pixelSize: 10
+                                font.bold: true
+                                color: parent.active ? "#1A1A1D" : "#CBA158"
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: if (stateManager) stateManager.setHeadphoneBus(index)
+                            }
+                        }
+                    }
+                }
+
                 // Reset Submix button (only visible in headphones mode)
                 Rectangle {
                     visible: stateManager && stateManager.activeMixTarget === "headphones"

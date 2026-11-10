@@ -42,6 +42,7 @@
   - Clearly identifies physical hardware sliders (`[FÍSICO]`) and software virtual faders (`[VIRTUAL]`).
   - Allows full interactive control of virtual faders (e.g., SMART Pads audio, Bluetooth, USB Chat) directly from the Linux desktop, updating console levels in real time.
 - **Channel Mute & Listen (Solo):** Instant toggle buttons with hardware LED color matching.
+- **Headphone Submixes (Duo / Pro II):** Switch to *My Headphones*, pick **🎧 1 / 🎧 2** (1–4 on Pro II) and set a personal level and mute per channel. The output is switched to *Custom* on the console, each channel can be re-linked to the main fader, and *Reset to Main* restores the output to the Main Mix.
 - **Input Source Routing Matrix:** Reassign any channel on the fly from the pool of available sources:
   - Neutrik Combo XLR 1 & 2 (with +48V Phantom Power badges)
   - Wireless Series IV dual internal receivers
@@ -169,7 +170,6 @@ Launch CasterManager from your application menu or start it from terminal:
 | **RØDE Streamer X** | Yes | Input dial, Headphone dial, Mic Mute | Stream mix levels | 4 per bank (2x2) |
 
 ### Known Limitations
-- The independent headphone **submix** is applied to the hardware only on the Streamer X path; on Duo/Pro II it is currently kept in the app.
 - The SMART Pads **MIDI** tab and Reverb/Echo pad effects are not yet written to the hardware.
 - The Streamer X headphone dial is not reported by the firmware, so it is not shown in the app.
 
@@ -270,6 +270,7 @@ This project is licensed under the [MIT License](LICENSE).
   - Identificación visual clara entre potenciómetros deslizantes reales (`[FÍSICO]`) y faders virtuales por software (`[VIRTUAL]`).
   - Control interactivo de los faders virtuales (audio de SMART Pads, Bluetooth, USB Chat) directamente desde la pantalla de Linux, moviendo el fader y modificando el volumen real de la consola al instante.
 - **Silencio (Mute) y Escucha (Listen / Solo):** Botones con retroiluminación LED sincronizada por hardware.
+- **Submezclas de Auriculares (Duo / Pro II):** Cambia a *Mis Auriculares*, elige **🎧 1 / 🎧 2** (1–4 en el Pro II) y ajusta un nivel y un mute personal por canal. La salida pasa a modo *Personalizado* en la consola, cada canal puede volver a vincularse al fader principal y *Restablecer a Principal* devuelve la salida a la Mezcla Principal.
 - **Matriz de Enrutamiento de Entradas:** Asignación de fuentes de entrada a cualquier canal en vivo:
   - Neutrik Combo XLR 1 y 2 (con indicadores de alimentación Phantom +48V)
   - Receptores duales integrados Wireless Series IV (2.4 GHz)
@@ -397,7 +398,6 @@ Puedes abrir CasterManager desde el menú de aplicaciones de tu entorno (KDE Pla
 | **RØDE Streamer X** | Sí | Dial de entrada, dial de auriculares, Mute de micro | Niveles de Stream Mix | 4 por banco (2x2) |
 
 ### Limitaciones Conocidas
-- La **submezcla** independiente de auriculares solo se aplica al hardware en la Streamer X; en Duo/Pro II por ahora se mantiene en la app.
 - La pestaña **MIDI** de los SMART Pads y los efectos Reverb/Echo aún no se escriben en el hardware.
 - El firmware de la Streamer X no informa del dial de auriculares, por eso no se muestra en la app.
 
