@@ -3345,6 +3345,43 @@ class StateManager(QObject):
         self.deviceConfigChanged.emit()
         return res
 
+    # Streamer X USB multitrack: OUTPUT.outputMultiMode = 2 makes the unit re-enumerate
+    # as "Streamer X Main Multitrack" (PID 0x0055) with 9 capture channels, exactly
+    # what RØDE UNIFY enables on macOS/Windows.
+    STREAMER_X_MULTITRACK_PID = "0055"
+
+    @pyqtProperty(bool, notify=deviceConfigChanged)
+    def streamerXMultitrack(self):
+        return self._is_streamer_x and str(self.bridge.target_pid) == self.STREAMER_X_MULTITRACK_PID
+
+    @pyqtSlot(bool)
+    def setStreamerXMultitrack(self, enabled):
+        if not self._is_streamer_x or not self._connected or self._permission_error:
+            return
+        if enabled == self.streamerXMultitrack:
+            return
+        self.toastMessage.emit("Cambiando la Streamer X a modo multipista USB..." if enabled
+                               else "Volviendo la Streamer X a modo estéreo USB...")
+
+        def do_switch():
+            import time
+            self.bridge.run_cmd(["set-property", "13", "outputMultiMode", f"u32:{2 if enabled else 0}"])
+            # The unit re-enumerates on USB: wait for PipeWire to expose the new capture device
+            want_multi = bool(enabled)
+            for _ in range(30):
+                time.sleep(0.5)
+                src = StreamerXAudioRouter.get_streamer_x_nodes().get("source")
+                if src and StreamerXAudioRouter.is_multitrack_source(src) == want_multi:
+                    break
+            # Virtual UNIFY devices point at the old ALSA nodes: rebuild them for the new layout
+            if StreamerXAudioRouter.is_unify_profile_installed():
+                StreamerXAudioRouter.install_unify_profile()
+            self.deviceConfigChanged.emit()
+            self.toastMessage.emit("Modo multipista activo: 9 canales por USB" if enabled
+                                   else "Modo estéreo USB activo")
+
+        self.executor.submit(do_switch)
+
     # DSP Processing Properties & Slots
     @pyqtProperty("QVariantList", notify=dspChanged)
     def dspChannels(self):

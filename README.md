@@ -64,6 +64,7 @@
 - **Clean UI:** Only the controls the Streamer X really has are shown (no LISTEN/Solo, no headphone submix selector). The headphone dial is an autonomous hardware control and is left to the device.
 - **Recording-friendly stream mix:** The USB 1 loopback is cut from the capture mix so PC audio no longer leaks into your microphone track in a DAW.
 - **UNIFY-style virtual devices for PipeWire:** Game, Chat, Music, System and Stream Mix sinks/sources, so each source can be recorded on its own track (e.g. in a DAW: Voice from `Streamer X Analog Stereo`, music from `UNIFY-Music`, jingles from `UNIFY-Game`).
+- **USB Multitrack mode (what RØDE UNIFY unlocks on macOS/Windows):** one switch writes `outputMultiMode = 2`; the unit re-enumerates as *Streamer X Main Multitrack* (USB PID `0x0055`) with **9 capture channels**. CasterManager then creates named sources for your DAW: **Streamer X - Micrófono** (ch 1), **Headset** (ch 2), **Wireless** (ch 3), **SMART Pads** (ch 4-5, stereo) and **Canales 6-7 / 8-9**. The UNIFY virtual devices are rebuilt automatically for the new layout. Note: PC audio is not part of the hardware multitrack (UNIFY mixes it in software on macOS too); record it from `UNIFY-Music`, `UNIFY-Game`, etc.
 - **4 SMART Pads per bank** with sounds and Voice FX.
 
 ### 🔀 Multiple Devices
@@ -292,6 +293,7 @@ This project is licensed under the [MIT License](LICENSE).
 - **Interfaz limpia:** Solo se muestran los controles que la Streamer X tiene (sin LISTEN/Solo ni selector de submezcla). El dial de auriculares es un control autónomo del hardware.
 - **Mezcla de captura apta para grabar:** Se corta el retorno de USB 1 en la mezcla de captura, así el audio del PC ya no se cuela en la pista del micrófono en tu DAW.
 - **Dispositivos virtuales estilo UNIFY para PipeWire:** Game, Chat, Music, System y Stream Mix, para grabar cada fuente en su propia pista (p. ej. en un DAW: Voz desde `Streamer X Analog Stereo`, música desde `UNIFY-Music`, jingles desde `UNIFY-Game`).
+- **Modo Multipista USB (lo que RØDE UNIFY desbloquea en macOS/Windows):** un interruptor escribe `outputMultiMode = 2`; la unidad se vuelve a anunciar como *Streamer X Main Multitrack* (PID USB `0x0055`) con **9 canales de captura**. CasterManager crea entonces fuentes con nombre para tu DAW: **Streamer X - Micrófono** (canal 1), **Headset** (2), **Wireless** (3), **SMART Pads** (4-5, estéreo) y **Canales 6-7 / 8-9**. Los dispositivos virtuales UNIFY se reconstruyen solos para el nuevo modo. Nota: el audio del PC no forma parte de la multipista del hardware (en macOS UNIFY también lo mezcla por software); grábalo desde `UNIFY-Music`, `UNIFY-Game`, etc.
 - **4 SMART Pads por banco** con sonidos y efectos de voz.
 
 ### 🔀 Varios Dispositivos a la Vez

@@ -218,6 +218,28 @@ Item {
                                         Layout.preferredWidth: root.width - 340
                                         wrapMode: Text.WordWrap
                                     }
+
+                                    // USB multitrack mode (what RØDE UNIFY enables on macOS/Windows)
+                                    RowLayout {
+                                        spacing: 10
+                                        Layout.topMargin: 4
+
+                                        Switch {
+                                            id: multitrackSwitch
+                                            checked: stateManager ? stateManager.streamerXMultitrack : false
+                                            onToggled: if (stateManager) stateManager.setStreamerXMultitrack(checked)
+                                        }
+
+                                        Text {
+                                            text: (stateManager && stateManager.streamerXMultitrack)
+                                                  ? "Multipista USB activa: Micrófono, Headset, Wireless, SMART Pads y canales 6-9 como entradas separadas para tu DAW"
+                                                  : "Multipista USB (9 canales): graba cada entrada de la Streamer X en su propia pista"
+                                            font.pixelSize: 11
+                                            color: (stateManager && stateManager.streamerXMultitrack) ? "#28C850" : "#C8C8D0"
+                                            Layout.preferredWidth: root.width - 400
+                                            wrapMode: Text.WordWrap
+                                        }
+                                    }
                                 }
 
                                 Button {

@@ -26,6 +26,8 @@ PRO_II_PRODUCT_IDS = {
 
 STREAMER_X_PRODUCT_IDS = {
     "0038": "RØDE Streamer X",
+    # Same unit after switching USB to multitrack (OUTPUT.outputMultiMode = 2)
+    "0055": "RØDE Streamer X",
 }
 
 class HidDrainer(threading.Thread):

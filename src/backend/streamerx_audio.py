@@ -61,6 +61,23 @@ class StreamerXAudioRouter:
         ("streamerx_stream_mix", "UNIFY-StreamMix", "unify_stream_mix_in"),
     ]
 
+    # USB multitrack mode (OUTPUT.outputMultiMode = 2, USB PID 0x0055): the capture
+    # device exposes 9 mono channels, one per UNIFY slot. Each entry becomes a named
+    # PipeWire source so a DAW can record every input on its own track.
+    # (source name, description, multichannel positions, output positions)
+    MULTITRACK_SOURCES = [
+        ("streamerx_mt_mic", "Streamer X - Micrófono", "aux0", "mono"),
+        ("streamerx_mt_headset", "Streamer X - Headset", "aux1", "mono"),
+        ("streamerx_mt_wireless", "Streamer X - Wireless", "aux2", "mono"),
+        ("streamerx_mt_pads", "Streamer X - SMART Pads", "aux3,aux4", "front-left,front-right"),
+        ("streamerx_mt_aux67", "Streamer X - Canales 6-7", "aux5,aux6", "front-left,front-right"),
+        ("streamerx_mt_aux89", "Streamer X - Canales 8-9", "aux7,aux8", "front-left,front-right"),
+    ]
+
+    @staticmethod
+    def is_multitrack_source(source_name: Optional[str]) -> bool:
+        return bool(source_name) and "multichannel" in source_name
+
     @staticmethod
     def get_streamer_x_nodes() -> Dict[str, Optional[str]]:
         """Finds the current PipeWire sink and source node names for Streamer X."""
@@ -74,7 +91,8 @@ class StreamerXAudioRouter:
                 props = n.get("info", {}).get("props", {})
                 name = props.get("node.name", "")
                 media_class = props.get("media.class", "")
-                if "streamer" in name.lower() or "streamer" in props.get("node.description", "").lower():
+                # Only the real ALSA device: our own virtual nodes are also named "streamerx_*"
+                if name.startswith("alsa_") and "streamer_x" in name.lower():
                     if media_class == "Audio/Sink" and not sink_name:
                         sink_name = name
                     elif media_class == "Audio/Source" and not source_name:
@@ -225,8 +243,30 @@ context.modules = [
             # 1. First remove any previous instances to avoid duplicates
             cls.remove_unify_profile(reload_services=False)
 
+            multitrack = cls.is_multitrack_source(hw_source)
+
             # 2. Hot-load virtual playback sinks, loopbacks and recording sources immediately
             loaded_ids = []
+
+            if multitrack:
+                # One named source per hardware channel (Mic, Headset, Wireless, Pads...)
+                for src_name, desc, master_map, out_map in cls.MULTITRACK_SOURCES:
+                    n_ch = len(master_map.split(","))
+                    cmd_mt = [
+                        "pactl", "load-module", "module-remap-source",
+                        f"source_name={src_name}",
+                        f"master={hw_source}",
+                        f"channels={n_ch}",
+                        f"master_channel_map={master_map}",
+                        f"channel_map={out_map}",
+                        "remix=no",
+                        f"source_properties=device.description='{desc}'",
+                    ]
+                    res_mt = subprocess.run(cmd_mt, capture_output=True, text=True, timeout=3)
+                    if res_mt.returncode == 0 and res_mt.stdout.strip().isdigit():
+                        loaded_ids.append(res_mt.stdout.strip())
+                    else:
+                        logger.warning(f"Could not create multitrack source {src_name}: {res_mt.stderr.strip()}")
             for ch_name, ch_desc, src_name in cls.CHANNELS:
                 # A) Load virtual playback sink (Output Device in KDE/System)
                 cmd_sink = [
@@ -246,6 +286,9 @@ context.modules = [
                         f"source={ch_name}.monitor",
                         f"sink={hw_sink}"
                     ]
+                    if multitrack:
+                        # 4-channel playback in multitrack mode: feed USB 1 (FL/FR) only
+                        cmd_loop += ["channels=2", "channel_map=front-left,front-right", "remix=false"]
                     res_loop = subprocess.run(cmd_loop, capture_output=True, text=True, timeout=3)
                     if res_loop.returncode == 0 and res_loop.stdout.strip().isdigit():
                         loaded_ids.append(res_loop.stdout.strip())
@@ -253,7 +296,7 @@ context.modules = [
                     # For Stream Mix: loopback physical mic into the stream mix sink
                     cmd_mic = [
                         "pactl", "load-module", "module-loopback",
-                        f"source={hw_source}",
+                        f"source={'streamerx_mt_mic' if multitrack else hw_source}",
                         f"sink={ch_name}"
                     ]
                     res_mic = subprocess.run(cmd_mic, capture_output=True, text=True, timeout=3)
