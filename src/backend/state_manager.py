@@ -3012,6 +3012,10 @@ class StateManager(QObject):
 
     @pyqtSlot(int, int)
     def assignChannelInputSource(self, fader_idx, input_source_id):
+        # Streamer X channel strips are hard-wired to their inputs (CHANNEL node N is
+        # not fader N there), so writing channelInputSource would retarget the wrong strip.
+        if self._is_streamer_x:
+            return
         if 0 <= fader_idx < 6:
             channel_node_idx = 28 + fader_idx
             if self._connected and not self._permission_error:

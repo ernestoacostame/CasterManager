@@ -582,13 +582,29 @@ Item {
                 }
                 Item { Layout.fillWidth: true }
                 Text {
+                    visible: !(stateManager && stateManager.isStreamerX)
                     text: (stateManager && stateManager.language === "en" ? "Click a source to assign it to " : "Haz clic en una fuente para asignarla al ") + (stateManager && stateManager.faders[root.selectedChannelIndex] ? stateManager.faders[root.selectedChannelIndex].name : (stateManager && stateManager.language === "en" ? "Channel " : "Canal ") + (root.selectedChannelIndex + 1))
                     font.pixelSize: 11
                     color: "#CBA158"
                 }
             }
 
+            // Streamer X: every channel strip is hard-wired to one physical/USB input
+            // (Mic, Headset, Wireless, USB 1, USB 2, HDMI, SMART Pads) and the unit has
+            // no Bluetooth, so source reassignment does not apply.
+            Text {
+                visible: Boolean(stateManager && stateManager.isStreamerX)
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
+                font.pixelSize: 12
+                color: "#8E8E93"
+                text: stateManager && stateManager.language === "en"
+                      ? "On the Streamer X each fader is fixed to its own input (Mic, Headset, USB 1, USB 2 / Chat, SMART Pads and HDMI). The hardware does not allow reassigning sources and it has no Bluetooth."
+                      : "En la Streamer X cada fader está fijo a su entrada (Micrófono, Headset, USB 1, USB 2 / Chat, SMART Pads y HDMI). El hardware no permite reasignar fuentes y no tiene Bluetooth."
+            }
+
             GridLayout {
+                visible: !(stateManager && stateManager.isStreamerX)
                 Layout.fillWidth: true
                 columns: 4
                 rowSpacing: 10
