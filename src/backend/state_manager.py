@@ -3475,13 +3475,14 @@ class StateManager(QObject):
                 ("padFilePath", "str:"),
                 ("padName", f"str:{name.replace(' ', '_')}"),
                 ("padColourIndex", f"u32:{col}"),
+                # Fade options go before the mode: the firmware reads them when the mode is set
+                ("padMixerFadeInSeconds", fade),
+                ("padMixerFadeOutSeconds", fade),
+                ("padMixerFadeExcludeHost", f"bool:{str(bool(pad.get('fade_exclude_host', False))).lower()}"),
                 ("padMixerMode", f"u32:{mode}"),
                 # Same trigger settings as the factory Censor pad
                 ("padMixerTriggerMode", "u32:0"),
                 ("padPlayMode", "u32:1"),
-                ("padMixerFadeInSeconds", fade),
-                ("padMixerFadeOutSeconds", fade),
-                ("padMixerFadeExcludeHost", f"bool:{str(bool(pad.get('fade_exclude_host', False))).lower()}"),
                 ("padActive", "bool:false"),
             ]
             self.executor.submit(self._send_pad_props, b_str, p_str, props, raw)
@@ -3498,9 +3499,19 @@ class StateManager(QObject):
         self.padsChanged.emit()
         self.selectedPadChanged.emit()
         if self._connected and not self._permission_error:
-            raw = pad.setdefault("_raw", {})
-            self.executor.submit(self._send_pad_props, str(self._current_bank), str(self._selected_pad_index),
-                                 [("padMixerFadeExcludeHost", f"bool:{str(bool(exclude)).lower()}")], raw)
+            b_str, p_str = str(self._current_bank), str(self._selected_pad_index)
+            mode = int(pad.get("mixer_mode", 2))
+            excl = f"bool:{str(bool(exclude)).lower()}"
+            def do_set():
+                run = self.bridge.run_cmd
+                run(["pad", "set-prop", b_str, p_str, "padMixerFadeExcludeHost", excl])
+                # The firmware only picks up the option when the mixer mode is (re)set, so re-arm it
+                run(["pad", "set-prop", b_str, p_str, "padMixerMode", "u32:0"])
+                run(["pad", "set-prop", b_str, p_str, "padMixerMode", f"u32:{mode}"])
+                raw = pad.setdefault("_raw", {})
+                raw["padMixerFadeExcludeHost"] = bool(exclude)
+                raw["padMixerMode"] = mode
+            self.executor.submit(do_set)
 
     @pyqtSlot(str)
     def updatePadType(self, ptype):
