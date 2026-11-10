@@ -534,6 +534,10 @@ Item {
                                 DspSlider { compact: true; label: root.s("attack", "Ataque");      prop: "noise_gate_attack";  defVal: 0.5 }
                                 DspSlider { compact: true; label: root.s("release", "Liberación"); prop: "noise_gate_release"; defVal: 0.4 }
                             }
+                            DspSlider {
+                                label: root.s("hold", "Retención (Hold)")
+                                prop: "noise_gate_hold"; defVal: 0.0
+                            }
                         }
 
                         DspCard {

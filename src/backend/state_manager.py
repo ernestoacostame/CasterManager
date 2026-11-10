@@ -230,6 +230,7 @@ TRANSLATIONS = {
         "range": "Rango",
         "attack": "Ataque",
         "release": "Liberación",
+        "hold": "Retención (Hold)",
         "ratio": "Relación",
         "makeup_gain": "Ganancia Compensación",
         "frequency": "Frecuencia",
@@ -471,6 +472,7 @@ TRANSLATIONS = {
         "range": "Range",
         "attack": "Attack",
         "release": "Release",
+        "hold": "Hold",
         "ratio": "Ratio",
         "makeup_gain": "Makeup Gain",
         "frequency": "Frequency",
@@ -518,7 +520,7 @@ DSP_PRESETS = {
     "broadcast": {
         "hpf_on": True, "hpf_frequency": 0.4,
         "noise_gate_on": True, "noise_gate_threshold": 0.35, "noise_gate_range": 0.75,
-        "noise_gate_attack": 0.4, "noise_gate_release": 0.45,
+        "noise_gate_attack": 0.4, "noise_gate_release": 0.45, "noise_gate_hold": 0.1,
         "deesser_on": True, "deesser_threshold": 0.6, "deesser_ratio": 0.5,
         "compressor_on": True, "compressor_threshold": 0.6, "compressor_ratio": 0.5, "compressor_gain": 0.25,
         "eq_on": True, "eq_low": 0.65, "eq_mid": 0.45, "eq_high": 0.65,
@@ -528,7 +530,7 @@ DSP_PRESETS = {
     "podcast": {
         "hpf_on": True, "hpf_frequency": 0.35,
         "noise_gate_on": True, "noise_gate_threshold": 0.25, "noise_gate_range": 0.6,
-        "noise_gate_attack": 0.5, "noise_gate_release": 0.4,
+        "noise_gate_attack": 0.5, "noise_gate_release": 0.5, "noise_gate_hold": 0.1,
         "deesser_on": True, "deesser_threshold": 0.65, "deesser_ratio": 0.45,
         "compressor_on": True, "compressor_threshold": 0.7, "compressor_ratio": 0.38, "compressor_gain": 0.15,
         "eq_on": True, "eq_low": 0.55, "eq_mid": 0.5, "eq_high": 0.55,
@@ -538,7 +540,7 @@ DSP_PRESETS = {
     "gaming": {
         "hpf_on": True, "hpf_frequency": 0.5,
         "noise_gate_on": True, "noise_gate_threshold": 0.48, "noise_gate_range": 0.85,
-        "noise_gate_attack": 0.3, "noise_gate_release": 0.35,
+        "noise_gate_attack": 0.3, "noise_gate_release": 0.35, "noise_gate_hold": 0.05,
         "deesser_on": True, "deesser_threshold": 0.55, "deesser_ratio": 0.55,
         "compressor_on": True, "compressor_threshold": 0.52, "compressor_ratio": 0.65, "compressor_gain": 0.32,
         "eq_on": True, "eq_low": 0.45, "eq_mid": 0.55, "eq_high": 0.7,
@@ -745,6 +747,7 @@ class StateManager(QObject):
                 "noise_gate_range": 0.7,
                 "noise_gate_attack": 0.5,
                 "noise_gate_release": 0.4,
+                "noise_gate_hold": 0.0,
                 "compressor_on": True,
                 "compressor_threshold": 0.65,
                 "compressor_ratio": 0.4,
@@ -1291,6 +1294,7 @@ class StateManager(QObject):
                     if "noiseGateRange" in cp: dsp["noise_gate_range"] = float(cp["noiseGateRange"])
                     if "noiseGateAttack" in cp: dsp["noise_gate_attack"] = float(cp["noiseGateAttack"])
                     if "noiseGateRelease" in cp: dsp["noise_gate_release"] = float(cp["noiseGateRelease"])
+                    if "noiseGateHold" in cp: dsp["noise_gate_hold"] = float(cp["noiseGateHold"])
                     if "compressorOn" in cp: dsp["compressor_on"] = bool(cp["compressorOn"])
                     if "compressorThreshold" in cp: dsp["compressor_threshold"] = float(cp["compressorThreshold"])
                     if "compressorRatio" in cp: dsp["compressor_ratio"] = float(cp["compressorRatio"])
@@ -3550,6 +3554,7 @@ class StateManager(QObject):
                 "noise_gate_range": ("noiseGateRange", "f64"),
                 "noise_gate_attack": ("noiseGateAttack", "f64"),
                 "noise_gate_release": ("noiseGateRelease", "f64"),
+                "noise_gate_hold": ("noiseGateHold", "f64"),
                 "compressor_on": ("compressorOn", "bool"),
                 "compressor_threshold": ("compressorThreshold", "f64"),
                 "compressor_ratio": ("compressorRatio", "f64"),
