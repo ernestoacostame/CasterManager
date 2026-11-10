@@ -529,7 +529,7 @@ DSP_PRESETS = {
     },
     "podcast": {
         "hpf_on": True, "hpf_frequency": 0.35,
-        "noise_gate_on": True, "noise_gate_threshold": 0.25, "noise_gate_range": 0.6,
+        "noise_gate_on": True, "noise_gate_threshold": 0.25, "noise_gate_range": 0.35,
         "noise_gate_attack": 0.5, "noise_gate_release": 0.5, "noise_gate_hold": 0.1,
         "deesser_on": True, "deesser_threshold": 0.65, "deesser_ratio": 0.45,
         "compressor_on": True, "compressor_threshold": 0.7, "compressor_ratio": 0.38, "compressor_gain": 0.15,
@@ -3421,25 +3421,38 @@ class StateManager(QObject):
 
     def _restore_streamer_x_self_monitor(self, retries=10):
         """Re-enumerating into/out of multitrack reloads the unit state and drops the
-        microphone (and headset) from the headphone mix, so you stop hearing yourself.
-        Put them back on headphone bus 0 (worker thread; USB capture is unaffected)."""
+        microphone from the headphone mix, so you stop hearing yourself.
+        Ensure Mic (src 0) is monitored on headphone bus 0, and keep unused Headset
+        (src 1) muted so its open analog preamp does not inject white noise."""
         import time
         for _ in range(retries):
             dump = self.bridge.dump_state()
             children = dump.get("children", []) if dump else []
             mix_nodes = [i for i, c in enumerate(children) if c.get("name") == "MIX"]
             if len(mix_nodes) >= 20:
-                for src in (0, 1):  # Mic, Headset (10 buses per source on Streamer X)
-                    node = mix_nodes[src * 10]
-                    props = children[node].get("properties", {})
-                    raw = str(list(props.get("mixLevelWithAnchor", {"": ""}).values())[0])
-                    try:
-                        lvl = float(raw.split("|")[0])
-                    except ValueError:
-                        lvl = -1.0
-                    if lvl <= 0.0:
-                        logger.info(f"Restoring Streamer X self-monitoring on MIX node {node}")
-                        self.bridge.run_cmd(["set-property", str(node), "mixLevelWithAnchor", "str:0.7|-1"])
+                # 1. Ensure XLR Mic (src 0) is audible in headphones
+                mic_node = mix_nodes[0]
+                props = children[mic_node].get("properties", {})
+                raw = str(list(props.get("mixLevelWithAnchor", {"": ""}).values())[0])
+                try:
+                    lvl = float(raw.split("|")[0])
+                except ValueError:
+                    lvl = -1.0
+                if lvl <= 0.0:
+                    logger.info(f"Restoring Streamer X microphone monitoring on MIX node {mic_node}")
+                    self.bridge.run_cmd(["set-property", str(mic_node), "mixLevelWithAnchor", "str:0.7|-1"])
+
+                # 2. Ensure Headset Mic (src 1) is NOT sending open-circuit hiss to headphones
+                headset_node = mix_nodes[10]
+                h_props = children[headset_node].get("properties", {})
+                h_raw = str(list(h_props.get("mixLevelWithAnchor", {"": ""}).values())[0])
+                try:
+                    h_lvl = float(h_raw.split("|")[0])
+                except ValueError:
+                    h_lvl = -1.0
+                if h_lvl > 0.0:
+                    logger.info(f"Muting unused Headset open preamp on MIX node {headset_node}")
+                    self.bridge.run_cmd(["set-property", str(headset_node), "mixLevelWithAnchor", "str:0|-1"])
                 return
             time.sleep(1.0)
 
