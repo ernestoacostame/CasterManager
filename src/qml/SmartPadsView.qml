@@ -826,14 +826,12 @@ Item {
                     visible: root.activeCategory === 2
 
                     Repeater {
-                        // mode = PAD.padMixerMode
+                        // mode = PAD.padMixerMode. Back Channel (3) is not offered: on the Streamer X it
+                        // fired the Censor tone and reset the unit, and it is untested on Duo / Pro II.
                         model: [
                             {"mode": 0, "name": "Censor", "desc": (stateManager && stateManager.language === "en" ? "While pressed, a sound plays and all channels are muted" : "Mientras lo pulsas suena un pitido y se silencian todos los canales"), "icon": "🔇"},
                             {"mode": 1, "name": "Trash Talk", "desc": (stateManager && stateManager.language === "en" ? "Mutes the audio sent to remote guests, so they can't hear you" : "Silencia el audio que se envía a los invitados remotos para que no te escuchen"), "icon": "🗣️"},
                             {"mode": 2, "name": "Fade In/Out", "desc": (stateManager && stateManager.language === "en" ? "Fades all channels out; pressing again fades them back in" : "Funde todos los canales a silencio; al pulsarlo otra vez vuelven a entrar"), "icon": "🌗"},
-                            {"mode": 3, "name": "Back Channel", "desc": (stateManager && stateManager.isStreamerX)
-                                ? (stateManager.language === "en" ? "While pressed, all audio devices and Chat are removed from the stream, so the audience can't hear the conversation" : "Mientras lo pulsas, todos los dispositivos de audio y el Chat salen del stream: la audiencia no oye la conversación")
-                                : (stateManager && stateManager.language === "en" ? "While pressed, creates a private mix between Microphone 1 and the channels you pick below" : "Mientras lo pulsas, crea una mezcla privada entre el Micrófono 1 y los canales que elijas abajo"), "icon": "🔁"},
                             {"mode": 4, "name": "Ducking", "desc": (stateManager && stateManager.language === "en" ? "While active, other channels drop whenever the microphone picks up sound" : "Mientras está activo, baja los demás canales cada vez que el micrófono capta sonido"), "icon": "📉"}
                         ]
 

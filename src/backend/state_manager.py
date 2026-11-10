@@ -3452,6 +3452,11 @@ class StateManager(QObject):
         """Turn the current pad into a real mixer pad (padType 3) with the given mode."""
         if mode not in self.PAD_MIXER_MODES:
             return
+        if mode == 3:
+            # Back Channel: on the Streamer X this produced the Censor tone and reset the
+            # unit; not verified on Duo / Pro II either, so refuse it until it is.
+            logger.warning("Back Channel mixer pads are disabled (unverified mode number)")
+            return
         pad = self._get_current_pad()
         if not pad:
             return
