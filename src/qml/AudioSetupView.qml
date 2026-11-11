@@ -614,14 +614,15 @@ Item {
                     model: [
                         {"id": 0, "name": "Input 1 (Mic / Inst)", "desc": "Neutrik Combo XLR", "icon": "🎙️", "tag": "+48V"},
                         {"id": 1, "name": "Input 2 (Mic / Inst)", "desc": "Neutrik Combo XLR", "icon": "🎙️", "tag": "+48V"},
-                        {"id": 2, "name": "Wireless 1", "desc": (stateManager && stateManager.language === "en" ? "Dual 2.4 GHz receiver" : "Receptor 2.4 GHz dual"), "icon": "📡", "tag": ""},
-                        {"id": 3, "name": "Wireless 2", "desc": (stateManager && stateManager.language === "en" ? "Dual 2.4 GHz receiver" : "Receptor 2.4 GHz dual"), "icon": "📡", "tag": ""},
+                        {"id": 2, "name": (stateManager && stateManager.isDuo ? "Wireless 1" : "Input 3 (Mic 3)"), "desc": (stateManager && stateManager.isDuo ? (stateManager.language === "en" ? "Dual 2.4 GHz receiver" : "Receptor 2.4 GHz dual") : "Neutrik Combo XLR"), "icon": (stateManager && stateManager.isDuo ? "📡" : "🎙️"), "tag": (stateManager && stateManager.isDuo ? "" : "+48V")},
+                        {"id": 3, "name": (stateManager && stateManager.isDuo ? "Wireless 2" : "Input 4 (Mic 4)"), "desc": (stateManager && stateManager.isDuo ? (stateManager.language === "en" ? "Dual 2.4 GHz receiver" : "Receptor 2.4 GHz dual") : "Neutrik Combo XLR"), "icon": (stateManager && stateManager.isDuo ? "📡" : "🎙️"), "tag": (stateManager && stateManager.isDuo ? "" : "+48V")},
                         {"id": 7, "name": "USB 1 Audio (Main)", "desc": (stateManager && stateManager.language === "en" ? "Multichannel 24-bit / 48kHz" : "Multicanal 24-bit / 48kHz"), "icon": "💻", "tag": ""},
                         {"id": 8, "name": "USB 1 Chat", "desc": (stateManager && stateManager.language === "en" ? "Automatic mix-minus" : "Mix-minus automático"), "icon": "💬", "tag": ""},
                         {"id": 9, "name": "USB 2 Audio", "desc": (stateManager && stateManager.language === "en" ? "Secondary / Smartphone" : "Secundario / Smartphone"), "icon": "📱", "tag": ""},
                         {"id": 10, "name": "Bluetooth Stereo", "desc": (stateManager && stateManager.language === "en" ? "A2DP and voice calls" : "A2DP y llamadas de voz"), "icon": "📶", "tag": ""},
                         {"id": 11, "name": "SMART Pads Audio", "desc": (stateManager && stateManager.language === "en" ? "Internal sound player" : "Reproductor interno"), "icon": "🎛️", "tag": ""},
-                        {"id": 4, "name": "Headset TRRS", "desc": (stateManager && stateManager.language === "en" ? "Headset microphone" : "Micrófono de auriculares"), "icon": "🎧", "tag": ""}
+                        {"id": 4, "name": "Headset TRRS", "desc": (stateManager && stateManager.language === "en" ? "Headset microphone" : "Micrófono de auriculares"), "icon": "🎧", "tag": ""},
+                        {"id": 4294967295, "name": (stateManager && stateManager.language === "en" ? "Unassigned" : "Sin asignar"), "desc": (stateManager && stateManager.language === "en" ? "Clear channel assignment" : "Desactivar canal"), "icon": "🚫", "tag": ""}
                     ]
 
                     Rectangle {

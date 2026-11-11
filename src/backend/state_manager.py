@@ -745,6 +745,7 @@ class StateManager(QObject):
         self._submix_custom = {}
 
         # Faders state
+        self._channel_node_indices = []
         self._faders = self._init_default_faders()
 
         # Polling timer for live fader & recording status
@@ -870,6 +871,26 @@ class StateManager(QObject):
             f.setdefault("submix_linked", True)
             f.setdefault("submix_mute", False)
         return raw
+
+    def _source_info_for_id(self, src_id):
+        is_en = (getattr(self, "_language", "es") == "en")
+        defs = {
+            0: {"name": "Mic 1", "icon": "mic", "color": "#FF3C3C"},
+            1: {"name": "Mic 2", "icon": "mic", "color": "#28C850"},
+            2: {"name": "Wireless 1" if self._is_duo else "Mic 3", "icon": "mic", "color": "#00C8C8" if self._is_duo else "#FF9600"},
+            3: {"name": "Wireless 2" if self._is_duo else "Mic 4", "icon": "mic", "color": "#00C8C8" if self._is_duo else "#3C96FF"},
+            4: {"name": "Headset", "icon": "mic", "color": "#28C850"},
+            7: {"name": "USB 1", "icon": "usb", "color": "#FF8C28"},
+            8: {"name": "USB 1 Chat", "icon": "chat", "color": "#00B800"},
+            9: {"name": "USB 2", "icon": "usb", "color": "#A050E6"},
+            10: {"name": "Bluetooth", "icon": "bluetooth", "color": "#3C96FF"},
+            11: {"name": "SMART Pads", "icon": "pads", "color": "#E63C78"},
+        }
+        if src_id in defs:
+            return defs[src_id]
+        if src_id == 4294967295 or src_id is None:
+            return {"name": "Sin asignar" if not is_en else "Unassigned", "icon": "none", "color": "#555555"}
+        return {"name": f"Input {src_id}", "icon": "mic", "color": "#888888"}
 
     def _init_empty_banks(self, use_cache=False):
         # The cache is only a placeholder for instant display at startup / device
@@ -1251,6 +1272,41 @@ class StateManager(QObject):
                     if "channelOutputMute" in c1_props:
                         self._faders[1]["mute"] = bool(c1_props["channelOutputMute"].get("Bool", False))
             else:
+                channel_nodes = [c for c in children if c.get("name") == "CHANNEL"]
+                if channel_nodes:
+                    self._channel_node_indices = [idx for idx, c in enumerate(children) if c.get("name") == "CHANNEL"]
+                    max_faders = 6 if self._is_duo else 9
+                    phys_count = 4 if self._is_duo else 6
+
+                    while len(self._faders) < min(len(channel_nodes), max_faders):
+                        new_idx = len(self._faders)
+                        self._faders.append({
+                            "index": new_idx,
+                            "name": f"Canal {new_idx + 1}",
+                            "color": "#CBA158",
+                            "icon": "mic",
+                            "level": 70,
+                            "mute": False,
+                            "listen": False,
+                            "is_virtual": (new_idx >= phys_count),
+                            "submix_level": 70,
+                            "submix_mute": False
+                        })
+
+                    for f_idx in range(min(len(channel_nodes), len(self._faders), max_faders)):
+                        ch_node = channel_nodes[f_idx]
+                        ch_props = ch_node.get("properties", {})
+                        src_u32 = ch_props.get("channelInputSource", {}).get("U32")
+                        src_info = self._source_info_for_id(src_u32)
+                        self._faders[f_idx]["name"] = src_info["name"]
+                        self._faders[f_idx]["icon"] = src_info["icon"]
+                        self._faders[f_idx]["color"] = src_info["color"]
+                        self._faders[f_idx]["is_virtual"] = (f_idx >= phys_count)
+                        if "channelOutputMute" in ch_props:
+                            self._faders[f_idx]["mute"] = bool(ch_props["channelOutputMute"].get("Bool", False))
+                        if "channelListenMute" in ch_props:
+                            self._faders[f_idx]["listen"] = bool(ch_props["channelListenMute"].get("Bool", False))
+
                 fout, _ = self.bridge.run_cmd(["fader", "list", "--json"])
                 if fout:
                     try:
@@ -1264,6 +1320,8 @@ class StateManager(QObject):
                                 self._faders[idx]["level_raw"] = float(item.get("level", 0.7))
                     except Exception as e:
                         logger.debug(f"Error parsing fader list: {e}")
+
+                self.fadersChanged.emit()
 
             # Current active bank: already in the dump (GUI.selectedBank), no extra CLI call
             gui_node = find_node(dump, "GUI")
@@ -3294,14 +3352,30 @@ class StateManager(QObject):
         # not fader N there), so writing channelInputSource would retarget the wrong strip.
         if self._is_streamer_x:
             return
-        if 0 <= fader_idx < 6:
-            channel_node_idx = 28 + fader_idx
-            if self._connected and not self._permission_error:
-                def do_assign():
-                    self.bridge.run_cmd(["set-property", str(channel_node_idx), "channelInputSource", f"u32:{input_source_id}"])
-                    self._sync_hardware_state()
-                self.executor.submit(do_assign)
-            self.toastMessage.emit(f"Canal {fader_idx + 1} asignado")
+        max_faders = 6 if self._is_duo else 9
+        if not (0 <= fader_idx < min(len(self._faders), max_faders)):
+            return
+
+        channel_node_idx = 28 + fader_idx
+        if fader_idx < len(self._channel_node_indices):
+            channel_node_idx = self._channel_node_indices[fader_idx]
+
+        # Immediately reflect in UI for instant responsiveness
+        src_info = self._source_info_for_id(input_source_id)
+        self._faders[fader_idx]["name"] = src_info["name"]
+        self._faders[fader_idx]["icon"] = src_info["icon"]
+        self._faders[fader_idx]["color"] = src_info["color"]
+        self.fadersChanged.emit()
+
+        if self._connected and not self._permission_error:
+            def do_assign():
+                self.bridge.run_cmd(["set-property", str(channel_node_idx), "channelInputSource", f"u32:{input_source_id}"])
+                self._sync_hardware_state()
+            self.executor.submit(do_assign)
+
+        is_en = (getattr(self, "_language", "es") == "en")
+        msg = f"Canal {fader_idx + 1}: {src_info['name']}" if not is_en else f"Channel {fader_idx + 1}: {src_info['name']}"
+        self.toastMessage.emit(msg)
 
     # Streamer X Censor over USB multitrack is handled by the castermanager-censor
     # user service (bin/castermanager-censor), so it works with this window closed.
@@ -3394,10 +3468,33 @@ class StateManager(QObject):
 
         self._poll_tick += 1
         refresh_dsp = (self._current_view == "audio_processing" and self._poll_tick % 3 == 0)
+        refresh_channels = (self._current_view == "audio_setup" and self._poll_tick % 5 == 0)
 
         def do_poll():
             if refresh_dsp:
                 self._refresh_dsp_from_device()
+            if refresh_channels:
+                try:
+                    dump = self.bridge.dump_state()
+                    if dump:
+                        ch_nodes = [c for c in dump.get("children", []) if c.get("name") == "CHANNEL"]
+                        max_f = 6 if self._is_duo else 9
+                        phys_c = 4 if self._is_duo else 6
+                        src_changed = False
+                        for f_i in range(min(len(ch_nodes), len(self._faders), max_f)):
+                            s_u32 = ch_nodes[f_i].get("properties", {}).get("channelInputSource", {}).get("U32")
+                            s_inf = self._source_info_for_id(s_u32)
+                            if self._faders[f_i].get("name") != s_inf["name"]:
+                                self._faders[f_i]["name"] = s_inf["name"]
+                                self._faders[f_i]["icon"] = s_inf["icon"]
+                                self._faders[f_i]["color"] = s_inf["color"]
+                                self._faders[f_i]["is_virtual"] = (f_i >= phys_c)
+                                src_changed = True
+                        if src_changed:
+                            self.fadersChanged.emit()
+                except Exception as e:
+                    logger.debug(f"Error checking channel source poll: {e}")
+
             fout, _ = self.bridge.run_cmd(["fader", "list", "--json"], timeout=2)
             if fout:
                 try:
