@@ -122,6 +122,11 @@ systemctl --user daemon-reload || true
 systemctl --user enable --now castermanager-drain.service || true
 systemctl --user enable --now castermanager-censor.service || true
 
+# RØDECaster Duo: friendly PipeWire names (Chat / Multitrack) for the Pro Audio nodes
+WP_DIR="$HOME/.config/wireplumber/wireplumber.conf.d"
+mkdir -p "$WP_DIR"
+cp "$SCRIPT_DIR/assets/wireplumber/51-castermanager-rodecaster-duo.conf" "$WP_DIR/"
+
 # 5. Install Desktop & System Icons (XDG Icon Theme Specification)
 echo "[5/6] Installing application icons to system icon theme..."
 python3 -c "

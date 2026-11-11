@@ -25,6 +25,7 @@ if command -v systemctl >/dev/null 2>&1; then
     systemctl --user disable castermanager-censor.service 2>/dev/null || true
 fi
 rm -f "$SYSTEMD_SERVICE" "$HOME/.config/systemd/user/castermanager-censor.service"
+rm -f "$HOME/.config/wireplumber/wireplumber.conf.d/51-castermanager-rodecaster-duo.conf"
 if command -v systemctl >/dev/null 2>&1; then
     systemctl --user daemon-reload || true
 fi
