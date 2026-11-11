@@ -29,8 +29,11 @@ Item {
     MediaPlayer {
         id: player
         audioOutput: AudioOutput { id: audioOut }
-        source: (root.activeRecording && root.activeRecording.stereo_wav) 
-                ? ("file://" + root.activeRecording.stereo_wav) 
+        // Released while leaving transfer mode: an open WAV keeps the card busy and the
+        // console refuses to leave transfer mode until it is closed.
+        source: (root.activeRecording && root.activeRecording.stereo_wav
+                 && !(stateManager && stateManager.transferExiting))
+                ? ("file://" + root.activeRecording.stereo_wav)
                 : ""
         onPositionChanged: {
             if (player.duration > 0) {
@@ -1072,6 +1075,47 @@ Item {
                 }
 
                 Item { height: 6 }
+
+                Text {
+                    visible: Boolean(stateManager && stateManager.transferModeActive && stateManager.transferStatusText)
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.fillWidth: true
+                    text: stateManager ? stateManager.transferStatusText : ""
+                    font.pixelSize: 11
+                    color: "#CBA158"
+                    wrapMode: Text.WordWrap
+                    horizontalAlignment: Text.AlignHCenter
+                }
+
+                // Leave transfer mode (also reachable from ⏏ in the sidebar)
+                Rectangle {
+                    visible: Boolean(stateManager && stateManager.transferModeActive)
+                    Layout.alignment: Qt.AlignHCenter
+                    width: exitTLabel.implicitWidth + 36
+                    height: 38
+                    radius: 8
+                    color: exitTMouse.containsMouse ? "#3A3A44" : "#2A2A32"
+                    border.color: "#4A4A55"
+                    opacity: (stateManager && stateManager.transferExiting) ? 0.5 : 1.0
+
+                    Text {
+                        id: exitTLabel
+                        anchors.centerIn: parent
+                        text: "⏏  " + (stateManager && stateManager.strings ? stateManager.strings.transfer_mode_exit : "Salir del Modo Transferencia")
+                        font.pixelSize: 12
+                        font.bold: true
+                        color: "#FFFFFF"
+                    }
+
+                    MouseArea {
+                        id: exitTMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        enabled: !(stateManager && stateManager.transferExiting)
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: if (stateManager) stateManager.exitTransferMode()
+                    }
+                }
 
                 // Action button if microSD is present to activate transfer
                 Rectangle {

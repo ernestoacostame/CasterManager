@@ -1,6 +1,7 @@
 import os
 import tempfile
 import threading
+import time
 import json
 import logging
 from datetime import datetime
@@ -202,6 +203,11 @@ TRANSLATIONS = {
         "punch": "Punch (Pegada)",
         "punch_desc": "Consistencia dinámica e impacto con el Compresor",
         "voice_presets": "Perfiles de Voz",
+        "hw_presets_synced": "Sincronizado con los Presets de tu RØDECaster",
+        "hw_preset_neutral_desc": "Procesamiento suave y transparente para cualquier voz",
+        "hw_preset_podcast_desc": "Voz cálida y equilibrada, ideal para conversación",
+        "hw_preset_broadcast_desc": "Presencia de radio con más cuerpo, brillo y compresión",
+        "hw_preset_custom_desc": "Preset guardado en tu RØDECaster",
         "preset_broadcast": "Broadcast",
         "preset_broadcast_desc": "Presencia clásica de radio y estudio con graves profundos",
         "preset_podcast": "Podcast Studio",
@@ -453,6 +459,11 @@ TRANSLATIONS = {
         "punch": "Punch",
         "punch_desc": "Dynamic consistency and vocal punch from Compressor",
         "voice_presets": "Voice Profiles",
+        "hw_presets_synced": "Synced with your RØDECaster Presets",
+        "hw_preset_neutral_desc": "Gentle, transparent processing for any voice",
+        "hw_preset_podcast_desc": "Warm, balanced voice, ideal for conversation",
+        "hw_preset_broadcast_desc": "Radio presence with more body, sparkle and compression",
+        "hw_preset_custom_desc": "Preset stored on your RØDECaster",
         "preset_broadcast": "Broadcast",
         "preset_broadcast_desc": "Classic radio studio presence with rich proximity",
         "preset_podcast": "Podcast Studio",
@@ -746,6 +757,9 @@ class StateManager(QObject):
         self._active_dsp_channel = 0
         self._dsp_channels = self._init_default_dsp_channels()
         self._pending_dsp_updates = {}
+        self._fx_presets = []
+        self._last_dsp_write = 0.0
+        self._poll_tick = 0
         self._dsp_timer = QTimer(self)
         self._dsp_timer.setSingleShot(True)
         self._dsp_timer.setInterval(120)
@@ -966,6 +980,7 @@ class StateManager(QObject):
         self._submix_custom = {}
         self._pending_fader_levels.clear()
         self._pending_dsp_updates.clear()
+        self._fx_presets = []
         self._copied_pad = None
         if self._selected_pad_index >= self._pads_per_bank:
             self._selected_pad_index = 0
@@ -1338,64 +1353,7 @@ class StateManager(QObject):
                 except Exception as e:
                     logger.debug(f"Error caching banks: {e}")
 
-            # Populate DSP Channels from CHANNEL and INPUTSOURCE
-            channel_nodes = [c for c in children if c.get("name") == "CHANNEL"]
-            input_nodes = [c for c in children if c.get("name") == "INPUTSOURCE"]
-            for i, dsp in enumerate(self._dsp_channels):
-                c_node = channel_nodes[i] if i < len(channel_nodes) else None
-                if c_node:
-                    dsp["_synced"] = True
-                    cp = {k: list(v.values())[0] for k, v in c_node.get("properties", {}).items()}
-                    if "channelBypassProcessing" in cp:
-                        bypass = bool(cp["channelBypassProcessing"])
-                        dsp["bypass_processing"] = bypass
-                        if bypass and (dsp.get("noise_gate_on") or dsp.get("aphex_on") or dsp.get("compressor_on")):
-                            ch_node_idxs = [idx for idx, c in enumerate(children) if c.get("name") == "CHANNEL"]
-                            if i < len(ch_node_idxs):
-                                self.bridge.run_cmd(["set-property", str(ch_node_idxs[i]), "channelBypassProcessing", "bool:false"])
-                                dsp["bypass_processing"] = False
-                    if "aphexOn" in cp: dsp["aphex_on"] = bool(cp["aphexOn"])
-                    if "aphexAEMix" in cp: dsp["aphex_ae_mix"] = float(cp["aphexAEMix"])
-                    if "aphexAETune" in cp: dsp["aphex_ae_tune"] = float(cp["aphexAETune"])
-                    if "aphexBBDrive" in cp: dsp["aphex_bb_drive"] = float(cp["aphexBBDrive"])
-                    if "aphexBBTune" in cp: dsp["aphex_bb_tune"] = float(cp["aphexBBTune"])
-                    if "noiseGateOn" in cp: dsp["noise_gate_on"] = bool(cp["noiseGateOn"])
-                    if "noiseGateThreshold" in cp: dsp["noise_gate_threshold"] = float(cp["noiseGateThreshold"])
-                    if "noiseGateRange" in cp: dsp["noise_gate_range"] = float(cp["noiseGateRange"])
-                    if "noiseGateAttack" in cp: dsp["noise_gate_attack"] = float(cp["noiseGateAttack"])
-                    if "noiseGateRelease" in cp: dsp["noise_gate_release"] = float(cp["noiseGateRelease"])
-                    if "noiseGateHold" in cp: dsp["noise_gate_hold"] = float(cp["noiseGateHold"])
-                    if "compressorOn" in cp: dsp["compressor_on"] = bool(cp["compressorOn"])
-                    if "compressorThreshold" in cp: dsp["compressor_threshold"] = float(cp["compressorThreshold"])
-                    if "compressorRatio" in cp: dsp["compressor_ratio"] = float(cp["compressorRatio"])
-                    if "compressorGain" in cp: dsp["compressor_gain"] = float(cp["compressorGain"])
-                    if "compressorAttack" in cp: dsp["compressor_attack"] = float(cp["compressorAttack"])
-                    if "compressorRelease" in cp: dsp["compressor_release"] = float(cp["compressorRelease"])
-                    if "hpfOn" in cp: dsp["hpf_on"] = bool(cp["hpfOn"])
-                    if "hpfFrequency" in cp: dsp["hpf_frequency"] = float(cp["hpfFrequency"])
-                    if "deesserOn" in cp: dsp["deesser_on"] = bool(cp["deesserOn"])
-                    if "deesserThreshold" in cp: dsp["deesser_threshold"] = float(cp["deesserThreshold"])
-                    if "deesserRatio" in cp: dsp["deesser_ratio"] = float(cp["deesserRatio"])
-                    if "eqOn" in cp: dsp["eq_on"] = bool(cp["eqOn"])
-                    if "eqLowGain" in cp: dsp["eq_low"] = float(cp["eqLowGain"])
-                    if "eqMidGain" in cp: dsp["eq_mid"] = float(cp["eqMidGain"])
-                    if "eqHighGain" in cp: dsp["eq_high"] = float(cp["eqHighGain"])
-                    dsp["voxlab_depth"] = int(dsp.get("aphex_bb_drive", 0.5) * 100)
-                    dsp["voxlab_sparkle"] = int(dsp.get("aphex_ae_mix", 0.5) * 100)
-                    comp_t = dsp.get("compressor_threshold", 0.65)
-                    dsp["voxlab_punch"] = max(0, min(100, int((1.0 - comp_t) / 0.55 * 100)))
-
-                in_node = input_nodes[i] if i < len(input_nodes) else None
-                if in_node:
-                    inp = {k: list(v.values())[0] for k, v in in_node.get("properties", {}).items()}
-                    if "inputMicrophoneGain" in inp: dsp["preamp_gain"] = int(inp["inputMicrophoneGain"])
-                    if "inputPower" in inp:
-                        pwr = int(inp["inputPower"])
-                        dsp["phantom_power"] = (pwr == 1)
-                    if "inputPhaseFlip" in inp: dsp["phase_flip"] = bool(inp["inputPhaseFlip"])
-
-                # The device has no notion of "voice profile": infer it from the real values
-                dsp["active_preset"] = detect_dsp_preset(dsp)
+            self._parse_dsp_channels(children, heal=True)
 
             # Streamer X channel strips are hard-wired (Mic, Headset, Wireless, Pads, USB 1,
             # USB 2/Chat, HDMI). Older builds could retarget a strip to an unused analog
@@ -1641,6 +1599,11 @@ class StateManager(QObject):
     @pyqtProperty(str, notify=transferStateChanged)
     def transferStatusText(self):
         return self._transfer_status
+
+    @pyqtProperty(bool, notify=transferStateChanged)
+    def transferExiting(self):
+        """True while leaving transfer mode: views must release files on the card."""
+        return getattr(self, "_transfer_exiting", False)
 
     # Slots
     @pyqtSlot(int)
@@ -2572,70 +2535,162 @@ class StateManager(QObject):
             logger.debug(f"Could not scan block devices: {e}")
         return parts
 
+    @staticmethod
+    def _mount_point_of(dev):
+        """Current mount point of a block device (automounted or ours), or ''."""
+        import subprocess
+        try:
+            out = subprocess.run(["findmnt", "-rn", "-o", "TARGET", "-S", dev],
+                                 capture_output=True, text=True, timeout=5).stdout.strip()
+            return out.splitlines()[0].replace("\\x20", " ") if out else ""
+        except Exception:
+            return ""
+
+    def _rode_media_present(self):
+        """True while a RØDE mass-storage medium is exposed (unit still in transfer mode)."""
+        for dev in self._find_rode_partitions():
+            disk = os.path.basename(dev).rstrip("0123456789")
+            try:
+                with open(f"/sys/class/block/{disk}/size") as f:
+                    if int(f.read().strip() or 0) > 0:
+                        return True
+            except Exception:
+                return True
+        return False
+
+    def _system_node(self):
+        idx = getattr(self, "_root_child_index", {}).get("SYSTEM")
+        return str(idx if idx is not None else 15)
+
     @pyqtSlot()
     def enterTransferMode(self):
         self._transfer_mode = True
         self._transfer_status = "Activando modo transferencia..."
         self.transferStateChanged.emit()
-        self.toastMessage.emit("Activando transferencia USB en la consola...")
+        self.toastMessage.emit("Activando transferencia USB en la consola..." if self._language == "es" else "Enabling USB transfer on the console...")
 
         def do_enter():
-            import time
             import subprocess
-            self.bridge.run_cmd(["set-property", "15", "transferModeType", "u32:1"])
-            time.sleep(2)
+            sys_node = self._system_node()
+            logger.info("Transfer mode: requesting SD card (transferModeType=1)")
+            self.bridge.run_cmd(["set-property", sys_node, "transferModeType", "u32:1"])
 
+            # The card needs ~5 s to enumerate and udisks a moment more to probe it; the
+            # desktop may also automount it on its own, so poll for up to 30 s.
             mount_path = ""
-            # The storage takes a moment to enumerate after switching to transfer mode
-            rode_parts = []
-            for _ in range(10):
-                rode_parts = self._find_rode_partitions()
-                if rode_parts:
-                    break
-                time.sleep(0.5)
-            for dev in rode_parts:
-                if os.path.exists(dev):
-                    out = subprocess.run(["udisksctl", "mount", "-b", dev], capture_output=True, text=True)
-                    if "Mounted" in out.stdout:
-                        parts = out.stdout.split(" at ")
-                        if len(parts) > 1:
-                            mount_path = parts[1].strip().rstrip(".")
-                            break
+            deadline = time.time() + 30
+            while time.time() < deadline and not mount_path:
+                time.sleep(1.0)
+                for dev in self._find_rode_partitions():
+                    if not os.path.exists(dev):
+                        continue
+                    mount_path = self._mount_point_of(dev)
+                    if mount_path:
+                        break
+                    try:
+                        out = subprocess.run(["udisksctl", "mount", "--no-user-interaction", "-b", dev],
+                                             capture_output=True, text=True, timeout=10)
+                    except Exception as e:
+                        logger.debug(f"udisksctl mount {dev} failed: {e}")
+                        continue
+                    if " at " in out.stdout:
+                        mount_path = out.stdout.split(" at ", 1)[1].strip().rstrip(".")
+                        break
+                    mount_path = self._mount_point_of(dev)
+                    if mount_path:
+                        break
+                    logger.debug(f"udisksctl mount {dev}: {(out.stderr or out.stdout).strip()}")
 
-            if not mount_path:
-                import glob
-                matches = glob.glob("/run/media/*/RodeCaster") + glob.glob("/media/*/RodeCaster")
-                if matches:
-                    mount_path = matches[0]
-
+            logger.info(f"Transfer mode: SD card mount point = {mount_path or '(none)'}")
             self._mount_point = mount_path
-            self._transfer_status = f"MicroSD montada en {mount_path}" if mount_path else "Modo Transferencia Activo"
+            if mount_path:
+                self._transfer_status = f"MicroSD montada en {mount_path}" if self._language == "es" else f"MicroSD mounted at {mount_path}"
+            else:
+                self._transfer_status = "No se pudo montar la MicroSD" if self._language == "es" else "Could not mount the MicroSD"
             self._scan_recordings(mount_path)
             self.transferStateChanged.emit()
-            msg = "¡MicroSD montada en tu sistema!" if mount_path else "Modo Transferencia Activo"
-            self.toastMessage.emit(msg)
+            if mount_path:
+                self.toastMessage.emit("¡MicroSD montada en tu sistema!" if self._language == "es" else "MicroSD mounted on your system!")
+            else:
+                self.toastMessage.emit("La MicroSD no apareció. Pulsa ⏏ para salir del modo transferencia" if self._language == "es"
+                                       else "The MicroSD did not show up. Press ⏏ to leave transfer mode")
 
         self.executor.submit(do_enter)
 
     @pyqtSlot()
     def exitTransferMode(self):
-        self._transfer_status = "Desmontando..."
+        if getattr(self, "_transfer_exiting", False):
+            return
+        self._transfer_exiting = True
+        self._transfer_status = "Desmontando..." if self._language == "es" else "Unmounting..."
         self.transferStateChanged.emit()
-        self.toastMessage.emit("Desmontando MicroSD...")
+        self.toastMessage.emit("Desmontando MicroSD..." if self._language == "es" else "Unmounting MicroSD...")
 
         def do_exit():
-            import subprocess
-            for dev in self._find_rode_partitions():
-                if os.path.exists(dev):
-                    subprocess.run(["udisksctl", "unmount", "-b", dev], capture_output=True, text=True)
+            try:
+                _do_exit()
+            finally:
+                self._transfer_exiting = False
+                self.transferStateChanged.emit()
 
-            self.bridge.run_cmd(["set-property", "15", "transferModeType", "u32:0"])
-            self.bridge.run_cmd(["set-property", "15", "remountPadStorage", "bool:true"])
-            self._transfer_mode = False
-            self._mount_point = ""
-            self._transfer_status = ""
-            self.transferStateChanged.emit()
-            self.toastMessage.emit("MicroSD desmontada de forma segura")
+        def _do_exit():
+            import subprocess
+            sys_node = self._system_node()
+            time.sleep(0.6)  # let the audio player close the WAV it has open on the card
+            # The unit only leaves transfer mode once the host has released the volume:
+            # if it is still mounted (e.g. a file manager has it open) it ignores the request.
+            for dev in self._find_rode_partitions():
+                if not os.path.exists(dev) or not self._mount_point_of(dev):
+                    continue
+                for args in (["udisksctl", "unmount", "--no-user-interaction", "-b", dev],
+                             ["udisksctl", "unmount", "--no-user-interaction", "--force", "-b", dev]):
+                    try:
+                        out = subprocess.run(args, capture_output=True, text=True, timeout=15)
+                        logger.info(f"Transfer mode: {' '.join(args[1:])}: {(out.stdout or out.stderr).strip()}")
+                    except Exception as e:
+                        logger.warning(f"Transfer mode: unmount {dev} failed: {e}")
+                    if not self._mount_point_of(dev):
+                        break
+
+            # transferModeType may already read 0 (a previous exit attempt while the card
+            # was still mounted), and writing the same value is a no-op: toggle 1 -> 0.
+            left = False
+            for _attempt in range(3):
+                self.bridge.run_cmd(["set-property", sys_node, "transferModeType", "u32:0"])
+                for _ in range(8):
+                    time.sleep(0.5)
+                    if not self._rode_media_present():
+                        left = True
+                        break
+                if left:
+                    break
+                logger.info("Transfer mode: unit still exposes the card, toggling transferModeType 1 -> 0")
+                self.bridge.run_cmd(["set-property", sys_node, "transferModeType", "u32:1"])
+                time.sleep(1.5)
+                for dev in self._find_rode_partitions():
+                    if self._mount_point_of(dev):
+                        subprocess.run(["udisksctl", "unmount", "--no-user-interaction", "--force", "-b", dev],
+                                       capture_output=True, text=True, timeout=15)
+
+            logger.info(f"Transfer mode: exit {'confirmed' if left else 'NOT confirmed'}")
+            if left:
+                self.bridge.run_cmd(["set-property", sys_node, "remountPadStorage", "bool:true"])
+                self._transfer_mode = False
+                self._mount_point = ""
+                self._transfer_status = ""
+                self._recordings = []
+                self.recordingsChanged.emit()
+                self.transferStateChanged.emit()
+                self.toastMessage.emit("MicroSD desmontada de forma segura" if self._language == "es" else "MicroSD safely unmounted")
+            else:
+                # Something on the PC still has files open on the card (file manager, player...):
+                # stay in transfer mode so the user can retry once it is closed.
+                self._mount_point = ""
+                self._transfer_status = ("Cierra las ventanas o programas que usan la MicroSD y pulsa ⏏ de nuevo"
+                                         if self._language == "es" else
+                                         "Close any window or app using the MicroSD and press ⏏ again")
+                self.transferStateChanged.emit()
+                self.toastMessage.emit(self._transfer_status)
 
         self.executor.submit(do_exit)
 
@@ -3261,6 +3316,9 @@ class StateManager(QObject):
                 children = dump.get("children", [])
                 changed = False
 
+                if self._current_view == "audio_processing":
+                    self._refresh_dsp_from_device(children)
+
                 # 1. Rotary Knob 1: Input Gain & Mute
                 # Input 0: Mic / Line (Node 191)
                 if 191 < len(children) and len(self._dsp_channels) > 0:
@@ -3331,7 +3389,12 @@ class StateManager(QObject):
             self._submit_poll(do_poll_streamerx)
             return
 
+        self._poll_tick += 1
+        refresh_dsp = (self._current_view == "audio_processing" and self._poll_tick % 3 == 0)
+
         def do_poll():
+            if refresh_dsp:
+                self._refresh_dsp_from_device()
             fout, _ = self.bridge.run_cmd(["fader", "list", "--json"], timeout=2)
             if fout:
                 try:
@@ -4135,8 +4198,9 @@ class StateManager(QObject):
         ch[name] = value
         if unchanged and ch.get("_synced"):
             return  # device already has this value: no hardware round-trip
-        if name != "active_preset" and not name.startswith("voxlab_"):
+        if name != "active_preset" and not name.startswith("voxlab_") and not self._fx_presets:
             ch["active_preset"] = detect_dsp_preset(ch)
+        self._last_dsp_write = time.time()
         self.dspChanged.emit()
 
         if not self._connected or self._permission_error:
@@ -4212,53 +4276,280 @@ class StateManager(QObject):
                 self.bridge.run_cmd(["set-property", str(node_idx), prop_name, str(val_str)])
         self.executor.submit(do_send)
 
+    def _parse_dsp_channels(self, children, heal=False):
+        """Read DSP state (CHANNEL/INPUTSOURCE) and hardware voice presets (FXPRESETS) from a dump."""
+        fx_node = next((c for c in children if c.get("name") == "FXPRESETS"), None)
+        if fx_node is not None:
+            presets = []
+            for f in fx_node.get("children", []):
+                fp = {k: list(v.values())[0] for k, v in f.get("properties", {}).items()}
+                contents = str(fp.get("fxPresetContents", ""))
+                parts = contents.split("|")
+                if not parts or not parts[0]:
+                    continue
+                try:
+                    values = [float(x) for x in parts[1:]]
+                except ValueError:
+                    continue
+                presets.append({"idx": int(fp.get("fxPresetIdx", len(presets))), "name": parts[0], "values": values})
+            presets.sort(key=lambda x: x["idx"])
+            self._fx_presets = presets
+        # Populate DSP Channels from CHANNEL and INPUTSOURCE
+        channel_nodes = [c for c in children if c.get("name") == "CHANNEL"]
+        input_nodes = [c for c in children if c.get("name") == "INPUTSOURCE"]
+        for i, dsp in enumerate(self._dsp_channels):
+            c_node = channel_nodes[i] if i < len(channel_nodes) else None
+            if c_node:
+                dsp["_synced"] = True
+                cp = {k: list(v.values())[0] for k, v in c_node.get("properties", {}).items()}
+                if "channelBypassProcessing" in cp:
+                    bypass = bool(cp["channelBypassProcessing"])
+                    dsp["bypass_processing"] = bypass
+                    if heal and bypass and (dsp.get("noise_gate_on") or dsp.get("aphex_on") or dsp.get("compressor_on")):
+                        ch_node_idxs = [idx for idx, c in enumerate(children) if c.get("name") == "CHANNEL"]
+                        if i < len(ch_node_idxs):
+                            self.bridge.run_cmd(["set-property", str(ch_node_idxs[i]), "channelBypassProcessing", "bool:false"])
+                            dsp["bypass_processing"] = False
+                if "aphexOn" in cp: dsp["aphex_on"] = bool(cp["aphexOn"])
+                if "aphexAEMix" in cp: dsp["aphex_ae_mix"] = float(cp["aphexAEMix"])
+                if "aphexAETune" in cp: dsp["aphex_ae_tune"] = float(cp["aphexAETune"])
+                if "aphexBBDrive" in cp: dsp["aphex_bb_drive"] = float(cp["aphexBBDrive"])
+                if "aphexBBTune" in cp: dsp["aphex_bb_tune"] = float(cp["aphexBBTune"])
+                if "noiseGateOn" in cp: dsp["noise_gate_on"] = bool(cp["noiseGateOn"])
+                if "noiseGateThreshold" in cp: dsp["noise_gate_threshold"] = float(cp["noiseGateThreshold"])
+                if "noiseGateRange" in cp: dsp["noise_gate_range"] = float(cp["noiseGateRange"])
+                if "noiseGateAttack" in cp: dsp["noise_gate_attack"] = float(cp["noiseGateAttack"])
+                if "noiseGateRelease" in cp: dsp["noise_gate_release"] = float(cp["noiseGateRelease"])
+                if "noiseGateHold" in cp: dsp["noise_gate_hold"] = float(cp["noiseGateHold"])
+                if "compressorOn" in cp: dsp["compressor_on"] = bool(cp["compressorOn"])
+                if "compressorThreshold" in cp: dsp["compressor_threshold"] = float(cp["compressorThreshold"])
+                if "compressorRatio" in cp: dsp["compressor_ratio"] = float(cp["compressorRatio"])
+                if "compressorGain" in cp: dsp["compressor_gain"] = float(cp["compressorGain"])
+                if "compressorAttack" in cp: dsp["compressor_attack"] = float(cp["compressorAttack"])
+                if "compressorRelease" in cp: dsp["compressor_release"] = float(cp["compressorRelease"])
+                if "hpfOn" in cp: dsp["hpf_on"] = bool(cp["hpfOn"])
+                if "hpfFrequency" in cp: dsp["hpf_frequency"] = float(cp["hpfFrequency"])
+                if "deesserOn" in cp: dsp["deesser_on"] = bool(cp["deesserOn"])
+                if "deesserThreshold" in cp: dsp["deesser_threshold"] = float(cp["deesserThreshold"])
+                if "deesserRatio" in cp: dsp["deesser_ratio"] = float(cp["deesserRatio"])
+                if "eqOn" in cp: dsp["eq_on"] = bool(cp["eqOn"])
+                if "eqLowGain" in cp: dsp["eq_low"] = float(cp["eqLowGain"])
+                if "eqMidGain" in cp: dsp["eq_mid"] = float(cp["eqMidGain"])
+                if "eqHighGain" in cp: dsp["eq_high"] = float(cp["eqHighGain"])
+                # VoxLab macros live on the channel itself (channelDepth/Sparkle/Punch)
+                if "channelDepth" in cp: dsp["voxlab_depth"] = int(round(float(cp["channelDepth"]) * 100))
+                if "channelSparkle" in cp: dsp["voxlab_sparkle"] = int(round(float(cp["channelSparkle"]) * 100))
+                if "channelPunch" in cp: dsp["voxlab_punch"] = int(round(float(cp["channelPunch"]) * 100))
+                if "channelCurrentFxPreset" in cp:
+                    dsp["hw_preset_idx"] = int(cp["channelCurrentFxPreset"])
+                    self._detect_macro_slot(dsp)
+
+            in_node = input_nodes[i] if i < len(input_nodes) else None
+            if in_node:
+                inp = {k: list(v.values())[0] for k, v in in_node.get("properties", {}).items()}
+                if "inputMicrophoneGain" in inp: dsp["preamp_gain"] = int(inp["inputMicrophoneGain"])
+                if "inputPower" in inp:
+                    pwr = int(inp["inputPower"])
+                    dsp["phantom_power"] = (pwr == 1)
+                if "inputPhaseFlip" in inp: dsp["phase_flip"] = bool(inp["inputPhaseFlip"])
+
+            # Voice profile = the hardware FXPRESET selected on this channel (shown on the
+            # unit's Presets screen); fall back to value matching on firmwares without it.
+            if self._fx_presets and "hw_preset_idx" in dsp:
+                dsp["active_preset"] = str(dsp["hw_preset_idx"])
+            else:
+                dsp["active_preset"] = detect_dsp_preset(dsp)
+
+    # Layout of FXPRESET.fxPresetContents after the name (reverse-engineered from the
+    # factory presets): [0..2] depth/sparkle/punch, [3..5] alternate macro set (used by
+    # the unit for other microphone types), then the full processing chain.
+    FX_PRESET_FIELDS = {
+        6: ("channelAdvancedProcessing", "bool"),
+        7: ("aphexOn", "bool"), 8: ("aphexAETune", "f64"), 9: ("aphexAEMix", "f64"),
+        10: ("aphexBBTune", "f64"), 11: ("aphexBBDrive", "f64"),
+        12: ("compressorOn", "bool"), 13: ("compressorThreshold", "f64"), 14: ("compressorRatio", "f64"),
+        15: ("compressorAttack", "f64"), 16: ("compressorRelease", "f64"), 17: ("compressorGain", "f64"),
+        18: ("deesserOn", "bool"), 19: ("deesserFrequency", "f64"), 20: ("deesserThreshold", "f64"),
+        21: ("deesserRatio", "f64"), 22: ("deesserAttack", "f64"), 23: ("deesserRelease", "f64"),
+        24: ("deesserGain", "f64"),
+        25: ("noiseGateOn", "bool"), 26: ("noiseGateThreshold", "f64"), 27: ("noiseGateAttack", "f64"),
+        28: ("noiseGateHold", "f64"), 29: ("noiseGateRelease", "f64"), 30: ("noiseGateRange", "f64"),
+        31: ("noiseGateHysteresis", "f64"),
+        32: ("eqOn", "bool"), 33: ("eqLowOn", "bool"), 34: ("eqLowShelf", "f64"), 35: ("eqLowQ", "f64"),
+        36: ("eqLowGain", "f64"), 37: ("eqMidOn", "bool"), 38: ("eqMidBell", "f64"), 39: ("eqMidQ", "f64"),
+        40: ("eqMidGain", "f64"), 41: ("eqHighOn", "bool"), 42: ("eqHighBell", "f64"), 43: ("eqHighQ", "f64"),
+        44: ("eqHighGain", "f64"), 45: ("hpfOn", "bool"), 46: ("hpfFrequency", "f64"), 47: ("hpfSlope", "f64"),
+    }
+    # Hardware property -> key in self._dsp_channels[i]
+    HW_TO_DSP_KEY = {
+        "aphexOn": "aphex_on", "aphexAEMix": "aphex_ae_mix", "aphexAETune": "aphex_ae_tune",
+        "aphexBBDrive": "aphex_bb_drive", "aphexBBTune": "aphex_bb_tune",
+        "noiseGateOn": "noise_gate_on", "noiseGateThreshold": "noise_gate_threshold",
+        "noiseGateRange": "noise_gate_range", "noiseGateAttack": "noise_gate_attack",
+        "noiseGateRelease": "noise_gate_release", "noiseGateHold": "noise_gate_hold",
+        "compressorOn": "compressor_on", "compressorThreshold": "compressor_threshold",
+        "compressorRatio": "compressor_ratio", "compressorGain": "compressor_gain",
+        "compressorAttack": "compressor_attack", "compressorRelease": "compressor_release",
+        "hpfOn": "hpf_on", "hpfFrequency": "hpf_frequency",
+        "deesserOn": "deesser_on", "deesserThreshold": "deesser_threshold", "deesserRatio": "deesser_ratio",
+        "eqOn": "eq_on", "eqLowGain": "eq_low", "eqMidGain": "eq_mid", "eqHighGain": "eq_high",
+    }
+
+    @staticmethod
+    def _voxlab_derived(depth, sparkle, punch):
+        """Processing values the RØDE firmware derives from the VoxLab macros (0..1).
+
+        Matches the factory presets and the values the unit writes when the macros are
+        turned on its touchscreen."""
+        import math
+        d, s, p = (max(0.0, min(1.0, float(x))) for x in (depth, sparkle, punch))
+        return {
+            "aphexBBDrive": 0.9 * d,
+            "aphexAEMix": 0.9 * s,
+            "eqLowGain": 0.5 + d / 8.0,
+            "eqHighGain": 0.5 + d / 8.0,
+            "eqMidGain": 0.5 - d / 16.0,
+            "compressorThreshold": (23.0 - 8.0 * p) / 30.0,
+            "compressorGain": p / 3.0,
+            "noiseGateThreshold": 0.25 + p / 6.0,
+            "noiseGateRange": math.sqrt(0.13 * p),
+            "deesserThreshold": (7.0 - p) / 12.0,
+        }
+
+    def _detect_macro_slot(self, dsp):
+        """Presets carry two macro sets; remember which one the unit used on this channel."""
+        idx = dsp.get("hw_preset_idx")
+        preset = next((x for x in self._fx_presets if x["idx"] == idx), None)
+        if not preset or len(preset["values"]) < 6:
+            return
+        cur = (dsp.get("voxlab_depth", -1) / 100.0, dsp.get("voxlab_sparkle", -1) / 100.0, dsp.get("voxlab_punch", -1) / 100.0)
+        v = preset["values"]
+        def near(a, b):
+            return all(abs(x - y) < 0.011 for x, y in zip(a, b))
+        if near(cur, v[0:3]):
+            dsp["_macro_slot"] = 0
+        elif near(cur, v[3:6]):
+            dsp["_macro_slot"] = 1
+
+    def _queue_channel_props(self, ch, props):
+        """Queue raw CHANNEL property writes ({hwName: value}) and mirror them locally."""
+        node = ch.get("channel_idx", 28 + self._active_dsp_channel)
+        for hw_name, val in props.items():
+            if isinstance(val, bool):
+                self._pending_dsp_updates[(node, hw_name)] = f"bool:{str(val).lower()}"
+            elif isinstance(val, int):
+                self._pending_dsp_updates[(node, hw_name)] = f"u32:{val}"
+            else:
+                self._pending_dsp_updates[(node, hw_name)] = f"f64:{float(val):.6f}"
+            key = self.HW_TO_DSP_KEY.get(hw_name)
+            if key:
+                ch[key] = val
+        self._last_dsp_write = time.time()
+
+    @pyqtProperty("QVariantList", notify=dspChanged)
+    def voicePresets(self):
+        """Voice profiles stored on the unit (FXPRESETS); empty if the firmware has none."""
+        return [{"id": str(p["idx"]), "name": p["name"]} for p in self._fx_presets]
+
     @pyqtSlot(str, int)
     def setVoxlabMacro(self, macro_name, value):
         """
-        Adjusts VoxLab macro controls (depth, sparkle, punch) and synchronizes with hardware DSP.
+        Adjusts a VoxLab macro (depth, sparkle, punch) exactly like the unit does: writes
+        channelDepth/Sparkle/Punch plus the processing values the firmware derives from them.
         """
         if not (0 <= self._active_dsp_channel < len(self._dsp_channels)):
             return
+        if macro_name not in ("depth", "sparkle", "punch"):
+            return
         ch = self._dsp_channels[self._active_dsp_channel]
         val = max(0, min(100, int(value)))
-        norm_val = val / 100.0
-
-        if macro_name == "depth":
-            ch["voxlab_depth"] = val
-            if val > 0 and not ch.get("aphex_on", False):
-                self.setDspParameter("aphex_on", True)
-            self.setDspParameter("aphex_bb_drive", norm_val)
-        elif macro_name == "sparkle":
-            ch["voxlab_sparkle"] = val
-            if val > 0 and not ch.get("aphex_on", False):
-                self.setDspParameter("aphex_on", True)
-            self.setDspParameter("aphex_ae_mix", norm_val)
-        elif macro_name == "punch":
-            ch["voxlab_punch"] = val
-            comp_thresh = 1.0 - (norm_val * 0.55)
-            comp_ratio = 0.25 + (norm_val * 0.55)
-            comp_gain = norm_val * 0.35
-            if val > 0 and not ch.get("compressor_on", False):
-                self.setDspParameter("compressor_on", True)
-            self.setDspParameter("compressor_threshold", comp_thresh)
-            self.setDspParameter("compressor_ratio", comp_ratio)
-            self.setDspParameter("compressor_gain", comp_gain)
-
-        ch["active_preset"] = "custom"
+        ch[f"voxlab_{macro_name}"] = val
         self.dspChanged.emit()
+        if not self._connected or self._permission_error:
+            return
+
+        d = ch.get("voxlab_depth", 50) / 100.0
+        s = ch.get("voxlab_sparkle", 50) / 100.0
+        p = ch.get("voxlab_punch", 50) / 100.0
+        derived = self._voxlab_derived(d, s, p)
+        affected = {
+            "depth": ("channelDepth", d, ["aphexBBDrive", "eqLowGain", "eqHighGain", "eqMidGain"]),
+            "sparkle": ("channelSparkle", s, ["aphexAEMix"]),
+            "punch": ("channelPunch", p, ["compressorThreshold", "compressorGain", "noiseGateThreshold",
+                                          "noiseGateRange", "deesserThreshold"]),
+        }[macro_name]
+        props = {affected[0]: affected[1]}
+        for k in affected[2]:
+            props[k] = derived[k]
+        if ch.get("bypass_processing"):
+            ch["bypass_processing"] = False
+            props["channelBypassProcessing"] = False
+        self._queue_channel_props(ch, props)
+        self._dsp_timer.start()
 
     @pyqtSlot(str)
     def applyDspPreset(self, preset_name):
         """
-        Applies standard studio voice presets to active DSP channel.
-        Presets: 'broadcast', 'podcast', 'gaming', 'neutral'
+        Applies a voice profile to the active DSP channel.
+
+        With hardware presets (FXPRESETS) the unit's own preset is selected
+        (channelCurrentFxPreset, so the touchscreen highlights it) and its processing
+        chain is written to the channel. Legacy ids ('broadcast', ...) use DSP_PRESETS.
         """
         if not (0 <= self._active_dsp_channel < len(self._dsp_channels)):
             return
         ch = self._dsp_channels[self._active_dsp_channel]
 
-        presets = DSP_PRESETS
+        hw = next((x for x in self._fx_presets if str(x["idx"]) == str(preset_name)), None)
+        if hw is not None:
+            v = hw["values"]
+            slot = ch.get("_macro_slot", 0)
+            base = 3 if (slot == 1 and len(v) >= 6) else 0
+            if len(v) < 48:
+                logger.warning(f"FX preset '{hw['name']}' has an unexpected layout ({len(v)} values)")
+                return
+            d, s, p = v[base], v[base + 1], v[base + 2]
+            props = {"channelCurrentFxPreset": int(hw["idx"])}
+            for i, (hw_name, typ) in self.FX_PRESET_FIELDS.items():
+                props[hw_name] = bool(v[i] >= 0.5) if typ == "bool" else float(v[i])
+            props.update({"channelDepth": d, "channelSparkle": s, "channelPunch": p})
+            props.update(self._voxlab_derived(d, s, p))
+            props["channelBypassProcessing"] = False
+            ch["bypass_processing"] = False
+            ch["voxlab_depth"] = int(round(d * 100))
+            ch["voxlab_sparkle"] = int(round(s * 100))
+            ch["voxlab_punch"] = int(round(p * 100))
+            ch["hw_preset_idx"] = int(hw["idx"])
+            ch["active_preset"] = str(hw["idx"])
+            self.dspChanged.emit()
+            if self._connected and not self._permission_error:
+                node = ch.get("channel_idx", 28 + self._active_dsp_channel)
+                args = ["set-properties", str(node)]
+                for hw_name, val in props.items():
+                    if hw_name == "channelCurrentFxPreset":
+                        args.append(f"{hw_name}=u32:{val}")
+                    elif isinstance(val, bool):
+                        args.append(f"{hw_name}=bool:{str(val).lower()}")
+                    else:
+                        args.append(f"{hw_name}=f64:{float(val):.6f}")
+                    key = self.HW_TO_DSP_KEY.get(hw_name)
+                    if key:
+                        ch[key] = val
+                self._last_dsp_write = time.time()
 
+                def do_apply():
+                    out, err = self.bridge.run_cmd(args, timeout=15)
+                    if err:
+                        logger.warning(f"Batch preset write failed ({err.strip()[:120]}), falling back to single writes")
+                        for a in args[2:]:
+                            name, value = a.split("=", 1)
+                            self.bridge.run_cmd(["set-property", str(node), name, value])
+                self.executor.submit(do_apply)
+            msg = f"Perfil de voz '{hw['name']}' aplicado" if self._language == "es" else f"Voice profile '{hw['name']}' applied"
+            self.toastMessage.emit(msg)
+            return
+
+        presets = DSP_PRESETS
         if preset_name in presets:
             p_data = presets[preset_name]
             for k, v in p_data.items():
@@ -4274,6 +4565,20 @@ class StateManager(QObject):
             label = preset_labels.get(preset_name, preset_name)
             msg = f"Perfil de voz '{label}' aplicado" if self._language == "es" else f"Voice profile '{label}' applied"
             self.toastMessage.emit(msg)
+
+    def _refresh_dsp_from_device(self, children=None):
+        """Pick up changes made on the unit (preset picked on the touchscreen, macros...)."""
+        if self._pending_dsp_updates or time.time() - getattr(self, "_last_dsp_write", 0) < 3.0:
+            return
+        if children is None:
+            dump = self.bridge.dump_state()
+            if not dump:
+                return
+            children = dump.get("children", [])
+        before = json.dumps(self._dsp_channels, sort_keys=True, default=str)
+        self._parse_dsp_channels(children, heal=False)
+        if json.dumps(self._dsp_channels, sort_keys=True, default=str) != before:
+            self.dspChanged.emit()
 
     @pyqtSlot()
     def openAudioProcessing(self):

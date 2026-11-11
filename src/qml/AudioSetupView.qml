@@ -446,31 +446,6 @@ Item {
                                     spacing: 4
 
                                     Rectangle {
-                                        Layout.fillWidth: true
-                                        height: 22
-                                        radius: 5
-                                        color: modelData.mute ? "#FF3B30" : "#26262B"
-                                        border.color: modelData.mute ? "#FF453A" : "#36363E"
-                                        border.width: 1
-
-                                        Text {
-                                            anchors.centerIn: parent
-                                            text: "MUTE"
-                                            font.pixelSize: 9
-                                            font.bold: true
-                                            color: modelData.mute ? "#FFFFFF" : "#AAAAAA"
-                                        }
-
-                                        MouseArea {
-                                            anchors.fill: parent
-                                            cursorShape: Qt.PointingHandCursor
-                                            onClicked: {
-                                                if (stateManager) stateManager.toggleFaderMute(modelData.index);
-                                            }
-                                        }
-                                    }
-
-                                    Rectangle {
                                         visible: !stateManager || !stateManager.isStreamerX
                                         Layout.fillWidth: true
                                         height: 22
@@ -495,25 +470,19 @@ Item {
                                             }
                                         }
                                     }
-                                }
-
-                                RowLayout {
-                                    visible: !stateManager || stateManager.faders.length <= 6
-                                    Layout.fillWidth: true
-                                    spacing: 6
 
                                     Rectangle {
                                         Layout.fillWidth: true
-                                        height: 28
-                                        radius: 6
-                                        color: modelData.mute ? "#FF3B30" : "#2E2E34"
-                                        border.color: modelData.mute ? "#FF453A" : "#3E3E46"
+                                        height: 22
+                                        radius: 5
+                                        color: modelData.mute ? "#FF3B30" : "#26262B"
+                                        border.color: modelData.mute ? "#FF453A" : "#36363E"
                                         border.width: 1
 
                                         Text {
                                             anchors.centerIn: parent
                                             text: "MUTE"
-                                            font.pixelSize: 10
+                                            font.pixelSize: 9
                                             font.bold: true
                                             color: modelData.mute ? "#FFFFFF" : "#AAAAAA"
                                         }
@@ -526,6 +495,12 @@ Item {
                                             }
                                         }
                                     }
+                                }
+
+                                RowLayout {
+                                    visible: !stateManager || stateManager.faders.length <= 6
+                                    Layout.fillWidth: true
+                                    spacing: 6
 
                                     Rectangle {
                                         visible: !stateManager || !stateManager.isStreamerX
@@ -549,6 +524,31 @@ Item {
                                             cursorShape: Qt.PointingHandCursor
                                             onClicked: {
                                                 if (stateManager) stateManager.toggleFaderListen(modelData.index);
+                                            }
+                                        }
+                                    }
+
+                                    Rectangle {
+                                        Layout.fillWidth: true
+                                        height: 28
+                                        radius: 6
+                                        color: modelData.mute ? "#FF3B30" : "#2E2E34"
+                                        border.color: modelData.mute ? "#FF453A" : "#3E3E46"
+                                        border.width: 1
+
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: "MUTE"
+                                            font.pixelSize: 10
+                                            font.bold: true
+                                            color: modelData.mute ? "#FFFFFF" : "#AAAAAA"
+                                        }
+
+                                        MouseArea {
+                                            anchors.fill: parent
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: {
+                                                if (stateManager) stateManager.toggleFaderMute(modelData.index);
                                             }
                                         }
                                     }

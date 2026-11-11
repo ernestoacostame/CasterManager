@@ -9,6 +9,32 @@ Item {
     property int activeTab: 0            // 0: VoxLab™, 1: Canal Avanzado
     property string focusedEffect: ""
 
+    // Voice profiles: the unit's own presets (FXPRESETS) when available, so the
+    // selection matches the Presets screen on the RØDECaster; legacy list otherwise.
+    function presetModel() {
+        var hw = stateManager ? stateManager.voicePresets : [];
+        if (hw && hw.length > 0) {
+            var out = [];
+            for (var i = 0; i < hw.length; i++) {
+                var n = String(hw[i].name);
+                var key = n.toLowerCase();
+                var icon = "🎚️", desc = "";
+                if (key.indexOf("neutral") >= 0) { icon = "🎛️"; desc = root.s("hw_preset_neutral_desc", ""); }
+                else if (key.indexOf("podcast") >= 0) { icon = "🎧"; desc = root.s("hw_preset_podcast_desc", ""); }
+                else if (key.indexOf("broadcast") >= 0) { icon = "🎙️"; desc = root.s("hw_preset_broadcast_desc", ""); }
+                else { desc = root.s("hw_preset_custom_desc", ""); }
+                out.push({"id": String(hw[i].id), "icon": icon, "name": n, "desc": desc});
+            }
+            return out;
+        }
+        return [
+            {"id": "broadcast", "icon": "🎙️", "name": root.s("preset_broadcast", "Broadcast"),          "desc": root.s("preset_broadcast_desc", "")},
+            {"id": "podcast",   "icon": "🎧", "name": root.s("preset_podcast", "Podcast Studio"),      "desc": root.s("preset_podcast_desc", "")},
+            {"id": "gaming",    "icon": "🎮", "name": root.s("preset_gaming", "Streaming / Gaming"),   "desc": root.s("preset_gaming_desc", "")},
+            {"id": "neutral",   "icon": "🎛️", "name": root.s("preset_neutral", "Neutro / Plano"),      "desc": root.s("preset_neutral_desc", "")}
+        ];
+    }
+
     function getVal(prop, defVal) {
         if (root.dsp && root.dsp[prop] !== undefined && root.dsp[prop] !== null) {
             return root.dsp[prop];
@@ -254,11 +280,23 @@ Item {
                     spacing: 18
                     visible: root.activeTab === 0
 
-                    Text {
-                        text: root.s("voice_presets", "Perfiles de Voz")
-                        font.pixelSize: 13
-                        font.bold: true
-                        color: "#FFFFFF"
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 10
+                        Text {
+                            text: root.s("voice_presets", "Perfiles de Voz")
+                            font.pixelSize: 13
+                            font.bold: true
+                            color: "#FFFFFF"
+                        }
+                        Text {
+                            visible: Boolean(stateManager && stateManager.voicePresets && stateManager.voicePresets.length > 0)
+                            Layout.fillWidth: true
+                            text: "🔗 " + root.s("hw_presets_synced", "Sincronizado con los Presets de tu RØDECaster")
+                            font.pixelSize: 11
+                            color: "#8E8E93"
+                            elide: Text.ElideRight
+                        }
                     }
 
                     GridLayout {
@@ -268,12 +306,7 @@ Item {
                         columnSpacing: 12
 
                         Repeater {
-                            model: [
-                                {"id": "broadcast", "icon": "🎙️", "name": root.s("preset_broadcast", "Broadcast"),          "desc": root.s("preset_broadcast_desc", "")},
-                                {"id": "podcast",   "icon": "🎧", "name": root.s("preset_podcast", "Podcast Studio"),      "desc": root.s("preset_podcast_desc", "")},
-                                {"id": "gaming",    "icon": "🎮", "name": root.s("preset_gaming", "Streaming / Gaming"),   "desc": root.s("preset_gaming_desc", "")},
-                                {"id": "neutral",   "icon": "🎛️", "name": root.s("preset_neutral", "Neutro / Plano"),      "desc": root.s("preset_neutral_desc", "")}
-                            ]
+                            model: root.presetModel()
 
                             Rectangle {
                                 readonly property bool isSelected: root.getVal("active_preset", "") === modelData.id

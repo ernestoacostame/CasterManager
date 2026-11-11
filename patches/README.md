@@ -8,5 +8,12 @@
   properties in one connection. CasterManager uses it to create voice-FX pads the way
   RØDE Unify does (a `PAD` plus its `PADEFFECTS/EFFECTS_PARAMETERS` block).
 
-Rebuild: `patch -p1 < patches/rcp2-cli-streamerx-addchild.patch` inside the rcp2-cli tree, then
+`rcp2-cli-set-properties.patch` (apply after the one above):
+
+- `set-properties <indices> [name=type:value...]`: writes several properties of one node in a
+  single connection. CasterManager uses it to apply a hardware voice preset (≈50 CHANNEL
+  properties + `channelCurrentFxPreset`) in under a second instead of one process per property.
+
+Rebuild: `patch -p1 < patches/rcp2-cli-streamerx-addchild.patch` and then
+`patch -p1 < patches/rcp2-cli-set-properties.patch` inside the rcp2-cli tree, then
 `cargo build --release --bin rcp2-cli` and copy `target/release/rcp2-cli` (stripped) to `bin/`.

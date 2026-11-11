@@ -1,0 +1,80 @@
+--- a/crates/rcp2-cli/src/commands/mod.rs
++++ b/crates/rcp2-cli/src/commands/mod.rs
+@@ -38,7 +38,7 @@
+ pub use record_cmd::{RecordAction, record};
+ #[cfg(debug_assertions)]
+ pub use send_cmd::send;
+-pub use set_property_cmd::{add_child, set_property};
++pub use set_property_cmd::{add_child, set_properties, set_property};
+ pub use show_cmd::{ShowAction, show};
+ pub use transfer_cmd::{TransferAction, transfer};
+ 
+--- a/crates/rcp2-cli/src/commands/set_property_cmd.rs
++++ b/crates/rcp2-cli/src/commands/set_property_cmd.rs
+@@ -26,6 +26,37 @@
+     Ok(())
+ }
+ 
++/// Sets several properties ("name=type:value") on one node in a single connection.
++pub fn set_properties(
++    ctx: &Context,
++    indices_str: &str,
++    props: &[String],
++) -> Result<(), Box<dyn std::error::Error>> {
++    let indices: Vec<usize> = indices_str
++        .split(',')
++        .map(|s| s.trim().parse())
++        .collect::<Result<_, _>>()?;
++    let mut parsed = Vec::new();
++    for p in props {
++        let (name, val) = p
++            .split_once('=')
++            .ok_or_else(|| format!("invalid property '{p}' (use name=type:value)"))?;
++        parsed.push((name.to_string(), parse_value(val)?));
++    }
++
++    let conn = super::open_connection(ctx)?;
++    conn.wait_for_state()?;
++
++    for (name, value) in parsed {
++        println!("setting [{indices_str}] {name} = {value:?}");
++        conn.send_property_update(indices.clone(), name.into(), value)?;
++        std::thread::sleep(std::time::Duration::from_millis(10));
++    }
++    conn.flush()?;
++    println!("done");
++    Ok(())
++}
++
+ /// Adds a child node (e.g. an EFFECTS_PARAMETERS under PADEFFECTS) at `parent_str`,
+ /// then sets `props` ("name=type:value") on it in the same connection.
+ pub fn add_child(
+--- a/crates/rcp2-cli/src/main.rs
++++ b/crates/rcp2-cli/src/main.rs
+@@ -109,6 +109,13 @@
+         /// Value (u32:N, bool:true/false, f64:N, str:text)
+         value: String,
+     },
++    /// Set several properties on one node in a single connection (CasterManager: voice presets)
++    SetProperties {
++        /// Comma-separated indices (e.g. "28")
++        indices: String,
++        /// Properties as name=type:value (e.g. channelDepth=f64:0.75)
++        props: Vec<String>,
++    },
+     /// Add a child node and initialise its properties (CasterManager: pad FX blocks)
+     AddChild {
+         /// Comma-separated parent indices (e.g. "214")
+@@ -199,6 +206,12 @@
+         } => commands::run_with_disclaimer(&ctx, || {
+             commands::set_property(&ctx, indices, name, value)
+         }),
++        Commands::SetProperties {
++            ref indices,
++            ref props,
++        } => commands::run_with_disclaimer(&ctx, || {
++            commands::set_properties(&ctx, indices, props)
++        }),
+         Commands::AddChild {
+             ref parent,
+             insert_at,
