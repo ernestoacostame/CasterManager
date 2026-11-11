@@ -22,14 +22,47 @@ echo ""
 # 1. Check Python and PyQt6
 echo "[1/6] Checking prerequisites..."
 if ! command -v python3 >/dev/null 2>&1; then
-    echo "ERROR: python3 is not installed."
+    echo "ERROR: python3 is not installed. Please install Python 3."
     exit 1
 fi
 
-if ! python3 -c "import PyQt6.QtQml, PyQt6.QtQuick" 2>/dev/null; then
-    echo "WARNING: PyQt6 (with QtQml / QtQuick) is missing."
-    echo "On Arch Linux run: sudo pacman -S python-pyqt6 qt6-declarative"
-    echo "On Ubuntu/Debian:  sudo apt install python3-pyqt6 python3-pyqt6.qtquick"
+PYQT_MISSING=0
+if ! python3 -c "import PyQt6.QtCore, PyQt6.QtGui, PyQt6.QtQml, PyQt6.QtQuick" 2>/dev/null; then
+    PYQT_MISSING=1
+fi
+
+if [ "$PYQT_MISSING" -eq 1 ]; then
+    echo ""
+    echo "==> PyQt6 (QtQml / QtQuick) components are missing."
+    DISTRO_CMD=""
+    if command -v pacman >/dev/null 2>&1; then
+        DISTRO_CMD="sudo pacman -S --needed python-pyqt6 qt6-declarative qt6-multimedia qt6-svg"
+    elif command -v apt-get >/dev/null 2>&1; then
+        DISTRO_CMD="sudo apt update && sudo apt install -y python3-pyqt6 python3-pyqt6.qtquick python3-pyqt6.qtmultimedia qml6-module-qtquick qml6-module-qtquick-controls qml6-module-qtquick-layouts qml6-module-qtquick-shapes qml6-module-qtquick-dialogs qml6-module-qtmultimedia libqt6svg6"
+    elif command -v dnf >/dev/null 2>&1; then
+        DISTRO_CMD="sudo dnf install -y python3-pyqt6 qt6-qtdeclarative qt6-qtmultimedia qt6-qtsvg"
+    elif command -v zypper >/dev/null 2>&1; then
+        DISTRO_CMD="sudo zypper in python3-PyQt6 qt6-declarative qt6-multimedia"
+    fi
+
+    if [ -n "$DISTRO_CMD" ]; then
+        echo "Detected package manager command to install dependencies:"
+        echo "  $DISTRO_CMD"
+        if [ -t 0 ]; then
+            read -r -p "Would you like to run this command now? [y/N] " reply
+            case "$reply" in
+                [yY][eE][sS]|[yY])
+                    eval "$DISTRO_CMD" || true
+                    ;;
+                *)
+                    echo "Continuing installation. Remember to install dependencies before launching CasterManager."
+                    ;;
+            esac
+        fi
+    else
+        echo "Please install PyQt6, Qt6 Declarative (QML), and Qt6 Multimedia using your package manager."
+    fi
+    echo ""
 fi
 
 # 2. Install udev rules and kernel quirks
@@ -122,35 +155,27 @@ systemctl --user daemon-reload || true
 systemctl --user enable --now castermanager-drain.service || true
 systemctl --user enable --now castermanager-censor.service || true
 
-# RØDECaster Duo / Pro II: friendly PipeWire names (Chat / Multitrack) for the Pro Audio nodes
+# RØDECaster Duo / Pro II / Streamer X: friendly PipeWire names (Chat / Multitrack) for the Pro Audio nodes
 WP_DIR="$HOME/.config/wireplumber/wireplumber.conf.d"
 mkdir -p "$WP_DIR"
 rm -f "$WP_DIR/51-castermanager-rodecaster-duo.conf"
 cp "$SCRIPT_DIR/assets/wireplumber/51-castermanager-rodecaster.conf" "$WP_DIR/"
+systemctl --user restart wireplumber.service 2>/dev/null || true
 
 # 5. Install Desktop & System Icons (XDG Icon Theme Specification)
 echo "[5/6] Installing application icons to system icon theme..."
-python3 -c "
-import os, sys, shutil
-from PyQt6.QtGui import QImage, QGuiApplication
+ICON_BASE="$HOME/.local/share/icons/hicolor"
+mkdir -p "$ICON_BASE"
 
-app = QGuiApplication(sys.argv)
-src_png = '$SCRIPT_DIR/assets/app_icon.png'
-src_svg = '$SCRIPT_DIR/assets/app_icon.svg'
-icon_base = os.path.expanduser('~/.local/share/icons/hicolor')
+if [ -d "$SCRIPT_DIR/assets/icons/hicolor" ]; then
+    cp -r "$SCRIPT_DIR/assets/icons/hicolor/"* "$ICON_BASE/"
+fi
 
-if os.path.exists(src_png):
-    img = QImage(src_png)
-    for s in [256, 128, 64, 48, 32, 16]:
-        dir_path = os.path.join(icon_base, f'{s}x{s}', 'apps')
-        os.makedirs(dir_path, exist_ok=True)
-        img.scaled(s, s).save(os.path.join(dir_path, 'castermanager.png'))
-
-if os.path.exists(src_svg):
-    scalable_dir = os.path.join(icon_base, 'scalable', 'apps')
-    os.makedirs(scalable_dir, exist_ok=True)
-    shutil.copyfile(src_svg, os.path.join(scalable_dir, 'castermanager.svg'))
-" || true
+# Fallback: copy standard icon to ~/.local/share/pixmaps
+mkdir -p "$HOME/.local/share/pixmaps"
+if [ -f "$SCRIPT_DIR/assets/app_icon.png" ]; then
+    cp --remove-destination "$SCRIPT_DIR/assets/app_icon.png" "$HOME/.local/share/pixmaps/castermanager.png"
+fi
 
 if command -v gtk-update-icon-cache >/dev/null 2>&1; then
     gtk-update-icon-cache -f -t "$HOME/.local/share/icons/hicolor" 2>/dev/null || true
