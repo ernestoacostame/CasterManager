@@ -1,0 +1,160 @@
+#!/usr/bin/env python3
+"""
+CasterManager Censor Service (RØDE Streamer X, USB multitrack)
+
+Runs in the background of the user session, independently of the CasterManager window.
+
+The Streamer X sends its USB multitrack channels *before* the Censor stage, so apps
+recording UNIFY-Mic (OBS, DAWs) hear everything said while a Censor pad is held.
+This service follows the unit's pad events and, while a Censor pad is active, mutes
+UNIFY-Mic and plays a censor tone in its place (see StreamerXAudioRouter.set_censor).
+
+Idle cost: one `rcp2-cli monitor` process while a Streamer X in multitrack mode is
+plugged in and the UNIFY sources exist; otherwise it just checks every few seconds.
+"""
+import json
+import logging
+import os
+import re
+import signal
+import subprocess
+import sys
+import time
+
+ROOT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+sys.path.insert(0, ROOT)
+from src.backend.streamerx_audio import StreamerXAudioRouter as Router  # noqa: E402
+
+CLI = os.path.join(ROOT, "bin", "rcp2-cli")
+RODE_VID = "19f7"
+MULTITRACK_PID = "0055"
+EVENT = re.compile(r"\[update\] \[(\d+), (\d+)\] (padActive|padType|padMixerMode) = (\w+)\((\w+)\)")
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] censor: %(message)s")
+log = logging.getLogger("castermanager-censor")
+
+running = True
+monitor_proc = None
+
+
+def stop(signum, frame):
+    global running
+    running = False
+    if monitor_proc is not None and monitor_proc.poll() is None:
+        monitor_proc.terminate()
+
+
+signal.signal(signal.SIGTERM, stop)
+signal.signal(signal.SIGINT, stop)
+
+
+def streamer_x_multitrack_present():
+    """True if a Streamer X enumerated as 'Main Multitrack' (PID 0x0055) is plugged in."""
+    base = "/sys/bus/usb/devices"
+    try:
+        for d in os.listdir(base):
+            try:
+                with open(os.path.join(base, d, "idVendor")) as f:
+                    if f.read().strip().lower() != RODE_VID:
+                        continue
+                with open(os.path.join(base, d, "idProduct")) as f:
+                    if f.read().strip().lower() == MULTITRACK_PID:
+                        return True
+            except OSError:
+                continue
+    except OSError:
+        pass
+    return False
+
+
+def cli_env():
+    env = os.environ.copy()
+    env["RCP_DEVICE_PID"] = MULTITRACK_PID
+    return env
+
+
+def censor_paths():
+    """{(SOUNDPADS index, child index)} of the Censor pads, or None if the dump failed."""
+    try:
+        out = subprocess.run([CLI, "--i-know-what-i-do", "dump"], capture_output=True,
+                             text=True, timeout=20, env=cli_env()).stdout
+        dump = json.loads(out) if out else None
+    except Exception as e:
+        log.debug(f"dump failed: {e}")
+        return None
+    if not dump:
+        return None
+    paths = set()
+    for ri, node in enumerate(dump.get("children", [])):
+        if node.get("name") != "SOUNDPADS":
+            continue
+        for ci, c in enumerate(node.get("children", [])):
+            p = {k: list(v.values())[0] for k, v in c.get("properties", {}).items()}
+            if int(p.get("padType", 0)) == 3 and int(p.get("padMixerMode", -1)) == 0:
+                paths.add((ri, ci))
+    return paths
+
+
+def ensure_censor_chain():
+    """UNIFY sources from an older CasterManager lack the censor bus: rebuild them once."""
+    if Router.censor_available():
+        return True
+    if Router.is_unify_profile_installed():
+        log.info("UNIFY sources lack the censor bus, rebuilding them")
+        Router.install_unify_profile()
+        return Router.censor_available()
+    return False
+
+
+def follow_device():
+    """Run one monitor session; returns when the monitor exits or the service stops."""
+    global monitor_proc
+    paths = censor_paths()
+    if paths is None:
+        return
+    log.info(f"following Streamer X pad events ({len(paths)} Censor pad(s))")
+    monitor_proc = subprocess.Popen([CLI, "--i-know-what-i-do", "monitor"], stdout=subprocess.PIPE,
+                                    stderr=subprocess.STDOUT, text=True, bufsize=1, env=cli_env())
+    try:
+        for line in monitor_proc.stdout:
+            if not running:
+                break
+            m = EVENT.search(line)
+            refresh = False
+            if m:
+                path = (int(m.group(1)), int(m.group(2)))
+                if m.group(3) == "padActive":
+                    if path in paths:
+                        active = m.group(5) == "true"
+                        log.info(f"Censor {'ON' if active else 'OFF'}")
+                        Router.set_censor(active)
+                else:
+                    refresh = True  # a pad changed type / mode
+            elif "added" in line.lower() or "removed" in line.lower():
+                refresh = True  # pads created / deleted: child indices moved
+            if refresh:
+                new_paths = censor_paths()
+                if new_paths is not None:
+                    paths = new_paths
+    finally:
+        if monitor_proc.poll() is None:
+            monitor_proc.terminate()
+        monitor_proc = None
+        Router.set_censor(False)
+
+
+def main():
+    log.info("started")
+    while running:
+        if streamer_x_multitrack_present() and ensure_censor_chain():
+            follow_device()
+            if running:
+                time.sleep(2)  # monitor ended (unplug, mode switch...): re-check
+        else:
+            time.sleep(5)
+    Router.set_censor(False)
+    log.info("stopped")
+
+
+if __name__ == "__main__":
+    main()

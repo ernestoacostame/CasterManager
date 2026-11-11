@@ -100,9 +100,27 @@ RestartSec=3
 WantedBy=default.target
 EOF
 
-chmod +x "$SCRIPT_DIR/bin/castermanager-drain"
+# Streamer X: applies the Censor pad to UNIFY-Mic in USB multitrack mode (the unit sends
+# its multitrack channels before the Censor). Runs without the CasterManager window.
+cat > "$SYSTEMD_USER_DIR/castermanager-censor.service" << EOF
+[Unit]
+Description=CasterManager Streamer X Censor Service (UNIFY-Mic)
+After=pipewire-pulse.service graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=$SCRIPT_DIR/bin/castermanager-censor
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=default.target
+EOF
+
+chmod +x "$SCRIPT_DIR/bin/castermanager-drain" "$SCRIPT_DIR/bin/castermanager-censor"
 systemctl --user daemon-reload || true
 systemctl --user enable --now castermanager-drain.service || true
+systemctl --user enable --now castermanager-censor.service || true
 
 # 5. Install Desktop & System Icons (XDG Icon Theme Specification)
 echo "[5/6] Installing application icons to system icon theme..."
