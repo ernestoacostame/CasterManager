@@ -144,7 +144,8 @@ Item {
                     Rectangle {
                         visible: Boolean(stateManager && stateManager.isStreamerX)
                         Layout.fillWidth: true
-                        height: unifyCol.height + 40
+                        implicitHeight: visible ? (unifyCol.implicitHeight + 40) : 0
+                        Layout.preferredHeight: implicitHeight
                         radius: 14
                         color: (stateManager && stateManager.streamerXUnifyInstalled) ? "#141F18" : "#191920"
                         border.color: (stateManager && stateManager.streamerXUnifyInstalled) ? "#28C850" : "#2E2E38"
@@ -405,7 +406,8 @@ Item {
                     // 2. Headphones Card
                     Rectangle {
                         Layout.fillWidth: true
-                        height: hpCol.height + 36
+                        implicitHeight: (stateManager && stateManager.isStreamerX) ? 104 : 150
+                        Layout.preferredHeight: implicitHeight
                         radius: 12
                         color: "#1A1A1D"
                         border.color: "#2C2C32"
@@ -413,9 +415,7 @@ Item {
 
                         ColumnLayout {
                             id: hpCol
-                            anchors.top: parent.top
-                            anchors.left: parent.left
-                            anchors.right: parent.right
+                            anchors.fill: parent
                             anchors.margins: 18
                             spacing: 14
 
@@ -431,6 +431,7 @@ Item {
                             // Headphone 1 (or Main Headphone for Streamer X)
                             RowLayout {
                                 Layout.fillWidth: true
+                                Layout.preferredHeight: 32
                                 spacing: 14
 
                                 Text {
@@ -476,6 +477,7 @@ Item {
                             RowLayout {
                                 visible: Boolean(stateManager && !stateManager.isStreamerX)
                                 Layout.fillWidth: true
+                                Layout.preferredHeight: visible ? 32 : 0
                                 spacing: 14
 
                                 Text {
@@ -519,23 +521,22 @@ Item {
                         }
                     }
 
-                    // 2. Monitor & Routing Options Card (Hidden for Streamer X: no monitor speakers or solo buttons)
-                Rectangle {
-                    visible: Boolean(stateManager && !stateManager.isStreamerX)
-                    Layout.fillWidth: true
-                    height: monCol.height + 36
-                    radius: 12
-                    color: "#1A1A1D"
-                    border.color: "#2C2C32"
-                    border.width: 1
+                    // 3. Monitor & Routing Options Card (Hidden for Streamer X: no monitor speakers or solo buttons)
+                    Rectangle {
+                        visible: Boolean(stateManager && !stateManager.isStreamerX)
+                        Layout.fillWidth: true
+                        implicitHeight: visible ? (monCol.implicitHeight + 36) : 0
+                        Layout.preferredHeight: implicitHeight
+                        radius: 12
+                        color: "#1A1A1D"
+                        border.color: "#2C2C32"
+                        border.width: 1
 
-                    ColumnLayout {
-                        id: monCol
-                        anchors.top: parent.top
-                        anchors.left: parent.left
-                        anchors.right: parent.right
-                        anchors.margins: 18
-                        spacing: 16
+                        ColumnLayout {
+                            id: monCol
+                            anchors.fill: parent
+                            anchors.margins: 18
+                            spacing: 16
 
                         Text {
                             text: "🔊 " + (stateManager ? stateManager.strings.monitor : "Monitores") + " & " + (stateManager ? stateManager.strings.routing : "Enrutamiento")
@@ -710,19 +711,24 @@ Item {
                             }
                         }
                     }
+                    Item { Layout.fillHeight: true }
                 }
             }
 
             // TAB 1: DISPLAY & BRIGHTNESS
             ColumnLayout {
-                width: root.width - 56
+                id: tab1Col
+                anchors.top: parent.top
+                anchors.left: parent.left
+                anchors.right: parent.right
                 spacing: 18
                 visible: root.activeTab === 1
 
                 // Brightness & Dimming Card
                 Rectangle {
                     Layout.fillWidth: true
-                    height: dispCol.height + 36
+                    implicitHeight: dispCol.implicitHeight + 36
+                    Layout.preferredHeight: implicitHeight
                     radius: 12
                     color: "#1A1A1D"
                     border.color: "#2C2C32"
@@ -730,9 +736,7 @@ Item {
 
                     ColumnLayout {
                         id: dispCol
-                        anchors.top: parent.top
-                        anchors.left: parent.left
-                        anchors.right: parent.right
+                        anchors.fill: parent
                         anchors.margins: 18
                         spacing: 16
 
@@ -1420,18 +1424,23 @@ Item {
                         }
                     }
                 }
+                Item { Layout.fillHeight: true }
             }
 
             // TAB 2: SYSTEM
             ColumnLayout {
-                width: root.width - 56
+                id: tab2Col
+                anchors.top: parent.top
+                anchors.left: parent.left
+                anchors.right: parent.right
                 spacing: 18
                 visible: root.activeTab === 2
 
                 // System Info Card
                 Rectangle {
                     Layout.fillWidth: true
-                    height: sysCol.height + 36
+                    implicitHeight: sysCol.implicitHeight + 36
+                    Layout.preferredHeight: implicitHeight
                     radius: 12
                     color: "#1A1A1D"
                     border.color: "#2C2C32"
@@ -1439,9 +1448,7 @@ Item {
 
                     ColumnLayout {
                         id: sysCol
-                        anchors.top: parent.top
-                        anchors.left: parent.left
-                        anchors.right: parent.right
+                        anchors.fill: parent
                         anchors.margins: 18
                         spacing: 16
 
@@ -1498,6 +1505,7 @@ Item {
                         }
                     }
                 }
+                Item { Layout.fillHeight: true }
             }
         }
     }
