@@ -95,15 +95,36 @@ def censor_paths():
     return paths
 
 
+_last_rebuild = 0.0
+
+
+def _mic_chain_complete():
+    try:
+        out = subprocess.run(["pactl", "list", "short", "sources"], capture_output=True,
+                             text=True, timeout=3).stdout
+    except Exception:
+        return False
+    names = {line.split("\t")[1] for line in out.splitlines() if "\t" in line}
+    return Router.MIC_SOURCE in names and Router.MIC_RAW in names
+
+
 def ensure_censor_chain():
-    """UNIFY sources from an older CasterManager lack the censor bus: rebuild them once."""
-    if Router.censor_available():
+    """Make sure UNIFY-Mic goes through the censor bus.
+
+    Rebuilds the UNIFY sources when they come from an older CasterManager (no bus) or
+    when replugging the unit / WirePlumber re-creating its nodes dropped the remapped
+    sources (their master disappeared). Only if the UNIFY profile is enabled."""
+    global _last_rebuild
+    if Router.censor_available() and _mic_chain_complete():
         return True
-    if Router.is_unify_profile_installed():
-        log.info("UNIFY sources lack the censor bus, rebuilding them")
-        Router.install_unify_profile()
-        return Router.censor_available()
-    return False
+    if not Router.is_unify_profile_installed():
+        return False
+    if time.time() - _last_rebuild < 30:
+        return False
+    _last_rebuild = time.time()
+    log.info("UNIFY sources incomplete, rebuilding them")
+    Router.install_unify_profile()
+    return Router.censor_available() and _mic_chain_complete()
 
 
 def follow_device():
@@ -158,3 +179,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
