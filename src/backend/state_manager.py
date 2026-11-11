@@ -110,6 +110,15 @@ TRANSLATIONS = {
         "display_brightness": "Pantalla",
         "buttons_brightness": "Botones",
         "auto_brightness": "Brillo Automático",
+        "scheduled_brightness": "Brillo Programado",
+        "scheduled_brightness_desc": "Ajusta el brillo de los botones automáticamente según el horario",
+        "schedule_start": "Hora de inicio (Noche)",
+        "schedule_end": "Hora de fin (Día)",
+        "schedule_day_brightness": "Brillo de día",
+        "schedule_night_brightness": "Brillo de noche",
+        "schedule_night_active": "Modo Nocturno activo",
+        "schedule_day_active": "Modo Diurno activo",
+        "schedule_next_change": "Próximo cambio a las",
         "dim_after": "Atenuar tras",
         "auto_mute_output": "Silenciar monitores al subir fader de micrófono",
         "auto_mute_bt": "Silenciar Bluetooth al subir micrófono",
@@ -352,6 +361,15 @@ TRANSLATIONS = {
         "display_brightness": "Display",
         "buttons_brightness": "Buttons",
         "auto_brightness": "Automatic Brightness",
+        "scheduled_brightness": "Scheduled Brightness",
+        "scheduled_brightness_desc": "Automatically adjust button brightness based on scheduled time",
+        "schedule_start": "Start time (Night)",
+        "schedule_end": "End time (Day)",
+        "schedule_day_brightness": "Day brightness",
+        "schedule_night_brightness": "Night brightness",
+        "schedule_night_active": "Night Mode active",
+        "schedule_day_active": "Day Mode active",
+        "schedule_next_change": "Next change at",
         "dim_after": "Dim After",
         "auto_mute_output": "Auto-mute monitor output when fader is raised",
         "auto_mute_bt": "Auto-mute Bluetooth when microphone is live",
@@ -648,6 +666,32 @@ class StateManager(QObject):
         self._screen_brightness = 250
         self._button_brightness = 255
         self._auto_brightness = False
+        # Streamer X Scheduled Brightness
+        self._brightness_schedule_enabled = (self.settings.value("streamerx_sched_enabled", "false") == "true")
+        try:
+            self._brightness_schedule_start_hour = int(self.settings.value("streamerx_sched_start_hour", 22))
+        except (TypeError, ValueError):
+            self._brightness_schedule_start_hour = 22
+        try:
+            self._brightness_schedule_start_minute = int(self.settings.value("streamerx_sched_start_minute", 0))
+        except (TypeError, ValueError):
+            self._brightness_schedule_start_minute = 0
+        try:
+            self._brightness_schedule_end_hour = int(self.settings.value("streamerx_sched_end_hour", 7))
+        except (TypeError, ValueError):
+            self._brightness_schedule_end_hour = 7
+        try:
+            self._brightness_schedule_end_minute = int(self.settings.value("streamerx_sched_end_minute", 0))
+        except (TypeError, ValueError):
+            self._brightness_schedule_end_minute = 0
+        try:
+            self._brightness_schedule_day = int(self.settings.value("streamerx_sched_day", 255))
+        except (TypeError, ValueError):
+            self._brightness_schedule_day = 255
+        try:
+            self._brightness_schedule_night = int(self.settings.value("streamerx_sched_night", 0))
+        except (TypeError, ValueError):
+            self._brightness_schedule_night = 0
         self._dim_after_sec = 0
         self._broadcast_meters = False
         self._haptic_feedback = 1
@@ -1394,6 +1438,7 @@ class StateManager(QObject):
             self.recordingChanged.emit()
             self.deviceConfigChanged.emit()
             self.dspChanged.emit()
+            self._check_brightness_schedule(force=True)
             self.toastMessage.emit(f"Synced with {self._model_name}" if self._language == "en" else f"Sincronizado con {self._model_name}")
 
         except Exception as e:
@@ -2099,7 +2144,14 @@ class StateManager(QObject):
                 "device_config": {
                     "screen_brightness": self._screen_brightness,
                     "button_brightness": self._button_brightness,
-                    "auto_brightness": self._auto_brightness
+                    "auto_brightness": self._auto_brightness,
+                    "brightness_schedule_enabled": self._brightness_schedule_enabled,
+                    "brightness_schedule_start_hour": self._brightness_schedule_start_hour,
+                    "brightness_schedule_start_minute": self._brightness_schedule_start_minute,
+                    "brightness_schedule_end_hour": self._brightness_schedule_end_hour,
+                    "brightness_schedule_end_minute": self._brightness_schedule_end_minute,
+                    "brightness_schedule_day": self._brightness_schedule_day,
+                    "brightness_schedule_night": self._brightness_schedule_night
                 }
             }
 
@@ -2232,6 +2284,16 @@ class StateManager(QObject):
                     self.setButtonBrightness(int(cfg["button_brightness"]))
                 if "auto_brightness" in cfg:
                     self.setAutoBrightness(bool(cfg["auto_brightness"]))
+                if "brightness_schedule_enabled" in cfg:
+                    self.setBrightnessScheduleEnabled(bool(cfg["brightness_schedule_enabled"]))
+                if "brightness_schedule_start_hour" in cfg and "brightness_schedule_start_minute" in cfg:
+                    self.setBrightnessScheduleStart(int(cfg["brightness_schedule_start_hour"]), int(cfg["brightness_schedule_start_minute"]))
+                if "brightness_schedule_end_hour" in cfg and "brightness_schedule_end_minute" in cfg:
+                    self.setBrightnessScheduleEnd(int(cfg["brightness_schedule_end_hour"]), int(cfg["brightness_schedule_end_minute"]))
+                if "brightness_schedule_day" in cfg:
+                    self.setBrightnessScheduleDay(int(cfg["brightness_schedule_day"]))
+                if "brightness_schedule_night" in cfg:
+                    self.setBrightnessScheduleNight(int(cfg["brightness_schedule_night"]))
 
             loaded_name = data.get("show_name", os.path.basename(clean_path))
             msg = f"Perfil '{loaded_name}' cargado con éxito" if self._language == "es" else f"Profile '{loaded_name}' loaded successfully"
@@ -3049,6 +3111,128 @@ class StateManager(QObject):
                 self.bridge.run_cmd(["set-property", "7", "broadcastMeters", f"bool:{str(val).lower()}"])
             self.executor.submit(do_set)
 
+    # Scheduled Brightness (Streamer X day/night schedule)
+    def _is_schedule_night(self):
+        from PyQt6.QtCore import QTime
+        start_t = QTime(self._brightness_schedule_start_hour, self._brightness_schedule_start_minute)
+        end_t = QTime(self._brightness_schedule_end_hour, self._brightness_schedule_end_minute)
+        now = QTime.currentTime()
+        if start_t == end_t:
+            return False
+        if start_t > end_t:
+            return now >= start_t or now < end_t
+        return start_t <= now < end_t
+
+    def _check_brightness_schedule(self, force=False):
+        if not self._brightness_schedule_enabled:
+            return
+        if not self._is_streamer_x or not self._connected or self._permission_error:
+            return
+
+        is_night = self._is_schedule_night()
+        target_val = self._brightness_schedule_night if is_night else self._brightness_schedule_day
+
+        if force or self._button_brightness != target_val:
+            logger.info(f"Scheduled brightness transition ({'night' if is_night else 'day'}): {self._button_brightness} -> {target_val}")
+            val = max(0, min(255, target_val))
+            self._button_brightness = val
+            self._pending_button_brightness = val
+            self.deviceConfigChanged.emit()
+            self._brightness_timer.start()
+
+    @pyqtProperty(bool, notify=deviceConfigChanged)
+    def brightnessScheduleEnabled(self):
+        return self._brightness_schedule_enabled
+
+    @pyqtSlot(bool)
+    def setBrightnessScheduleEnabled(self, enabled):
+        self._brightness_schedule_enabled = bool(enabled)
+        self.settings.setValue("streamerx_sched_enabled", "true" if self._brightness_schedule_enabled else "false")
+        if self._brightness_schedule_enabled:
+            self._check_brightness_schedule(force=True)
+        self.deviceConfigChanged.emit()
+
+    @pyqtProperty(int, notify=deviceConfigChanged)
+    def brightnessScheduleStartHour(self):
+        return self._brightness_schedule_start_hour
+
+    @pyqtProperty(int, notify=deviceConfigChanged)
+    def brightnessScheduleStartMinute(self):
+        return self._brightness_schedule_start_minute
+
+    @pyqtSlot(int, int)
+    def setBrightnessScheduleStart(self, hour, minute):
+        self._brightness_schedule_start_hour = max(0, min(23, int(hour)))
+        self._brightness_schedule_start_minute = max(0, min(59, int(minute)))
+        self.settings.setValue("streamerx_sched_start_hour", self._brightness_schedule_start_hour)
+        self.settings.setValue("streamerx_sched_start_minute", self._brightness_schedule_start_minute)
+        if self._brightness_schedule_enabled:
+            self._check_brightness_schedule(force=True)
+        self.deviceConfigChanged.emit()
+
+    @pyqtProperty(int, notify=deviceConfigChanged)
+    def brightnessScheduleEndHour(self):
+        return self._brightness_schedule_end_hour
+
+    @pyqtProperty(int, notify=deviceConfigChanged)
+    def brightnessScheduleEndMinute(self):
+        return self._brightness_schedule_end_minute
+
+    @pyqtSlot(int, int)
+    def setBrightnessScheduleEnd(self, hour, minute):
+        self._brightness_schedule_end_hour = max(0, min(23, int(hour)))
+        self._brightness_schedule_end_minute = max(0, min(59, int(minute)))
+        self.settings.setValue("streamerx_sched_end_hour", self._brightness_schedule_end_hour)
+        self.settings.setValue("streamerx_sched_end_minute", self._brightness_schedule_end_minute)
+        if self._brightness_schedule_enabled:
+            self._check_brightness_schedule(force=True)
+        self.deviceConfigChanged.emit()
+
+    @pyqtProperty(int, notify=deviceConfigChanged)
+    def brightnessScheduleDay(self):
+        return self._brightness_schedule_day
+
+    @pyqtSlot(int)
+    def setBrightnessScheduleDay(self, val):
+        self._brightness_schedule_day = max(0, min(255, int(val)))
+        self.settings.setValue("streamerx_sched_day", self._brightness_schedule_day)
+        if not self._is_schedule_night() and self._brightness_schedule_enabled:
+            self._check_brightness_schedule(force=True)
+        else:
+            self.deviceConfigChanged.emit()
+
+    @pyqtProperty(int, notify=deviceConfigChanged)
+    def brightnessScheduleNight(self):
+        return self._brightness_schedule_night
+
+    @pyqtSlot(int)
+    def setBrightnessScheduleNight(self, val):
+        self._brightness_schedule_night = max(0, min(255, int(val)))
+        self.settings.setValue("streamerx_sched_night", self._brightness_schedule_night)
+        if self._is_schedule_night() and self._brightness_schedule_enabled:
+            self._check_brightness_schedule(force=True)
+        else:
+            self.deviceConfigChanged.emit()
+
+    @pyqtProperty(bool, notify=deviceConfigChanged)
+    def brightnessScheduleIsNight(self):
+        return self._is_schedule_night()
+
+    @pyqtProperty(str, notify=deviceConfigChanged)
+    def brightnessScheduleStatusText(self):
+        is_night = self._is_schedule_night()
+        is_es = (self._language == "es")
+        if is_night:
+            pct = int(round(self._brightness_schedule_night / 255.0 * 100))
+            status = "Modo Nocturno activo" if is_es else "Night Mode active"
+            next_t = f"{self._brightness_schedule_end_hour:02d}:{self._brightness_schedule_end_minute:02d}"
+        else:
+            pct = int(round(self._brightness_schedule_day / 255.0 * 100))
+            status = "Modo Diurno activo" if is_es else "Day Mode active"
+            next_t = f"{self._brightness_schedule_start_hour:02d}:{self._brightness_schedule_start_minute:02d}"
+        next_lbl = "Próximo cambio a las" if is_es else "Next change at"
+        return f"{status} ({pct}%) • {next_lbl} {next_t}"
+
     @pyqtSlot(int, int)
     def assignChannelInputSource(self, fader_idx, input_source_id):
         # Streamer X channel strips are hard-wired to their inputs (CHANNEL node N is
@@ -3067,6 +3251,8 @@ class StateManager(QObject):
     def _poll_live_hardware(self):
         if not self._connected or self._permission_error or self._transfer_mode:
             return
+        if self._is_streamer_x and self._brightness_schedule_enabled:
+            self._check_brightness_schedule()
         if self.isStreamerX:
             def do_poll_streamerx():
                 dump = self.bridge.dump_state()

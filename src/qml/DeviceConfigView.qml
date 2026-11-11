@@ -8,6 +8,9 @@ Item {
 
     property int activeTab: 0 // 0: Output, 1: Display, 2: System
 
+    readonly property var hoursList: ["00","01","02","03","04","05","06","07","08","09","10","11","12","13","14","15","16","17","18","19","20","21","22","23"]
+    readonly property var minutesList: ["00","01","02","03","04","05","06","07","08","09","10","11","12","13","14","15","16","17","18","19","20","21","22","23","24","25","26","27","28","29","30","31","32","33","34","35","36","37","38","39","40","41","42","43","44","45","46","47","48","49","50","51","52","53","54","55","56","57","58","59"]
+
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: 28
@@ -780,11 +783,20 @@ Item {
                             }
                             Slider {
                                 Layout.fillWidth: true
-                                from: 20
+                                from: (stateManager && stateManager.isStreamerX ? 0 : 20)
                                 to: 255
                                 value: stateManager ? stateManager.buttonBrightness : 255
                                 onMoved: {
-                                    if (stateManager) stateManager.setButtonBrightness(Math.round(value));
+                                    if (stateManager) {
+                                        stateManager.setButtonBrightness(Math.round(value));
+                                        if (stateManager.isStreamerX && stateManager.brightnessScheduleEnabled) {
+                                            if (stateManager.brightnessScheduleIsNight) {
+                                                stateManager.setBrightnessScheduleNight(Math.round(value));
+                                            } else {
+                                                stateManager.setBrightnessScheduleDay(Math.round(value));
+                                            }
+                                        }
+                                    }
                                 }
                             }
                             Text {
@@ -792,6 +804,429 @@ Item {
                                 font.pixelSize: 12
                                 color: "#CBA158"
                                 Layout.preferredWidth: 45
+                            }
+                        }
+
+                        // Scheduled Brightness (Streamer X)
+                        Rectangle {
+                            visible: stateManager && stateManager.isStreamerX
+                            Layout.fillWidth: true
+                            height: 1
+                            color: "#28282E"
+                        }
+
+                        ColumnLayout {
+                            visible: stateManager && stateManager.isStreamerX
+                            Layout.fillWidth: true
+                            spacing: 14
+
+                            // Schedule Switch Header
+                            RowLayout {
+                                Layout.fillWidth: true
+                                ColumnLayout {
+                                    spacing: 2
+                                    Text {
+                                        text: stateManager ? stateManager.strings.scheduled_brightness : "Brillo Programado"
+                                        font.pixelSize: 13
+                                        font.bold: true
+                                        color: "#E0E0E0"
+                                    }
+                                    Text {
+                                        text: stateManager ? stateManager.strings.scheduled_brightness_desc : "Ajusta el brillo de los botones automáticamente según el horario"
+                                        font.pixelSize: 11
+                                        color: "#8E8E93"
+                                    }
+                                }
+                                Item { Layout.fillWidth: true }
+                                Switch {
+                                    checked: stateManager ? stateManager.brightnessScheduleEnabled : false
+                                    onToggled: {
+                                        if (stateManager) stateManager.setBrightnessScheduleEnabled(checked);
+                                    }
+                                }
+                            }
+
+                            // Active Status Banner (when enabled)
+                            Rectangle {
+                                visible: stateManager && stateManager.brightnessScheduleEnabled
+                                Layout.fillWidth: true
+                                height: 38
+                                radius: 8
+                                color: (stateManager && stateManager.brightnessScheduleIsNight) ? "#1A1D27" : "#24221A"
+                                border.color: (stateManager && stateManager.brightnessScheduleIsNight) ? "#33415F" : "#554622"
+
+                                RowLayout {
+                                    anchors.fill: parent
+                                    anchors.leftMargin: 14
+                                    anchors.rightMargin: 14
+                                    spacing: 10
+
+                                    Text {
+                                        text: (stateManager && stateManager.brightnessScheduleIsNight) ? "🌙" : "☀️"
+                                        font.pixelSize: 14
+                                    }
+                                    Text {
+                                        text: stateManager ? stateManager.brightnessScheduleStatusText : ""
+                                        font.pixelSize: 12
+                                        font.bold: true
+                                        color: (stateManager && stateManager.brightnessScheduleIsNight) ? "#8BB2FF" : "#F5D061"
+                                        Layout.fillWidth: true
+                                    }
+                                }
+                            }
+
+                            // Time Range Pickers
+                            ColumnLayout {
+                                visible: stateManager && stateManager.brightnessScheduleEnabled
+                                Layout.fillWidth: true
+                                spacing: 14
+
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 14
+
+                                    // Start Time Box (Night mode starts)
+                                    Rectangle {
+                                        Layout.fillWidth: true
+                                        height: 72
+                                        radius: 8
+                                        color: "#18181C"
+                                        border.color: "#2C2C34"
+
+                                        ColumnLayout {
+                                            anchors.fill: parent
+                                            anchors.margins: 10
+                                            spacing: 6
+
+                                            Text {
+                                                text: "🌙 " + (stateManager ? stateManager.strings.schedule_start : "Hora de inicio (Noche)")
+                                                font.pixelSize: 11
+                                                font.bold: true
+                                                color: "#A0A0A8"
+                                            }
+
+                                            RowLayout {
+                                                spacing: 6
+                                                ComboBox {
+                                                    id: schedStartHourCombo
+                                                    implicitWidth: 64
+                                                    implicitHeight: 28
+                                                    model: root.hoursList
+                                                    currentIndex: stateManager ? stateManager.brightnessScheduleStartHour : 22
+                                                    onActivated: (index) => {
+                                                        if (stateManager) stateManager.setBrightnessScheduleStart(index, schedStartMinCombo.currentIndex);
+                                                    }
+                                                    background: Rectangle {
+                                                        color: "#222228"
+                                                        border.color: "#383842"
+                                                        radius: 6
+                                                    }
+                                                    contentItem: Text {
+                                                        text: schedStartHourCombo.displayText
+                                                        font.pixelSize: 12
+                                                        font.bold: true
+                                                        color: "#FFFFFF"
+                                                        verticalAlignment: Text.AlignVCenter
+                                                        horizontalAlignment: Text.AlignHCenter
+                                                    }
+                                                    delegate: ItemDelegate {
+                                                        width: schedStartHourCombo.width
+                                                        implicitHeight: 28
+                                                        contentItem: Text {
+                                                            text: modelData
+                                                            color: highlighted ? "#CBA158" : "#E0E0E0"
+                                                            font.pixelSize: 12
+                                                            horizontalAlignment: Text.AlignHCenter
+                                                            verticalAlignment: Text.AlignVCenter
+                                                        }
+                                                        background: Rectangle {
+                                                            color: highlighted ? "#2A2A35" : "#1B1B1F"
+                                                        }
+                                                    }
+                                                    popup: Popup {
+                                                        y: schedStartHourCombo.height + 2
+                                                        width: schedStartHourCombo.width
+                                                        implicitHeight: Math.min(180, contentItem.implicitHeight + 8)
+                                                        padding: 2
+                                                        contentItem: ListView {
+                                                            clip: true
+                                                            implicitHeight: contentHeight
+                                                            model: schedStartHourCombo.popup.visible ? schedStartHourCombo.delegateModel : null
+                                                            currentIndex: schedStartHourCombo.highlightedIndex
+                                                            ScrollIndicator.vertical: ScrollIndicator { }
+                                                        }
+                                                        background: Rectangle {
+                                                            color: "#1B1B1F"
+                                                            border.color: "#383842"
+                                                            radius: 6
+                                                        }
+                                                    }
+                                                }
+
+                                                Text {
+                                                    text: ":"
+                                                    font.pixelSize: 14
+                                                    font.bold: true
+                                                    color: "#8E8E93"
+                                                }
+
+                                                ComboBox {
+                                                    id: schedStartMinCombo
+                                                    implicitWidth: 64
+                                                    implicitHeight: 28
+                                                    model: root.minutesList
+                                                    currentIndex: stateManager ? stateManager.brightnessScheduleStartMinute : 0
+                                                    onActivated: (index) => {
+                                                        if (stateManager) stateManager.setBrightnessScheduleStart(schedStartHourCombo.currentIndex, index);
+                                                    }
+                                                    background: Rectangle {
+                                                        color: "#222228"
+                                                        border.color: "#383842"
+                                                        radius: 6
+                                                    }
+                                                    contentItem: Text {
+                                                        text: schedStartMinCombo.displayText
+                                                        font.pixelSize: 12
+                                                        font.bold: true
+                                                        color: "#FFFFFF"
+                                                        verticalAlignment: Text.AlignVCenter
+                                                        horizontalAlignment: Text.AlignHCenter
+                                                    }
+                                                    delegate: ItemDelegate {
+                                                        width: schedStartMinCombo.width
+                                                        implicitHeight: 28
+                                                        contentItem: Text {
+                                                            text: modelData
+                                                            color: highlighted ? "#CBA158" : "#E0E0E0"
+                                                            font.pixelSize: 12
+                                                            horizontalAlignment: Text.AlignHCenter
+                                                            verticalAlignment: Text.AlignVCenter
+                                                        }
+                                                        background: Rectangle {
+                                                            color: highlighted ? "#2A2A35" : "#1B1B1F"
+                                                        }
+                                                    }
+                                                    popup: Popup {
+                                                        y: schedStartMinCombo.height + 2
+                                                        width: schedStartMinCombo.width
+                                                        implicitHeight: Math.min(180, contentItem.implicitHeight + 8)
+                                                        padding: 2
+                                                        contentItem: ListView {
+                                                            clip: true
+                                                            implicitHeight: contentHeight
+                                                            model: schedStartMinCombo.popup.visible ? schedStartMinCombo.delegateModel : null
+                                                            currentIndex: schedStartMinCombo.highlightedIndex
+                                                            ScrollIndicator.vertical: ScrollIndicator { }
+                                                        }
+                                                        background: Rectangle {
+                                                            color: "#1B1B1F"
+                                                            border.color: "#383842"
+                                                            radius: 6
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    // End Time Box (Day mode starts)
+                                    Rectangle {
+                                        Layout.fillWidth: true
+                                        height: 72
+                                        radius: 8
+                                        color: "#18181C"
+                                        border.color: "#2C2C34"
+
+                                        ColumnLayout {
+                                            anchors.fill: parent
+                                            anchors.margins: 10
+                                            spacing: 6
+
+                                            Text {
+                                                text: "☀️ " + (stateManager ? stateManager.strings.schedule_end : "Hora de fin (Día)")
+                                                font.pixelSize: 11
+                                                font.bold: true
+                                                color: "#A0A0A8"
+                                            }
+
+                                            RowLayout {
+                                                spacing: 6
+                                                ComboBox {
+                                                    id: schedEndHourCombo
+                                                    implicitWidth: 64
+                                                    implicitHeight: 28
+                                                    model: root.hoursList
+                                                    currentIndex: stateManager ? stateManager.brightnessScheduleEndHour : 7
+                                                    onActivated: (index) => {
+                                                        if (stateManager) stateManager.setBrightnessScheduleEnd(index, schedEndMinCombo.currentIndex);
+                                                    }
+                                                    background: Rectangle {
+                                                        color: "#222228"
+                                                        border.color: "#383842"
+                                                        radius: 6
+                                                    }
+                                                    contentItem: Text {
+                                                        text: schedEndHourCombo.displayText
+                                                        font.pixelSize: 12
+                                                        font.bold: true
+                                                        color: "#FFFFFF"
+                                                        verticalAlignment: Text.AlignVCenter
+                                                        horizontalAlignment: Text.AlignHCenter
+                                                    }
+                                                    delegate: ItemDelegate {
+                                                        width: schedEndHourCombo.width
+                                                        implicitHeight: 28
+                                                        contentItem: Text {
+                                                            text: modelData
+                                                            color: highlighted ? "#CBA158" : "#E0E0E0"
+                                                            font.pixelSize: 12
+                                                            horizontalAlignment: Text.AlignHCenter
+                                                            verticalAlignment: Text.AlignVCenter
+                                                        }
+                                                        background: Rectangle {
+                                                            color: highlighted ? "#2A2A35" : "#1B1B1F"
+                                                        }
+                                                    }
+                                                    popup: Popup {
+                                                        y: schedEndHourCombo.height + 2
+                                                        width: schedEndHourCombo.width
+                                                        implicitHeight: Math.min(180, contentItem.implicitHeight + 8)
+                                                        padding: 2
+                                                        contentItem: ListView {
+                                                            clip: true
+                                                            implicitHeight: contentHeight
+                                                            model: schedEndHourCombo.popup.visible ? schedEndHourCombo.delegateModel : null
+                                                            currentIndex: schedEndHourCombo.highlightedIndex
+                                                            ScrollIndicator.vertical: ScrollIndicator { }
+                                                        }
+                                                        background: Rectangle {
+                                                            color: "#1B1B1F"
+                                                            border.color: "#383842"
+                                                            radius: 6
+                                                        }
+                                                    }
+                                                }
+
+                                                Text {
+                                                    text: ":"
+                                                    font.pixelSize: 14
+                                                    font.bold: true
+                                                    color: "#8E8E93"
+                                                }
+
+                                                ComboBox {
+                                                    id: schedEndMinCombo
+                                                    implicitWidth: 64
+                                                    implicitHeight: 28
+                                                    model: root.minutesList
+                                                    currentIndex: stateManager ? stateManager.brightnessScheduleEndMinute : 0
+                                                    onActivated: (index) => {
+                                                        if (stateManager) stateManager.setBrightnessScheduleEnd(schedEndHourCombo.currentIndex, index);
+                                                    }
+                                                    background: Rectangle {
+                                                        color: "#222228"
+                                                        border.color: "#383842"
+                                                        radius: 6
+                                                    }
+                                                    contentItem: Text {
+                                                        text: schedEndMinCombo.displayText
+                                                        font.pixelSize: 12
+                                                        font.bold: true
+                                                        color: "#FFFFFF"
+                                                        verticalAlignment: Text.AlignVCenter
+                                                        horizontalAlignment: Text.AlignHCenter
+                                                    }
+                                                    delegate: ItemDelegate {
+                                                        width: schedEndMinCombo.width
+                                                        implicitHeight: 28
+                                                        contentItem: Text {
+                                                            text: modelData
+                                                            color: highlighted ? "#CBA158" : "#E0E0E0"
+                                                            font.pixelSize: 12
+                                                            horizontalAlignment: Text.AlignHCenter
+                                                            verticalAlignment: Text.AlignVCenter
+                                                        }
+                                                        background: Rectangle {
+                                                            color: highlighted ? "#2A2A35" : "#1B1B1F"
+                                                        }
+                                                    }
+                                                    popup: Popup {
+                                                        y: schedEndMinCombo.height + 2
+                                                        width: schedEndMinCombo.width
+                                                        implicitHeight: Math.min(180, contentItem.implicitHeight + 8)
+                                                        padding: 2
+                                                        contentItem: ListView {
+                                                            clip: true
+                                                            implicitHeight: contentHeight
+                                                            model: schedEndMinCombo.popup.visible ? schedEndMinCombo.delegateModel : null
+                                                            currentIndex: schedEndMinCombo.highlightedIndex
+                                                            ScrollIndicator.vertical: ScrollIndicator { }
+                                                        }
+                                                        background: Rectangle {
+                                                            color: "#1B1B1F"
+                                                            border.color: "#383842"
+                                                            radius: 6
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // Day Brightness Slider
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 14
+                                    Text {
+                                        text: "☀️ " + (stateManager ? stateManager.strings.schedule_day_brightness : "Brillo de día")
+                                        font.pixelSize: 13
+                                        color: "#E0E0E0"
+                                        Layout.preferredWidth: 140
+                                    }
+                                    Slider {
+                                        Layout.fillWidth: true
+                                        from: 0
+                                        to: 255
+                                        value: stateManager ? stateManager.brightnessScheduleDay : 255
+                                        onMoved: {
+                                            if (stateManager) stateManager.setBrightnessScheduleDay(Math.round(value));
+                                        }
+                                    }
+                                    Text {
+                                        text: Math.round(((stateManager ? stateManager.brightnessScheduleDay : 255) / 255.0) * 100) + "%"
+                                        font.pixelSize: 12
+                                        color: "#CBA158"
+                                        Layout.preferredWidth: 45
+                                    }
+                                }
+
+                                // Night Brightness Slider
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 14
+                                    Text {
+                                        text: "🌙 " + (stateManager ? stateManager.strings.schedule_night_brightness : "Brillo de noche")
+                                        font.pixelSize: 13
+                                        color: "#E0E0E0"
+                                        Layout.preferredWidth: 140
+                                    }
+                                    Slider {
+                                        Layout.fillWidth: true
+                                        from: 0
+                                        to: 255
+                                        value: stateManager ? stateManager.brightnessScheduleNight : 0
+                                        onMoved: {
+                                            if (stateManager) stateManager.setBrightnessScheduleNight(Math.round(value));
+                                        }
+                                    }
+                                    Text {
+                                        text: Math.round(((stateManager ? stateManager.brightnessScheduleNight : 0) / 255.0) * 100) + "%"
+                                        font.pixelSize: 12
+                                        color: "#CBA158"
+                                        Layout.preferredWidth: 45
+                                    }
+                                }
                             }
                         }
 
