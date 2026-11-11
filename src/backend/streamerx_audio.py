@@ -74,6 +74,84 @@ class StreamerXAudioRouter:
         ("streamerx_mt_aux89", "UNIFY-Aux8-9", "aux7,aux8", "front-left,front-right"),
     ]
 
+    # Censor support for the multitrack mic: hw aux0 -> MIC_RAW -> loopback -> MIC_BUS -> MIC_SOURCE
+    MIC_SOURCE = "streamerx_mt_mic"
+    MIC_RAW = "streamerx_mt_mic_raw"
+    MIC_BUS = "streamerx_mic_bus"
+    _bleep_proc = None
+    _censor_active = False
+
+    @classmethod
+    def _load_censorable_mic(cls, hw_source: str, master_map: str, desc: str) -> list:
+        ids = []
+        cmds = [
+            ["pactl", "load-module", "module-remap-source", f"source_name={cls.MIC_RAW}",
+             f"master={hw_source}", "channels=1", f"master_channel_map={master_map}",
+             "channel_map=mono", "remix=no", "source_properties=device.description='UNIFY-Mic-Raw'"],
+            ["pactl", "load-module", "module-null-sink", f"sink_name={cls.MIC_BUS}", "channels=1",
+             "channel_map=mono", "sink_properties=device.description='UNIFY-Mic-Bus'"],
+            ["pactl", "load-module", "module-loopback", f"source={cls.MIC_RAW}", f"sink={cls.MIC_BUS}",
+             "latency_msec=5", "channels=1", "channel_map=mono", "remix=no"],
+            ["pactl", "load-module", "module-remap-source", f"source_name={cls.MIC_SOURCE}",
+             f"master={cls.MIC_BUS}.monitor", "channels=1", "channel_map=mono",
+             f"source_properties=device.description='{desc}'"],
+        ]
+        for cmd in cmds:
+            res = subprocess.run(cmd, capture_output=True, text=True, timeout=3)
+            if res.returncode == 0 and res.stdout.strip().isdigit():
+                ids.append(res.stdout.strip())
+            else:
+                logger.warning(f"Censor mic chain: '{' '.join(cmd[2:4])}' failed: {res.stderr.strip()}")
+        return ids
+
+    @classmethod
+    def _bleep_file(cls) -> str:
+        """1 kHz censor tone (WAV, mono 48 kHz, 30 s, -16 dBFS RMS), generated once."""
+        import math, struct, wave
+        cache = os.path.expanduser("~/.cache/CasterManager")
+        os.makedirs(cache, exist_ok=True)
+        path = os.path.join(cache, "censor_bleep.wav")
+        if not os.path.isfile(path):
+            sr, secs, amp = 48000, 30, 0.22
+            frames = bytearray()
+            for i in range(sr * secs):
+                frames += struct.pack("<h", int(amp * 32767 * math.sin(2 * math.pi * 1000 * i / sr)))
+            with wave.open(path, "wb") as w:
+                w.setnchannels(1)
+                w.setsampwidth(2)
+                w.setframerate(sr)
+                w.writeframes(bytes(frames))
+        return path
+
+    @classmethod
+    def censor_available(cls) -> bool:
+        try:
+            out = subprocess.run(["pactl", "list", "short", "sinks"], capture_output=True, text=True, timeout=3).stdout
+            return any(line.split("\t")[1:2] == [cls.MIC_BUS] for line in out.splitlines())
+        except Exception:
+            return False
+
+    @classmethod
+    def set_censor(cls, active: bool) -> None:
+        """Silence the multitrack mic (what OBS records) and play the censor tone in its place."""
+        if active == cls._censor_active:
+            return
+        cls._censor_active = active
+        subprocess.run(["pactl", "set-source-mute", cls.MIC_RAW, "1" if active else "0"],
+                       capture_output=True, timeout=3)
+        if cls._bleep_proc is not None:
+            try:
+                cls._bleep_proc.terminate()
+            except Exception:
+                pass
+            cls._bleep_proc = None
+        if active:
+            try:
+                cls._bleep_proc = subprocess.Popen(["paplay", f"--device={cls.MIC_BUS}", "--latency-msec=20", cls._bleep_file()],
+                                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            except Exception as e:
+                logger.warning(f"Could not play censor tone: {e}")
+
     @staticmethod
     def is_multitrack_source(source_name: Optional[str]) -> bool:
         return bool(source_name) and "multichannel" in source_name
@@ -252,6 +330,11 @@ context.modules = [
                 # One named source per hardware channel (Mic, Headset, Wireless, Pads...)
                 for src_name, desc, master_map, out_map in cls.MULTITRACK_SOURCES:
                     n_ch = len(master_map.split(","))
+                    if src_name == cls.MIC_SOURCE:
+                        # The unit sends its multitrack channels *before* the Censor, so the
+                        # mic goes through a bus we can silence/bleep (see set_censor()).
+                        loaded_ids += cls._load_censorable_mic(hw_source, master_map, desc)
+                        continue
                     cmd_mt = [
                         "pactl", "load-module", "module-remap-source",
                         f"source_name={src_name}",

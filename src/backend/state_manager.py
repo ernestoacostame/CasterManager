@@ -758,6 +758,9 @@ class StateManager(QObject):
         self._dsp_channels = self._init_default_dsp_channels()
         self._pending_dsp_updates = {}
         self._fx_presets = []
+        self._censor_proc = None
+        self._censor_watch_gen = 0
+        self._censor_lock = threading.RLock()
         self._last_dsp_write = 0.0
         self._poll_tick = 0
         self._dsp_timer = QTimer(self)
@@ -913,6 +916,7 @@ class StateManager(QObject):
             self._selected_device_index = 0
             self.stateChanged.emit()
             self.devicesChanged.emit()
+            self._stop_censor_watch()
             return
 
         current_serial = self._serial
@@ -929,10 +933,12 @@ class StateManager(QObject):
             self.bridge.target_pid == target_dev.get("product_id") and
             self._permission_error == (not target_dev.get("has_permission", False))):
             self.devicesChanged.emit()
+            self._update_censor_watch()
             return
 
         self._apply_device_config(target_dev)
         self.devicesChanged.emit()
+        self._update_censor_watch()
 
     def _apply_device_config(self, info):
         logger.info(f"Applying config for active device: {info['display_name']} ({info['product_id']})")
@@ -1397,6 +1403,7 @@ class StateManager(QObject):
             self.deviceConfigChanged.emit()
             self.dspChanged.emit()
             self._check_brightness_schedule(force=True)
+            self._update_censor_watch()
             self.toastMessage.emit(f"Synced with {self._model_name}" if self._language == "en" else f"Sincronizado con {self._model_name}")
 
         except Exception as e:
@@ -3303,6 +3310,136 @@ class StateManager(QObject):
                 self.executor.submit(do_assign)
             self.toastMessage.emit(f"Canal {fader_idx + 1} asignado")
 
+    # --- Streamer X Censor over USB multitrack -------------------------------------
+    # The Streamer X sends its multitrack channels before the Censor stage, so OBS
+    # recording UNIFY-Mic hears everything said while Censor is held. Follow the unit's
+    # padActive events live and censor UNIFY-Mic on the PC side (mute + tone).
+    def _update_censor_watch(self):
+        """Run the censor watcher whenever a Streamer X in USB multitrack mode is plugged in
+        and the UNIFY sources exist, whichever device is selected in the app."""
+        dev = next((d for d in (self._devices or [])
+                    if str(d.get("product_id")) == self.STREAMER_X_MULTITRACK_PID and d.get("has_permission")), None)
+        if (dev is not None and not StreamerXAudioRouter.censor_available()
+                and StreamerXAudioRouter.is_unify_profile_installed()
+                and not getattr(self, "_censor_upgrade_done", False)):
+            # UNIFY sources from an older version: rebuild them with the censorable mic chain
+            self._censor_upgrade_done = True
+            logger.info("Rebuilding UNIFY sources with the censor-capable mic chain")
+            StreamerXAudioRouter.install_unify_profile()
+        want = dev is not None and StreamerXAudioRouter.censor_available()
+        key = (dev.get("product_id"), dev.get("serial")) if dev else None
+        if not want:
+            self._stop_censor_watch()
+            return
+        with self._censor_lock:
+            t = getattr(self, "_censor_thread", None)
+            if t is not None and t.is_alive() and getattr(self, "_censor_watch_key", None) == key:
+                return
+            self._stop_censor_watch()
+            self._censor_watch_key = key
+            self._censor_watch_gen += 1
+            self._censor_thread = threading.Thread(target=self._censor_watch_loop,
+                                                   args=(self._censor_watch_gen, key[0], key[1]),
+                                                   daemon=True, name="censor-watch")
+            self._censor_thread.start()
+
+    def _stop_censor_watch(self):
+        self._censor_watch_gen += 1
+        self._censor_watch_key = None
+        proc, self._censor_proc = self._censor_proc, None
+        if proc is not None and proc.poll() is None:
+            try:
+                proc.terminate()
+            except Exception:
+                pass
+        try:
+            StreamerXAudioRouter.set_censor(False)
+        except Exception:
+            pass
+
+    @staticmethod
+    def _censor_paths_from_dump(dump):
+        paths = set()
+        for ri, node in enumerate((dump or {}).get("children", [])):
+            if node.get("name") != "SOUNDPADS":
+                continue
+            for ci, c in enumerate(node.get("children", [])):
+                cp = {k: list(v.values())[0] for k, v in c.get("properties", {}).items()}
+                if int(cp.get("padType", 0)) == 3 and int(cp.get("padMixerMode", -1)) == 0:
+                    paths.add((ri, ci))
+        return paths
+
+    def _censor_watch_loop(self, gen, pid, serial):
+        import re
+        import signal
+        import subprocess
+        import ctypes
+        pat = re.compile(r"\[update\] \[(\d+), (\d+)\] (padActive|padType|padMixerMode) = (\w+)\((\w+)\)")
+        env = os.environ.copy()
+        env["RCP_DEVICE_PID"] = str(pid)
+        if serial:
+            env["RCP_DEVICE_SERIAL"] = str(serial)
+        cli = self.bridge.cli_path
+
+        def die_with_parent():
+            try:
+                ctypes.CDLL("libc.so.6").prctl(1, signal.SIGTERM)  # PR_SET_PDEATHSIG
+            except Exception:
+                pass
+
+        def load_paths():
+            try:
+                out = subprocess.run([cli, "--i-know-what-i-do", "dump"], capture_output=True,
+                                     text=True, timeout=20, env=env).stdout
+                return self._censor_paths_from_dump(json.loads(out)) if out else None
+            except Exception as e:
+                logger.debug(f"Censor watch: dump failed: {e}")
+                return None
+
+        logger.info("Censor watch: following Streamer X pad events for UNIFY-Mic")
+        while gen == self._censor_watch_gen:
+            paths = load_paths()
+            if paths is None:
+                time.sleep(3.0)
+                continue
+            try:
+                proc = subprocess.Popen([cli, "--i-know-what-i-do", "monitor"],
+                                        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+                                        bufsize=1, env=env, preexec_fn=die_with_parent)
+            except Exception as e:
+                logger.warning(f"Censor watch: cannot start monitor: {e}")
+                return
+            self._censor_proc = proc
+            refresh = False
+            for line in proc.stdout:
+                if gen != self._censor_watch_gen:
+                    break
+                m = pat.search(line)
+                if m:
+                    path = (int(m.group(1)), int(m.group(2)))
+                    if m.group(3) == "padActive":
+                        if path in paths:
+                            active = m.group(5) == "true"
+                            logger.info(f"Censor {'ON' if active else 'OFF'} -> UNIFY-Mic")
+                            StreamerXAudioRouter.set_censor(active)
+                    else:
+                        refresh = True  # a pad changed type/mode: re-read the censor pads
+                elif "added" in line.lower() or "removed" in line.lower():
+                    refresh = True
+                if refresh:
+                    new_paths = load_paths()
+                    if new_paths is not None:
+                        paths = new_paths
+                    refresh = False
+            try:
+                proc.terminate()
+            except Exception:
+                pass
+            StreamerXAudioRouter.set_censor(False)
+            if gen != self._censor_watch_gen:
+                break
+            time.sleep(2.0)  # monitor exited (unplug, re-enumeration...): retry
+
     def _poll_live_hardware(self):
         if not self._connected or self._permission_error or self._transfer_mode:
             return
@@ -4078,6 +4215,7 @@ class StateManager(QObject):
             res = StreamerXAudioRouter.install_unify_profile()
             self.toastMessage.emit("UNIFY profile (Multitrack PipeWire) enabled" if self._language == "en" else "Perfil UNIFY (Multipista PipeWire) activado")
         self.deviceConfigChanged.emit()
+        self._update_censor_watch()
         return res
 
     # Streamer X USB multitrack: OUTPUT.outputMultiMode = 2 makes the unit re-enumerate
@@ -4153,6 +4291,7 @@ class StateManager(QObject):
             if StreamerXAudioRouter.is_unify_profile_installed():
                 StreamerXAudioRouter.install_unify_profile()
             self._restore_streamer_x_self_monitor()
+            self._update_censor_watch()
             self.deviceConfigChanged.emit()
             if self._language == "en":
                 self.toastMessage.emit("Multitrack mode active: 9 USB channels" if enabled else "Standard stereo USB mode active")
