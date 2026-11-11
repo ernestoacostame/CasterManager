@@ -7,7 +7,25 @@ Item {
     id: root
 
     property var selectedPad: stateManager ? stateManager.selectedPad : ({})
-    property int activeCategory: (root.selectedPad && root.selectedPad.type === "fx") ? 1 : ((root.selectedPad && root.selectedPad.type === "mixer") ? 2 : ((root.selectedPad && root.selectedPad.type === "midi") ? 3 : 0))
+    // Editor tab. Follows the selected pad's real type; clicking a tab only switches the
+    // view (the pad changes type when an option inside the tab is applied), and selecting
+    // another pad jumps back to that pad's own tab.
+    function categoryFor(p) {
+        if (!p) return 0;
+        if (p.type === "fx") return 1;
+        if (p.type === "mixer") return 2;
+        if (p.type === "midi") return 3;
+        return 0;
+    }
+    property int activeCategory: categoryFor(selectedPad)
+    property var lastPadKey: undefined
+    onSelectedPadChanged: {
+        var key = selectedPad ? (String(selectedPad.idx) + ":" + selectedPad.type) : "";
+        if (key !== lastPadKey) {
+            lastPadKey = key;
+            activeCategory = categoryFor(selectedPad);
+        }
+    }
     property int fxTargetChannel: (root.selectedPad && root.selectedPad.fx_channel !== undefined) ? root.selectedPad.fx_channel : 0
     property int fxTriggerMode: (root.selectedPad && root.selectedPad.fx_mode !== undefined) ? root.selectedPad.fx_mode : 1
 
@@ -165,10 +183,7 @@ Item {
                                     anchors.fill: parent
                                     hoverEnabled: true
                                     cursorShape: Qt.PointingHandCursor
-                                    onClicked: {
-                                        root.activeCategory = index;
-                                        if (stateManager) stateManager.updatePadType(modelData.id);
-                                    }
+                                    onClicked: root.activeCategory = index
                                 }
                             }
                         }
@@ -817,12 +832,14 @@ Item {
                         ].filter(function(m) { return !(stateManager && stateManager.isStreamerX && m.mode === 1); })
 
                         Rectangle {
+                            readonly property bool isCurrent: Boolean(root.selectedPad && root.selectedPad.type === "mixer"
+                                                                      && root.selectedPad.mixer_mode === modelData.mode)
                             Layout.fillWidth: true
                             height: 76
                             radius: 10
-                            color: mixCardArea.containsMouse ? "#2A2A30" : "#202024"
-                            border.color: mixCardArea.containsMouse ? "#CBA158" : "#2E2E36"
-                            border.width: 1
+                            color: isCurrent ? "#2E281C" : (mixCardArea.containsMouse ? "#2A2A30" : "#202024")
+                            border.color: isCurrent ? "#CBA158" : (mixCardArea.containsMouse ? "#5A5040" : "#2E2E36")
+                            border.width: isCurrent ? 2 : 1
 
                             RowLayout {
                                 anchors.fill: parent
@@ -833,8 +850,13 @@ Item {
                                 ColumnLayout {
                                     Layout.fillWidth: true
                                     spacing: 4
-                                    Text { text: modelData.name; font.pixelSize: 14; font.bold: true; color: "#FFFFFF" }
+                                    Text { text: modelData.name; font.pixelSize: 14; font.bold: true; color: parent.parent.parent.isCurrent ? "#CBA158" : "#FFFFFF" }
                                     Text { text: modelData.desc; font.pixelSize: 11; color: "#9A9A9E"; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+                                }
+                                Text {
+                                    visible: parent.parent.isCurrent
+                                    text: "✓"
+                                    font.pixelSize: 16; font.bold: true; color: "#CBA158"
                                 }
                             }
 
@@ -936,13 +958,14 @@ Item {
                         }
                     }
 
-                    // Ducking depth (DUCKER.duckerDepth): how much other audio drops while a Ducking pad is held
+                    // Ducking depth (DUCKER.duckerDepth): global setting, only relevant to Ducking pads
                     Rectangle {
+                        visible: Boolean(root.selectedPad && root.selectedPad.type === "mixer" && root.selectedPad.mixer_mode === 4)
                         Layout.fillWidth: true
                         height: duckCol.height + 28
                         radius: 10
                         color: "#202024"
-                        border.color: (stateManager && stateManager.duckingEnabled) ? "#CBA158" : "#2E2E36"
+                        border.color: "#2E2E36"
                         border.width: 1
 
                         ColumnLayout {
