@@ -1140,7 +1140,8 @@ class StateManager(QObject):
 
                 # Prioritize MicroSD card when inserted; otherwise fallback to internal memory
                 self._has_sd_card = (sd_volume is not None and sd_volume.get("cap", 0) > 0)
-                self._storage_label = "MicroSD" if self._has_sd_card else "Memoria Interna"
+                is_en = (getattr(self, "_language", "es") == "en")
+                self._storage_label = "MicroSD" if self._has_sd_card else ("Internal Storage" if is_en else "Memoria Interna")
                 active_vol = sd_volume if sd_volume else internal_volume
                 if active_vol:
                     cap = active_vol["cap"]
@@ -1278,11 +1279,12 @@ class StateManager(QObject):
                     max_faders = 6 if self._is_duo else 9
                     phys_count = 4 if self._is_duo else 6
 
+                    is_en = (getattr(self, "_language", "es") == "en")
                     while len(self._faders) < min(len(channel_nodes), max_faders):
                         new_idx = len(self._faders)
                         self._faders.append({
                             "index": new_idx,
-                            "name": f"Canal {new_idx + 1}",
+                            "name": (f"Channel {new_idx + 1}" if is_en else f"Canal {new_idx + 1}"),
                             "color": "#CBA158",
                             "icon": "mic",
                             "level": 70,
@@ -1488,8 +1490,17 @@ class StateManager(QObject):
             self.settings.setValue("language", lang)
             for i, ch in enumerate(self._dsp_channels):
                 ch["name"] = self._localized_dsp_channel_name(i)
+            for f in self._faders:
+                if f.get("name") in ("Sin asignar", "Unassigned"):
+                    f["name"] = "Sin asignar" if lang == "es" else "Unassigned"
+                elif f.get("name", "").startswith("Canal ") or f.get("name", "").startswith("Channel "):
+                    f_num = f["name"].split()[-1]
+                    f["name"] = f"Canal {f_num}" if lang == "es" else f"Channel {f_num}"
+            self._storage_label = "MicroSD" if self._has_sd_card else ("Internal Storage" if lang == "en" else "Memoria Interna")
             self.languageChanged.emit()
             self.dspChanged.emit()
+            self.fadersChanged.emit()
+            self.stateChanged.emit()
             msg = "Idioma cambiado a Español" if lang == "es" else "Language changed to English"
             self.toastMessage.emit(msg)
 
@@ -1564,7 +1575,10 @@ class StateManager(QObject):
 
     @pyqtProperty(str, notify=stateChanged)
     def storageLabel(self):
-        return self._storage_label
+        if self._has_sd_card:
+            return "MicroSD"
+        is_en = (getattr(self, "_language", "es") == "en")
+        return "Internal Storage" if is_en else "Memoria Interna"
 
     @pyqtProperty(int, notify=stateChanged)
     def padCols(self):
@@ -1711,7 +1725,9 @@ class StateManager(QObject):
                     sound_file = os.path.join(base_dir, "assets", "sounds", sound_file)
                 if os.path.exists(sound_file):
                     self.executor.submit(subprocess.run, ["paplay", sound_file], capture_output=True)
-            self.toastMessage.emit(f"Pulsado: {pad.get('name') or f'Pad {display_index+1}'}")
+            is_en = (self._language == "en")
+            pname = pad.get('name') or f"Pad {display_index+1}"
+            self.toastMessage.emit(f"Triggered: {pname}" if is_en else f"Pulsado: {pname}")
 
     @pyqtSlot(str)
     def updatePadName(self, name):
@@ -1729,7 +1745,8 @@ class StateManager(QObject):
                 self.bridge.run_cmd,
                 ["pad", "set-prop", str(self._current_bank), str(self._selected_pad_index), "padName", f"str:{name}"]
             )
-        self.toastMessage.emit(f"Nombre guardado: {name}")
+        is_en = (self._language == "en")
+        self.toastMessage.emit(f"Name saved: {name}" if is_en else f"Nombre guardado: {name}")
 
     @pyqtSlot(int)
     def updatePadColor(self, color_idx):
@@ -1757,8 +1774,12 @@ class StateManager(QObject):
         self.padsChanged.emit()
         self.selectedPadChanged.emit()
 
-        mode_name = "Toggle (Reproducir/Pausar)" if mode == "toggle" else ("One Shot (Completo)" if mode == "oneshot" else "Hold (Mantener)")
-        self.toastMessage.emit(f"Modo: {mode_name}")
+        is_en = (self._language == "en")
+        if is_en:
+            mode_name = "Toggle (Play/Pause)" if mode == "toggle" else ("One Shot (Complete)" if mode == "oneshot" else "Hold (Momentary)")
+        else:
+            mode_name = "Toggle (Reproducir/Pausar)" if mode == "toggle" else ("One Shot (Completo)" if mode == "oneshot" else "Hold (Mantener)")
+        self.toastMessage.emit(f"Mode: {mode_name}" if is_en else f"Modo: {mode_name}")
 
         mode_val = 0 if mode == "toggle" else (1 if mode == "oneshot" else 2)
         if self._connected and not self._permission_error:
@@ -1778,7 +1799,11 @@ class StateManager(QObject):
         self.padsChanged.emit()
         self.selectedPadChanged.emit()
 
-        self.toastMessage.emit("Bucle: " + ("Activado (Loop On)" if loop else "Desactivado (Loop Off)"))
+        is_en = (self._language == "en")
+        if is_en:
+            self.toastMessage.emit("Loop: " + ("On" if loop else "Off"))
+        else:
+            self.toastMessage.emit("Bucle: " + ("Activado (Loop On)" if loop else "Desactivado (Loop Off)"))
 
         val_str = "bool:true" if loop else "bool:false"
         if self._connected and not self._permission_error:
@@ -1798,7 +1823,11 @@ class StateManager(QObject):
         self.padsChanged.emit()
         self.selectedPadChanged.emit()
 
-        self.toastMessage.emit("Replay: " + ("Activado (Reiniciar al pulsar)" if replay else "Desactivado (Pausar al pulsar)"))
+        is_en = (self._language == "en")
+        if is_en:
+            self.toastMessage.emit("Replay: " + ("Enabled (Restart on press)" if replay else "Disabled (Pause on press)"))
+        else:
+            self.toastMessage.emit("Replay: " + ("Activado (Reiniciar al pulsar)" if replay else "Desactivado (Pausar al pulsar)"))
 
         val_str = "bool:true" if replay else "bool:false"
         if self._connected and not self._permission_error:
@@ -1828,13 +1857,14 @@ class StateManager(QObject):
     @pyqtSlot(str, str)
     def uploadSoundFile(self, file_path, pad_name):
         clean_path = file_path.replace("file://", "")
+        is_en = (self._language == "en")
         if not os.path.isfile(clean_path):
-            self.toastMessage.emit("Archivo no encontrado")
+            self.toastMessage.emit("File not found" if is_en else "Archivo no encontrado")
             return
 
         ext = os.path.splitext(clean_path)[1].lower()
         if self._is_streamer_x and ext not in [".wav", ".mp3"]:
-            self.toastMessage.emit("La Streamer X solo admite archivos de audio .wav o .mp3")
+            self.toastMessage.emit("Streamer X only supports .wav or .mp3 audio files" if is_en else "La Streamer X solo admite archivos de audio .wav o .mp3")
             return
 
         pad = self._get_current_pad()
@@ -1851,7 +1881,7 @@ class StateManager(QObject):
         self.selectedPadChanged.emit()
 
         if self._connected and not self._permission_error:
-            self.toastMessage.emit(f"Subiendo a la {self._model_name}: {name}...")
+            self.toastMessage.emit(f"Uploading to {self._model_name}: {name}..." if is_en else f"Subiendo a la {self._model_name}: {name}...")
             b_idx, p_idx = self._current_bank, self._selected_pad_index
             def do_upload():
                 # Upload always creates a new PAD node: remove whatever is in the
@@ -1866,14 +1896,14 @@ class StateManager(QObject):
                 ], timeout=45)
                 if err:
                     logger.error(f"Upload error: {err}")
-                    self.toastMessage.emit(f"Error al subir: {err}")
+                    self.toastMessage.emit(f"Upload error: {err}" if is_en else f"Error al subir: {err}")
                 else:
                     logger.info(f"Upload finished: {out}")
-                    self.toastMessage.emit(f"Audio cargado con éxito en Pad {self._selected_pad_index + 1}!")
+                    self.toastMessage.emit(f"Audio loaded to Pad {self._selected_pad_index + 1}!" if is_en else f"¡Audio cargado con éxito en Pad {self._selected_pad_index + 1}!")
                     self._sync_hardware_state()
             self.executor.submit(do_upload)
         else:
-            self.toastMessage.emit(f"Audio asignado al Pad {self._selected_pad_index + 1}: {name}")
+            self.toastMessage.emit(f"Audio assigned to Pad {self._selected_pad_index + 1}: {name}" if is_en else f"Audio asignado al Pad {self._selected_pad_index + 1}: {name}")
 
     @pyqtSlot()
     def clearCurrentPad(self):
@@ -1887,39 +1917,42 @@ class StateManager(QObject):
         self.padsChanged.emit()
         self.selectedPadChanged.emit()
 
+        is_en = (self._language == "en")
         if self._connected and not self._permission_error:
             b_idx, p_idx = self._current_bank, self._selected_pad_index
             def do_clear():
                 removed, err = self.bridge.clear_pad(b_idx, p_idx)
                 if err:
                     logger.error(f"Error clearing pad: {err}")
-                    self.toastMessage.emit(f"Error al limpiar: {err}")
+                    self.toastMessage.emit(f"Clear error: {err}" if is_en else f"Error al limpiar: {err}")
                 else:
                     if removed:
                         logger.info(f"Pad cleared on hardware (bank {b_idx}, pad {p_idx}, {removed} node(s) removed)")
                     else:
                         logger.info(f"Pad bank {b_idx} pad {p_idx} was already empty on hardware")
-                    self.toastMessage.emit(f"Pad limpiado en la {self._model_name}")
+                    self.toastMessage.emit(f"Pad cleared on {self._model_name}" if is_en else f"Pad limpiado en la {self._model_name}")
                     self._sync_hardware_state()
 
             self.executor.submit(do_clear)
         else:
-            self.toastMessage.emit("Pad limpiado")
+            self.toastMessage.emit("Pad cleared" if is_en else "Pad limpiado")
 
     @pyqtSlot()
     def copyCurrentPad(self):
         pad = self._get_current_pad()
+        is_en = (self._language == "en")
         if not pad or pad.get("type") == "empty":
-            self.toastMessage.emit("El pad seleccionado está vacío")
+            self.toastMessage.emit("Selected pad is empty" if is_en else "El pad seleccionado está vacío")
             return
         self._copied_pad = dict(pad)
         self.padClipboardChanged.emit()
-        self.toastMessage.emit(f"Pad copiado: {self._copied_pad.get('name') or 'Pad'}")
+        self.toastMessage.emit(f"Pad copied: {self._copied_pad.get('name') or 'Pad'}" if is_en else f"Pad copiado: {self._copied_pad.get('name') or 'Pad'}")
 
     @pyqtSlot(int)
     def pasteToPad(self, target_display_idx):
         if not self._copied_pad:
-            self.toastMessage.emit("No hay ningún pad en el portapapeles")
+            is_en = (self._language == "en")
+            self.toastMessage.emit("No pad in clipboard" if is_en else "No hay ningún pad en el portapapeles")
             return
         self.copyPadData(self._copied_pad, target_display_idx)
 
@@ -1956,7 +1989,8 @@ class StateManager(QObject):
         self.padsChanged.emit()
         self.selectedPadChanged.emit()
         pad_name = target.get("name") or "Pad"
-        self.toastMessage.emit(f"Pad copiado a la posición {dst_display_idx + 1}: {pad_name}")
+        is_en = (self._language == "en")
+        self.toastMessage.emit(f"Pad copied to slot {dst_display_idx + 1}: {pad_name}" if is_en else f"Pad copiado a la posición {dst_display_idx + 1}: {pad_name}")
 
         if self._connected and not self._permission_error:
             ptype = target.get("type")
@@ -2005,7 +2039,7 @@ class StateManager(QObject):
                                 ["pad", "export", str(src_bank), str(src_disp), tmp_path], timeout=90)
                             if exp_err or os.path.getsize(tmp_path) == 0:
                                 logger.error(f"Could not export source pad audio: {exp_err}")
-                                self.toastMessage.emit("No se pudo leer el audio del pad de origen")
+                                self.toastMessage.emit("Could not read audio from source pad" if is_en else "No se pudo leer el audio del pad de origen")
                                 os.unlink(tmp_path)
                                 tmp_path = None
                             else:
@@ -2030,8 +2064,9 @@ class StateManager(QObject):
         if not pad:
             return
 
+        is_en = (self._language == "en")
         if not pad.get("file") or pad.get("type") == "empty":
-            self.toastMessage.emit("El pad seleccionado no tiene ningún archivo asignado para exportar.")
+            self.toastMessage.emit("Selected pad has no file to export" if is_en else "El pad seleccionado no tiene ningún archivo asignado para exportar.")
             return
 
         clean_path = target_filepath
@@ -2039,9 +2074,9 @@ class StateManager(QObject):
             clean_path = clean_path[7:]
 
         pad_name = pad.get("name") or "Pad"
-        self.toastMessage.emit(f"Exportando audio '{pad_name}'...")
+        self.toastMessage.emit(f"Exporting audio '{pad_name}'..." if is_en else f"Exportando audio '{pad_name}'...")
         self._transfer_mode = True
-        self._transfer_status = f"Exportando audio de '{pad_name}'..."
+        self._transfer_status = f"Exporting audio from '{pad_name}'..." if is_en else f"Exportando audio de '{pad_name}'..."
         self.transferStateChanged.emit()
 
         if self._connected and not self._permission_error:
@@ -2055,14 +2090,14 @@ class StateManager(QObject):
                     )
                     if err:
                         logger.error(f"Error exporting pad: {err}")
-                        self.toastMessage.emit(f"Error al exportar: {err}")
+                        self.toastMessage.emit(f"Export error: {err}" if is_en else f"Error al exportar: {err}")
                     else:
                         filename = os.path.basename(clean_path)
                         logger.info(f"Export finished successfully: {out}")
-                        self.toastMessage.emit(f"¡Audio guardado exitosamente como {filename}!")
+                        self.toastMessage.emit(f"Audio saved successfully as {filename}!" if is_en else f"¡Audio guardado exitosamente como {filename}!")
                 except Exception as e:
                     logger.error(f"Export exception: {e}")
-                    self.toastMessage.emit(f"Error al exportar: {e}")
+                    self.toastMessage.emit(f"Export error: {e}" if is_en else f"Error al exportar: {e}")
                 finally:
                     self._transfer_mode = False
                     self._transfer_status = ""
@@ -2072,7 +2107,7 @@ class StateManager(QObject):
         else:
             self._transfer_mode = False
             self.transferStateChanged.emit()
-            self.toastMessage.emit("No hay conexión con la Rodecaster.")
+            self.toastMessage.emit("No connection to RØDECaster" if is_en else "No hay conexión con la Rodecaster.")
 
     @pyqtSlot(str)
     def updateShowName(self, name):
@@ -2089,7 +2124,8 @@ class StateManager(QObject):
                 self.bridge.run_cmd,
                 ["show", "set-name", name]
             )
-        self.toastMessage.emit(f"Perfil guardado: {name}")
+        is_en = (self._language == "en")
+        self.toastMessage.emit(f"Profile saved: {name}" if is_en else f"Perfil guardado: {name}")
 
     @pyqtSlot(int)
     def updateShowIcon(self, icon_idx):
@@ -2213,7 +2249,7 @@ class StateManager(QObject):
                 clean_path = clean_path[7:]
 
             if not os.path.exists(clean_path):
-                self.toastMessage.emit("Archivo no encontrado")
+                self.toastMessage.emit("File not found" if self._language == "en" else "Archivo no encontrado")
                 return False
 
             with open(clean_path, "r", encoding="utf-8") as f:
@@ -2556,16 +2592,18 @@ class StateManager(QObject):
 
                     cmd.append(clean_dest)
                     res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                    is_en = (self._language == "en")
                     if res.returncode == 0:
                         filename = os.path.basename(clean_dest)
-                        self.toastMessage.emit(f"¡Grabación exportada con éxito como {filename}!")
+                        self.toastMessage.emit(f"Recording exported successfully as {filename}!" if is_en else f"¡Grabación exportada con éxito como {filename}!")
                     else:
-                        self.toastMessage.emit(f"Error al procesar con ffmpeg: {res.stderr.decode()[:60]}")
+                        self.toastMessage.emit(f"FFmpeg error: {res.stderr.decode()[:60]}" if is_en else f"Error al procesar con ffmpeg: {res.stderr.decode()[:60]}")
                 else:
-                    self.toastMessage.emit("No se encontró el archivo de la grabación" if self._language == "es" else "Recording file not found")
+                    self.toastMessage.emit("Recording file not found" if self._language == "en" else "No se encontró el archivo de la grabación")
             except Exception as e:
                 logger.error(f"Error exporting recording: {e}")
-                self.toastMessage.emit(f"Error al exportar: {e}")
+                is_en = (self._language == "en")
+                self.toastMessage.emit(f"Export error: {e}" if is_en else f"Error al exportar: {e}")
 
         self.executor.submit(do_export)
 
@@ -2755,7 +2793,8 @@ class StateManager(QObject):
     @pyqtSlot(str)
     def openRecordingFolder(self, path):
         if not path or not os.path.exists(path):
-            self.toastMessage.emit("Carpeta no encontrada o MicroSD desmontada")
+            is_en = (self._language == "en")
+            self.toastMessage.emit("Folder not found or MicroSD unmounted" if is_en else "Carpeta no encontrada o MicroSD desmontada")
             return
         import subprocess
         subprocess.Popen(["xdg-open", path])
@@ -2804,7 +2843,8 @@ class StateManager(QObject):
         if matches:
             self.uploadSoundFile(matches[0], sound["name"])
         else:
-            self.toastMessage.emit(f"Sonido {filename} no encontrado")
+            is_en = (self._language == "en")
+            self.toastMessage.emit(f"Sound {filename} not found" if is_en else f"Sonido {filename} no encontrado")
 
     # Faders & Submixes Mixer
     @pyqtProperty(str, notify=activeMixTargetChanged)
@@ -2845,13 +2885,15 @@ class StateManager(QObject):
     @pyqtSlot(int)
     def toggleFaderMute(self, index):
         if 0 <= index < len(self._faders):
+            is_en = (self._language == "en")
             if self._active_mix_target == "headphones":
                 new_mute = not self._faders[index].get("submix_mute", False)
                 self._faders[index]["submix_mute"] = new_mute
                 self.fadersChanged.emit()
                 if self._mix_layout and self._connected and not self._permission_error:
                     self.executor.submit(self._write_submix, self._submix_bus, index, None, new_mute, None)
-                msg = f"{self._faders[index]['name']} (Auriculares {self._submix_bus + 1}): " + ("Mute" if new_mute else "Unmute")
+                hp_lbl = "Headphones" if is_en else "Auriculares"
+                msg = f"{self._faders[index]['name']} ({hp_lbl} {self._submix_bus + 1}): " + ("Mute" if new_mute else "Unmute")
                 self.toastMessage.emit(msg)
             else:
                 new_mute = not self._faders[index]["mute"]
@@ -2890,7 +2932,9 @@ class StateManager(QObject):
             if self._connected and not self._permission_error:
                 action = "on" if new_listen else "off"
                 self.executor.submit(self.bridge.run_cmd, ["fader", "listen", str(index), action])
-            msg = f"{self._faders[index]['name']}: Listen " + ("Activado" if new_listen else "Desactivado")
+            is_en = (self._language == "en")
+            listen_lbl = ("On" if new_listen else "Off") if is_en else ("Activado" if new_listen else "Desactivado")
+            msg = f"{self._faders[index]['name']}: Listen {listen_lbl}"
             self.toastMessage.emit(msg)
 
     @pyqtSlot(int, int)
@@ -2927,7 +2971,9 @@ class StateManager(QObject):
                 self.executor.submit(self._write_submix, self._submix_bus, index,
                                      self._faders[index].get("submix_level", self._faders[index]["level"]), None, None)
             self.fadersChanged.emit()
-            msg = f"{self._faders[index]['name']}: " + ("Vinculado al Stream" if new_linked else "Monitoreo Personalizado")
+            is_en = (self._language == "en")
+            link_lbl = ("Linked to Stream" if new_linked else "Custom Monitoring") if is_en else ("Vinculado al Stream" if new_linked else "Monitoreo Personalizado")
+            msg = f"{self._faders[index]['name']}: {link_lbl}"
             self.toastMessage.emit(msg)
 
     @pyqtSlot()
@@ -3135,7 +3181,11 @@ class StateManager(QObject):
                 self.bridge.run_cmd,
                 ["set-property", "3", "requestRecordState", target_val]
             )
-        msg = "Grabación iniciada" if new_state else "Grabación detenida"
+        is_en = (self._language == "en")
+        if new_state:
+            msg = "Recording started" if is_en else "Grabación iniciada"
+        else:
+            msg = "Recording stopped" if is_en else "Grabación detenida"
         self.toastMessage.emit(msg)
 
     @pyqtSlot()
@@ -3145,7 +3195,8 @@ class StateManager(QObject):
                 self.bridge.run_cmd,
                 ["set-property", "3", "requestDropMarker", "f64:1.0"]
             )
-        self.toastMessage.emit("Marca colocada en la grabación")
+        is_en = (self._language == "en")
+        self.toastMessage.emit("Marker dropped in recording" if is_en else "Marca colocada en la grabación")
 
     # Device Configuration
     @pyqtProperty(int, notify=deviceConfigChanged)
@@ -3600,7 +3651,10 @@ class StateManager(QObject):
                 self.bridge.run_cmd,
                 ["set-property", "13", "outputMonMute", f"bool:{str(new_mute).lower()}"]
             )
-        self.toastMessage.emit("Auriculares: " + ("Silenciados" if new_mute else "Activos"))
+        is_en = (self._language == "en")
+        hp_lbl = "Headphones: " if is_en else "Auriculares: "
+        st_lbl = ("Muted" if new_mute else "Active") if is_en else ("Silenciados" if new_mute else "Activos")
+        self.toastMessage.emit(f"{hp_lbl}{st_lbl}")
 
     @pyqtProperty(bool, notify=deviceConfigChanged)
     def monitorAutoMute(self):
@@ -3795,7 +3849,8 @@ class StateManager(QObject):
                 # Set proper hardware properties to prevent audio engine lockup
                 self._send_pad_props(b_str, p_str, props, raw)
             self.executor.submit(do_assign)
-        self.toastMessage.emit(f"Efecto '{fx_name}' configurado")
+        is_en = (self._language == "en")
+        self.toastMessage.emit(f"Effect '{fx_name}' configured" if is_en else f"Efecto '{fx_name}' configurado")
 
     # ------------------------------------------------------------------
     # Voice FX pads (padType 2). As in RØDE Unify / RØDECaster App, a pad can stack
@@ -4156,7 +4211,8 @@ class StateManager(QObject):
                 pad["name"] = "MIDI CC#1"
         self.padsChanged.emit()
         self.selectedPadChanged.emit()
-        self.toastMessage.emit(f"Tipo: {ptype.upper()}")
+        is_en = (self._language == "en")
+        self.toastMessage.emit(f"Type: {ptype.upper()}" if is_en else f"Tipo: {ptype.upper()}")
 
     @pyqtSlot()
     def refresh(self):

@@ -313,7 +313,7 @@ Item {
                                     }
 
                                     Text {
-                                        text: modelData.name || ("Canal " + (index + 1))
+                                        text: modelData.name || ((stateManager && stateManager.language === "en" ? "Channel " : "Canal ") + (index + 1))
                                         font.pixelSize: (stateManager && stateManager.faders.length > 6) ? 10 : 12
                                         font.bold: true
                                         color: root.selectedChannelIndex === modelData.index ? "#CBA158" : "#FFFFFF"

@@ -988,7 +988,7 @@ Item {
 
                     RowLayout {
                         Text {
-                            text: (stateManager ? (stateManager.storageLabel || "Almacenamiento") : "Almacenamiento")
+                            text: (stateManager ? (stateManager.storageLabel || (stateManager.language === "en" ? "Storage" : "Almacenamiento")) : "Storage")
                             font.pixelSize: 13
                             font.bold: true
                             color: "#FFFFFF"
@@ -1051,9 +1051,9 @@ Item {
                     Layout.alignment: Qt.AlignHCenter
                     text: (stateManager && stateManager.hasMicroSD)
                           ? (stateManager.transferModeActive 
-                             ? (stateManager.strings ? stateManager.strings.no_recordings_title : "No hay grabaciones en la tarjeta")
-                             : "Modo Transferencia Desactivado")
-                          : (stateManager && stateManager.strings ? stateManager.strings.no_microsd_title : "No hay tarjeta MicroSD instalada")
+                             ? (stateManager.strings ? stateManager.strings.no_recordings_title : (stateManager && stateManager.language === "en" ? "No recordings on card" : "No hay grabaciones en la tarjeta"))
+                             : (stateManager && stateManager.language === "en" ? "Transfer Mode Disabled" : "Modo Transferencia Desactivado"))
+                          : (stateManager && stateManager.strings ? stateManager.strings.no_microsd_title : (stateManager && stateManager.language === "en" ? "No MicroSD Card Installed" : "No hay tarjeta MicroSD instalada"))
                     font.pixelSize: 16
                     font.bold: true
                     color: "#FFFFFF"
@@ -1065,9 +1065,9 @@ Item {
                     Layout.fillWidth: true
                     text: (stateManager && stateManager.hasMicroSD)
                           ? (stateManager.transferModeActive 
-                             ? (stateManager.strings ? stateManager.strings.no_recordings_desc : "Las grabaciones realizadas con el botón REC en tu RØDECaster aparecerán aquí.")
+                             ? (stateManager.strings ? stateManager.strings.no_recordings_desc : (stateManager && stateManager.language === "en" ? "Recordings made with the REC button on your RØDECaster will appear here." : "Las grabaciones realizadas con el botón REC en tu RØDECaster aparecerán aquí."))
                              : (stateManager && stateManager.language === "en" ? "Enable transfer mode so your system mounts the MicroSD card to explore your takes." : "Activa el modo de transferencia para que tu sistema monte la tarjeta MicroSD y puedas explorar tus tomas."))
-                          : (stateManager && stateManager.strings ? stateManager.strings.no_microsd_desc : "La ranura de tarjeta MicroSD de tu RØDECaster está vacía. Inserta una tarjeta MicroSD para grabar tomas y transferirlas a tu PC.")
+                          : (stateManager && stateManager.strings ? stateManager.strings.no_microsd_desc : (stateManager && stateManager.language === "en" ? "The MicroSD card slot on your RØDECaster is empty. Insert a MicroSD card to record takes and transfer them to your PC." : "La ranura de tarjeta MicroSD de tu RØDECaster está vacía. Inserta una tarjeta MicroSD para grabar tomas y transferirlas a tu PC."))
                     font.pixelSize: 12
                     color: "#8E8E93"
                     wrapMode: Text.WordWrap
