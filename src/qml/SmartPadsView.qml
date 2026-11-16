@@ -203,466 +203,831 @@ Item {
 
             // Main Editor Body (Flickable ScrollView for responsive sizing)
             ScrollView {
+                id: editorScroll
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 clip: true
-                topPadding: 32
-                bottomPadding: 24
+                contentWidth: availableWidth
 
-                // TAB 0: SOUND
-                ColumnLayout {
-                    width: root.width - 320 - 48
-                    anchors.horizontalCenter: parent ? parent.horizontalCenter : undefined
-                    spacing: 20
-                    visible: root.activeCategory === 0
+                Item {
+                    width: editorScroll.availableWidth
+                    implicitHeight: editorContent.implicitHeight + 48
 
-                    // Audio file actually stored in this pad (the name is just a label)
-                    Text {
-                        visible: Boolean(root.selectedPad && root.selectedPad.type === "sound" && root.selectedPad.file)
-                        Layout.fillWidth: true
-                        elide: Text.ElideMiddle
-                        font.pixelSize: 11
-                        color: "#8E8E93"
-                        text: (stateManager && stateManager.language === "en" ? "Audio file: " : "Archivo de audio: ")
-                              + (root.selectedPad && root.selectedPad.file ? String(root.selectedPad.file).split("/").pop() : "")
-                    }
+                    ColumnLayout {
+                        id: editorContent
+                        x: 24
+                        y: 24
+                        width: Math.max(420, editorScroll.availableWidth - 48)
+                        spacing: 0
 
-                    // Three Main Sound Actions Box
-                    Rectangle {
-                        Layout.fillWidth: true
-                        height: 110
-                        radius: 10
-                        color: "#202023"
-                        border.color: "#2E2E33"
+                        // TAB 0: SOUND
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 16
+                            visible: root.activeCategory === 0
 
-                        RowLayout {
-                            anchors.fill: parent
-                            spacing: 0
-
-                            // 1. Choose File
-                            Item {
+                            // Audio file actually stored in this pad (the name is just a label)
+                            Rectangle {
+                                visible: Boolean(root.selectedPad && root.selectedPad.type === "sound" && root.selectedPad.file)
                                 Layout.fillWidth: true
-                                Layout.fillHeight: true
+                                height: 36
+                                radius: 8
+                                color: "#1C1C20"
+                                border.color: "#2C2C34"
+                                border.width: 1
 
-                                ColumnLayout {
-                                    anchors.centerIn: parent
+                                RowLayout {
+                                    anchors.fill: parent
+                                    anchors.leftMargin: 12
+                                    anchors.rightMargin: 12
                                     spacing: 8
 
-                                    FlatIcon {
-                                        Layout.alignment: Qt.AlignHCenter
-                                        name: "folder"
-                                        implicitWidth: 26
-                                        implicitHeight: 26
-                                        color: actArea1.containsMouse ? "#CBA158" : "#C8C8CC"
-                                    }
+                                    Text { text: "💾"; font.pixelSize: 13 }
                                     Text {
-                                        Layout.alignment: Qt.AlignHCenter
-                                        text: stateManager ? stateManager.strings.choose_file : "Elegir Archivo"
+                                        Layout.fillWidth: true
+                                        elide: Text.ElideMiddle
                                         font.pixelSize: 11
-                                        font.weight: Font.Medium
-                                        color: actArea1.containsMouse ? "#FFFFFF" : "#C8C8CC"
+                                        color: "#D0D0D5"
+                                        text: (stateManager && stateManager.language === "en" ? "Audio file: " : "Archivo de audio: ")
+                                              + (root.selectedPad && root.selectedPad.file ? String(root.selectedPad.file).split("/").pop() : "")
                                     }
-                                }
-
-                                MouseArea {
-                                    id: actArea1
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: fileDialog.open()
                                 }
                             }
 
-                            Rectangle { width: 1; height: 60; color: "#2E2E33"; Layout.alignment: Qt.AlignVCenter }
-
-                            // 2. Drag & Drop
-                            Item {
+                            // Three Main Sound Actions Box
+                            Rectangle {
                                 Layout.fillWidth: true
-                                Layout.fillHeight: true
+                                height: 110
+                                radius: 10
+                                color: "#1C1C20"
+                                border.color: "#2C2C34"
+                                border.width: 1
 
-                                ColumnLayout {
-                                    anchors.centerIn: parent
-                                    spacing: 8
-
-                                    FlatIcon {
-                                        Layout.alignment: Qt.AlignHCenter
-                                        name: "drag_drop"
-                                        implicitWidth: 26
-                                        implicitHeight: 26
-                                        color: dropArea.containsDrag ? "#CBA158" : "#C8C8CC"
-                                    }
-                                    Text {
-                                        Layout.alignment: Qt.AlignHCenter
-                                        text: stateManager ? stateManager.strings.drag_drop : "Arrastrar y Soltar"
-                                        font.pixelSize: 11
-                                        font.weight: Font.Medium
-                                        color: dropArea.containsDrag ? "#CBA158" : "#C8C8CC"
-                                    }
-                                }
-
-                                DropArea {
-                                    id: dropArea
+                                RowLayout {
                                     anchors.fill: parent
-                                    onDropped: (drop) => {
-                                        if (drop.hasUrls && drop.urls.length > 0) {
-                                            stateManager.uploadSoundFile(drop.urls[0].toString(), "");
+                                    spacing: 0
+
+                                    // 1. Choose File
+                                    Item {
+                                        Layout.fillWidth: true
+                                        Layout.fillHeight: true
+
+                                        ColumnLayout {
+                                            anchors.centerIn: parent
+                                            spacing: 8
+
+                                            FlatIcon {
+                                                Layout.alignment: Qt.AlignHCenter
+                                                name: "folder"
+                                                implicitWidth: 26
+                                                implicitHeight: 26
+                                                color: actArea1.containsMouse ? "#CBA158" : "#C8C8CC"
+                                            }
+                                            Text {
+                                                Layout.alignment: Qt.AlignHCenter
+                                                text: stateManager ? stateManager.strings.choose_file : "Elegir Archivo"
+                                                font.pixelSize: 11
+                                                font.weight: Font.Medium
+                                                color: actArea1.containsMouse ? "#FFFFFF" : "#C8C8CC"
+                                            }
+                                        }
+
+                                        MouseArea {
+                                            id: actArea1
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: fileDialog.open()
+                                        }
+                                    }
+
+                                    Rectangle { width: 1; height: 60; color: "#2E2E33"; Layout.alignment: Qt.AlignVCenter }
+
+                                    // 2. Drag & Drop
+                                    Item {
+                                        Layout.fillWidth: true
+                                        Layout.fillHeight: true
+
+                                        ColumnLayout {
+                                            anchors.centerIn: parent
+                                            spacing: 8
+
+                                            FlatIcon {
+                                                Layout.alignment: Qt.AlignHCenter
+                                                name: "drag_drop"
+                                                implicitWidth: 26
+                                                implicitHeight: 26
+                                                color: dropArea.containsDrag ? "#CBA158" : "#C8C8CC"
+                                            }
+                                            Text {
+                                                Layout.alignment: Qt.AlignHCenter
+                                                text: stateManager ? stateManager.strings.drag_drop : "Arrastrar y Soltar"
+                                                font.pixelSize: 11
+                                                font.weight: Font.Medium
+                                                color: dropArea.containsDrag ? "#CBA158" : "#C8C8CC"
+                                            }
+                                        }
+
+                                        DropArea {
+                                            id: dropArea
+                                            anchors.fill: parent
+                                            onDropped: (drop) => {
+                                                if (drop.hasUrls && drop.urls.length > 0) {
+                                                    stateManager.uploadSoundFile(drop.urls[0].toString(), "");
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    Rectangle { width: 1; height: 60; color: "#2E2E33"; Layout.alignment: Qt.AlignVCenter }
+
+                                    // 3. Export
+                                    Item {
+                                        Layout.fillWidth: true
+                                        Layout.fillHeight: true
+
+                                        readonly property bool hasAudio: Boolean(root.selectedPad && root.selectedPad.file && root.selectedPad.type !== "empty")
+
+                                        ColumnLayout {
+                                            anchors.centerIn: parent
+                                            spacing: 8
+
+                                            FlatIcon {
+                                                Layout.alignment: Qt.AlignHCenter
+                                                name: "export"
+                                                implicitWidth: 26
+                                                implicitHeight: 26
+                                                color: parent.parent.hasAudio ? (actArea3.containsMouse ? "#CBA158" : "#C8C8CC") : "#55555A"
+                                            }
+                                            Text {
+                                                Layout.alignment: Qt.AlignHCenter
+                                                text: stateManager ? stateManager.strings.export_audio : "Exportar Audio"
+                                                font.pixelSize: 11
+                                                font.weight: Font.Medium
+                                                color: parent.parent.hasAudio ? (actArea3.containsMouse ? "#FFFFFF" : "#C8C8CC") : "#55555A"
+                                            }
+                                        }
+
+                                        MouseArea {
+                                            id: actArea3
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            cursorShape: parent.hasAudio ? Qt.PointingHandCursor : Qt.ArrowCursor
+                                            onClicked: {
+                                                if (!parent.hasAudio) {
+                                                    if (stateManager) stateManager.toastMessage(stateManager.strings.no_audio_export);
+                                                    return;
+                                                }
+                                                let padName = (root.selectedPad && root.selectedPad.name) ? root.selectedPad.name.replace(/[^a-zA-Z0-9_-]/g, "_") : "pad_audio";
+                                                let ext = (root.selectedPad && root.selectedPad.file && root.selectedPad.file.endsWith(".mp3")) ? ".mp3" : ".wav";
+                                                exportFileDialog.currentFile = "file://" + padName + ext;
+                                                exportFileDialog.open();
+                                            }
                                         }
                                     }
                                 }
                             }
 
-                            Rectangle { width: 1; height: 60; color: "#2E2E33"; Layout.alignment: Qt.AlignVCenter }
-
-                            // 3. Export
-                            Item {
+                            // Official RØDE Factory Sounds Picker
+                            Rectangle {
                                 Layout.fillWidth: true
-                                Layout.fillHeight: true
-
-                                readonly property bool hasAudio: Boolean(root.selectedPad && root.selectedPad.file && root.selectedPad.type !== "empty")
+                                height: factoryCol.height + 28
+                                radius: 10
+                                color: "#1C1C20"
+                                border.color: "#2C2C34"
+                                border.width: 1
 
                                 ColumnLayout {
-                                    anchors.centerIn: parent
-                                    spacing: 8
+                                    id: factoryCol
+                                    anchors.top: parent.top
+                                    anchors.left: parent.left
+                                    anchors.right: parent.right
+                                    anchors.margins: 14
+                                    spacing: 10
 
-                                    FlatIcon {
-                                        Layout.alignment: Qt.AlignHCenter
-                                        name: "export"
-                                        implicitWidth: 26
-                                        implicitHeight: 26
-                                        color: parent.parent.hasAudio ? (actArea3.containsMouse ? "#CBA158" : "#C8C8CC") : "#55555A"
+                                    RowLayout {
+                                        spacing: 8
+                                        FlatIcon {
+                                            name: "speaker"
+                                            implicitWidth: 14
+                                            implicitHeight: 14
+                                            color: "#CBA158"
+                                        }
+                                        Text {
+                                            text: stateManager ? stateManager.strings.factory_sounds : "Sonidos de Fábrica"
+                                            font.pixelSize: 12
+                                            font.bold: true
+                                            color: "#FFFFFF"
+                                        }
+                                        Item { Layout.fillWidth: true }
+                                        Text {
+                                            text: stateManager ? stateManager.strings.load_factory_sound : "Cargar sonido oficial RØDE"
+                                            font.pixelSize: 10
+                                            color: "#8E8E93"
+                                        }
                                     }
-                                    Text {
-                                        Layout.alignment: Qt.AlignHCenter
-                                        text: stateManager ? stateManager.strings.export_audio : "Exportar Audio"
-                                        font.pixelSize: 11
-                                        font.weight: Font.Medium
-                                        color: parent.parent.hasAudio ? (actArea3.containsMouse ? "#FFFFFF" : "#C8C8CC") : "#55555A"
+
+                                    GridLayout {
+                                        Layout.fillWidth: true
+                                        columns: 4
+                                        rowSpacing: 6
+                                        columnSpacing: 6
+
+                                        Repeater {
+                                            model: stateManager ? stateManager.factorySounds : []
+
+                                            Rectangle {
+                                                Layout.fillWidth: true
+                                                height: 30
+                                                radius: 6
+                                                color: factArea.containsMouse ? "#32323A" : "#242428"
+                                                border.color: factArea.containsMouse ? "#CBA158" : "#323238"
+                                                border.width: 1
+
+                                                Text {
+                                                    anchors.centerIn: parent
+                                                    text: modelData.name
+                                                    font.pixelSize: 10
+                                                    font.weight: Font.Medium
+                                                    color: factArea.containsMouse ? "#FFFFFF" : "#D0D0D5"
+                                                }
+
+                                                MouseArea {
+                                                    id: factArea
+                                                    anchors.fill: parent
+                                                    hoverEnabled: true
+                                                    cursorShape: Qt.PointingHandCursor
+                                                    onClicked: {
+                                                        if (stateManager) stateManager.loadFactorySound(modelData.id);
+                                                    }
+                                                }
+                                            }
+                                        }
                                     }
                                 }
+                            }
 
-                                MouseArea {
-                                    id: actArea3
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    cursorShape: parent.hasAudio ? Qt.PointingHandCursor : Qt.ArrowCursor
-                                    onClicked: {
-                                        if (!parent.hasAudio) {
-                                            if (stateManager) stateManager.toastMessage(stateManager.strings.no_audio_export);
-                                            return;
+                            // Playback Options & Gain Card
+                            Rectangle {
+                                Layout.fillWidth: true
+                                implicitHeight: playbackCol.implicitHeight + 28
+                                radius: 10
+                                color: "#1C1C20"
+                                border.color: "#2C2C34"
+                                border.width: 1
+
+                                ColumnLayout {
+                                    id: playbackCol
+                                    anchors.top: parent.top
+                                    anchors.left: parent.left
+                                    anchors.right: parent.right
+                                    anchors.margins: 14
+                                    spacing: 14
+
+                                    // Playback options (Toggle, Loop, Replay)
+                                    RowLayout {
+                                        Layout.alignment: Qt.AlignHCenter
+                                        spacing: 40
+
+                                        // Mode (Toggle / One Shot / Hold)
+                                        ColumnLayout {
+                                            spacing: 6
+                                            Layout.alignment: Qt.AlignHCenter
+
+                                            Rectangle {
+                                                width: 44
+                                                height: 44
+                                                radius: 22
+                                                color: modeArea.containsMouse ? "#2C2C32" : "#222226"
+                                                border.color: modeArea.containsMouse ? "#44444D" : "#323238"
+                                                border.width: 1
+                                                Layout.alignment: Qt.AlignHCenter
+
+                                                FlatIcon {
+                                                    anchors.centerIn: parent
+                                                    name: {
+                                                        let m = (root.selectedPad && root.selectedPad.mode !== undefined) ? root.selectedPad.mode : "toggle";
+                                                        return (m === "oneshot") ? "oneshot" : ((m === "hold") ? "hold" : "toggle");
+                                                    }
+                                                    implicitWidth: 20
+                                                    implicitHeight: 20
+                                                    color: "#FFFFFF"
+                                                }
+
+                                                MouseArea {
+                                                    id: modeArea
+                                                    anchors.fill: parent
+                                                    hoverEnabled: true
+                                                    cursorShape: Qt.PointingHandCursor
+                                                    onClicked: {
+                                                        let current = (root.selectedPad && root.selectedPad.mode !== undefined) ? root.selectedPad.mode : "toggle";
+                                                        let next = (current === "toggle") ? "oneshot" : ((current === "oneshot") ? "hold" : "toggle");
+                                                        stateManager.updatePadPlayMode(next);
+                                                    }
+                                                }
+                                            }
+
+                                            Text {
+                                                Layout.alignment: Qt.AlignHCenter
+                                                text: {
+                                                    let m = (root.selectedPad && root.selectedPad.mode !== undefined) ? root.selectedPad.mode : "toggle";
+                                                    return (m === "oneshot") ? (stateManager ? stateManager.strings.mode_oneshot : "One Shot") : ((m === "hold") ? (stateManager ? stateManager.strings.mode_hold : "Hold") : (stateManager ? stateManager.strings.mode_toggle : "Toggle"));
+                                                }
+                                                font.pixelSize: 11
+                                                font.weight: Font.Medium
+                                                color: "#FFFFFF"
+                                            }
                                         }
-                                        let padName = (root.selectedPad && root.selectedPad.name) ? root.selectedPad.name.replace(/[^a-zA-Z0-9_-]/g, "_") : "pad_audio";
-                                        let ext = (root.selectedPad && root.selectedPad.file && root.selectedPad.file.endsWith(".mp3")) ? ".mp3" : ".wav";
-                                        exportFileDialog.currentFile = "file://" + padName + ext;
-                                        exportFileDialog.open();
+
+                                        // Loop (Loop Off / On)
+                                        ColumnLayout {
+                                            spacing: 6
+                                            Layout.alignment: Qt.AlignHCenter
+
+                                            Rectangle {
+                                                width: 44
+                                                height: 44
+                                                radius: 22
+                                                color: root.selectedPad && root.selectedPad.loop ? "#2C271E" : (loopArea.containsMouse ? "#2C2C32" : "#222226")
+                                                border.color: root.selectedPad && root.selectedPad.loop ? "#CBA158" : (loopArea.containsMouse ? "#44444D" : "#323238")
+                                                border.width: 1
+                                                Layout.alignment: Qt.AlignHCenter
+
+                                                FlatIcon {
+                                                    anchors.centerIn: parent
+                                                    name: root.selectedPad && root.selectedPad.loop ? "loop_on" : "loop_off"
+                                                    implicitWidth: 20
+                                                    implicitHeight: 20
+                                                    color: root.selectedPad && root.selectedPad.loop ? "#CBA158" : "#8E8E93"
+                                                }
+
+                                                MouseArea {
+                                                    id: loopArea
+                                                    anchors.fill: parent
+                                                    hoverEnabled: true
+                                                    cursorShape: Qt.PointingHandCursor
+                                                    onClicked: {
+                                                        let current = (root.selectedPad && root.selectedPad.loop !== undefined) ? root.selectedPad.loop : false;
+                                                        stateManager.updatePadLoop(!current);
+                                                    }
+                                                }
+                                            }
+
+                                            Text {
+                                                Layout.alignment: Qt.AlignHCenter
+                                                text: root.selectedPad && root.selectedPad.loop ? (stateManager ? stateManager.strings.loop_on : "Loop On") : (stateManager ? stateManager.strings.loop_off : "Loop Off")
+                                                font.pixelSize: 11
+                                                font.weight: Font.Medium
+                                                color: root.selectedPad && root.selectedPad.loop ? "#CBA158" : "#8E8E93"
+                                            }
+                                        }
+
+                                        // Replay
+                                        ColumnLayout {
+                                            spacing: 6
+                                            Layout.alignment: Qt.AlignHCenter
+
+                                            Rectangle {
+                                                width: 44
+                                                height: 44
+                                                radius: 22
+                                                color: root.selectedPad && root.selectedPad.replay ? "#2C271E" : (replayArea.containsMouse ? "#2C2C32" : "#222226")
+                                                border.color: root.selectedPad && root.selectedPad.replay ? "#CBA158" : (replayArea.containsMouse ? "#44444D" : "#323238")
+                                                border.width: 1
+                                                Layout.alignment: Qt.AlignHCenter
+
+                                                FlatIcon {
+                                                    anchors.centerIn: parent
+                                                    name: "replay"
+                                                    implicitWidth: 20
+                                                    implicitHeight: 20
+                                                    color: root.selectedPad && root.selectedPad.replay ? "#CBA158" : "#8E8E93"
+                                                }
+
+                                                MouseArea {
+                                                    id: replayArea
+                                                    anchors.fill: parent
+                                                    hoverEnabled: true
+                                                    cursorShape: Qt.PointingHandCursor
+                                                    onClicked: {
+                                                        let current = (root.selectedPad && root.selectedPad.replay !== undefined) ? root.selectedPad.replay : false;
+                                                        stateManager.updatePadReplay(!current);
+                                                    }
+                                                }
+                                            }
+
+                                            Text {
+                                                Layout.alignment: Qt.AlignHCenter
+                                                text: stateManager ? stateManager.strings.replay : "Replay"
+                                                font.pixelSize: 11
+                                                font.weight: Font.Medium
+                                                color: root.selectedPad && root.selectedPad.replay ? "#CBA158" : "#8E8E93"
+                                            }
+                                        }
+                                    }
+
+                                    Rectangle {
+                                        Layout.fillWidth: true
+                                        height: 1
+                                        color: "#26262E"
+                                    }
+
+                                    // Gain Level Slider
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        spacing: 14
+
+                                        Text {
+                                            text: stateManager ? stateManager.strings.gain : "Ganancia:"
+                                            font.pixelSize: 12
+                                            color: "#8E8E93"
+                                        }
+
+                                        Slider {
+                                            id: gainSlider
+                                            Layout.fillWidth: true
+                                            from: -12.0
+                                            to: 12.0
+                                            stepSize: 0.5
+                                            value: (root.selectedPad && root.selectedPad.gain !== undefined) ? root.selectedPad.gain : 0.0
+
+                                            onMoved: {
+                                                stateManager.updatePadGain(value);
+                                            }
+                                        }
+
+                                        Text {
+                                            text: (gainSlider.value > 0 ? "+" : "") + gainSlider.value.toFixed(1) + " dB"
+                                            font.pixelSize: 12
+                                            font.bold: true
+                                            color: "#CBA158"
+                                            Layout.preferredWidth: 56
+                                            horizontalAlignment: Text.AlignRight
+                                        }
                                     }
                                 }
                             }
                         }
-                    }
 
-                    // Official RØDE Factory Sounds Picker
-                    Rectangle {
-                        Layout.fillWidth: true
-                        height: factoryCol.height + 24
-                        radius: 10
-                        color: "#1C1C1F"
-                        border.color: "#2C2C32"
-                        border.width: 1
-
+                        // TAB 1: FX EFFECTS
                         ColumnLayout {
-                            id: factoryCol
-                            anchors.top: parent.top
-                            anchors.left: parent.left
-                            anchors.right: parent.right
-                            anchors.margins: 14
-                            spacing: 10
+                            Layout.fillWidth: true
+                            spacing: 14
+                            visible: root.activeCategory === 1
 
-                            RowLayout {
-                                spacing: 8
-                                FlatIcon {
-                                    name: "speaker"
-                                    implicitWidth: 14
-                                    implicitHeight: 14
-                                    color: "#CBA158"
+                            readonly property var activeFxObj: (root.selectedPad && root.selectedPad.type === "fx" && root.selectedPad.fx) ? root.selectedPad.fx : ({})
+                            readonly property int activeFxCount: {
+                                var f = activeFxObj;
+                                var keys = ["reverbOn", "echoOn", "distortionOn", "pitchShiftOn", "robotOn", "voiceDisguiseOn"];
+                                var cnt = 0;
+                                for (var i = 0; i < keys.length; i++) {
+                                    if (f[keys[i]]) cnt++;
                                 }
-                                Text {
-                                    text: stateManager ? stateManager.strings.factory_sounds : "Sonidos de Fábrica"
-                                    font.pixelSize: 12
-                                    font.bold: true
-                                    color: "#FFFFFF"
-                                }
-                                Item { Layout.fillWidth: true }
-                                Text {
-                                    text: stateManager ? stateManager.strings.load_factory_sound : "Cargar sonido oficial RØDE"
-                                    font.pixelSize: 10
-                                    color: "#8E8E93"
-                                }
+                                return cnt;
                             }
 
-                            GridLayout {
+                            // Top Control & Info Bar
+                            Rectangle {
                                 Layout.fillWidth: true
-                                columns: 4
-                                rowSpacing: 6
-                                columnSpacing: 6
+                                implicitHeight: fxTopCol.implicitHeight + 24
+                                radius: 10
+                                color: "#1C1C20"
+                                border.color: "#2C2C34"
+                                border.width: 1
 
-                                Repeater {
-                                    model: stateManager ? stateManager.factorySounds : []
+                                ColumnLayout {
+                                    id: fxTopCol
+                                    anchors.top: parent.top
+                                    anchors.left: parent.left
+                                    anchors.right: parent.right
+                                    anchors.margins: 12
+                                    spacing: 10
+
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        spacing: 14
+
+                                        // Trigger mode selector
+                                        RowLayout {
+                                            spacing: 8
+                                            Text {
+                                                text: stateManager && stateManager.language === "en" ? "Mode:" : "Modo:"
+                                                font.pixelSize: 12; font.bold: true; color: "#FFFFFF"
+                                            }
+                                            Row {
+                                                spacing: 4
+                                                Repeater {
+                                                    model: [
+                                                        {"v": 1, "t": stateManager && stateManager.language === "en" ? "Latching" : "Enclavado"},
+                                                        {"v": 0, "t": stateManager && stateManager.language === "en" ? "Momentary" : "Momentáneo"}
+                                                    ]
+                                                    Rectangle {
+                                                        readonly property bool sel: root.fxTriggerMode === modelData.v
+                                                        width: fxSegText.implicitWidth + 20
+                                                        height: 28
+                                                        radius: 6
+                                                        color: sel ? "#CBA158" : "#26262C"
+                                                        Text {
+                                                            id: fxSegText
+                                                            anchors.centerIn: parent
+                                                            text: modelData.t
+                                                            font.pixelSize: 11
+                                                            font.bold: parent.sel
+                                                            color: parent.sel ? "#121214" : "#D0D0D0"
+                                                        }
+                                                        MouseArea {
+                                                            anchors.fill: parent
+                                                            cursorShape: Qt.PointingHandCursor
+                                                            onClicked: if (stateManager) stateManager.setPadFxTrigger(modelData.v)
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        Rectangle {
+                                            visible: !(stateManager && stateManager.isStreamerX)
+                                            width: 1
+                                            height: 24
+                                            color: "#2E2E36"
+                                        }
+
+                                        // Target Microphone selector (Duo / Pro II)
+                                        RowLayout {
+                                            visible: !(stateManager && stateManager.isStreamerX)
+                                            spacing: 8
+                                            Text {
+                                                text: stateManager && stateManager.language === "en" ? "Microphone:" : "Micrófono:"
+                                                font.pixelSize: 12; font.bold: true; color: "#FFFFFF"
+                                            }
+                                            Row {
+                                                spacing: 4
+                                                Repeater {
+                                                    model: [{"v": 0, "t": "Mic 1"}, {"v": 1, "t": "Mic 2"}]
+                                                    Rectangle {
+                                                        readonly property bool sel: root.fxTargetChannel === modelData.v
+                                                        width: micSegText.implicitWidth + 20
+                                                        height: 28
+                                                        radius: 6
+                                                        color: sel ? "#CBA158" : "#26262C"
+                                                        Text {
+                                                            id: micSegText
+                                                            anchors.centerIn: parent
+                                                            text: modelData.t
+                                                            font.pixelSize: 11
+                                                            font.bold: parent.sel
+                                                            color: parent.sel ? "#121214" : "#D0D0D0"
+                                                        }
+                                                        MouseArea {
+                                                            anchors.fill: parent
+                                                            cursorShape: Qt.PointingHandCursor
+                                                            onClicked: if (stateManager) stateManager.setPadFxInput(modelData.v)
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        Item { Layout.fillWidth: true }
+
+                                        // Active FX count badge
+                                        Rectangle {
+                                            readonly property int cnt: parent.parent.parent.parent.activeFxCount
+                                            height: 24
+                                            width: fxBadgeText.implicitWidth + 18
+                                            radius: 12
+                                            color: cnt > 0 ? "#2D2820" : "#24242A"
+                                            border.color: cnt > 0 ? "#CBA158" : "#2E2E38"
+                                            border.width: 1
+
+                                            Text {
+                                                id: fxBadgeText
+                                                anchors.centerIn: parent
+                                                font.pixelSize: 10
+                                                font.bold: true
+                                                color: parent.cnt > 0 ? "#CBA158" : "#8E8E93"
+                                                text: {
+                                                    var en = (stateManager && stateManager.language === "en");
+                                                    if (parent.cnt > 0) {
+                                                        if (en) return parent.cnt === 1 ? "1 active" : (parent.cnt + " active");
+                                                        return parent.cnt === 1 ? "1 activo" : (parent.cnt + " activos");
+                                                    }
+                                                    return en ? "Stackable FX" : "FX Apilables";
+                                                }
+                                            }
+                                        }
+                                    }
 
                                     Rectangle {
                                         Layout.fillWidth: true
-                                        height: 30
-                                        radius: 6
-                                        color: factArea.containsMouse ? "#32323A" : "#242428"
-                                        border.color: factArea.containsMouse ? "#CBA158" : "#323238"
-                                        border.width: 1
+                                        height: 1
+                                        color: "#26262E"
+                                    }
 
-                                        Text {
-                                            anchors.centerIn: parent
-                                            text: modelData.name
-                                            font.pixelSize: 10
-                                            font.weight: Font.Medium
-                                            color: factArea.containsMouse ? "#FFFFFF" : "#D0D0D5"
-                                        }
+                                    Text {
+                                        Layout.fillWidth: true
+                                        wrapMode: Text.WordWrap
+                                        font.pixelSize: 11
+                                        color: "#8E8E93"
+                                        text: stateManager && stateManager.language === "en"
+                                              ? "Turn on one or several effects: they all apply together while the pad is active."
+                                              : "Activa uno o varios efectos: se aplican todos juntos mientras el pad está activo."
+                                    }
+                                }
+                            }
 
-                                        MouseArea {
-                                            id: factArea
+                            // Height-matched 2-column Stackable Voice Effects Grid
+                            GridLayout {
+                                Layout.fillWidth: true
+                                columns: 2
+                                rowSpacing: 12
+                                columnSpacing: 12
+
+                                Repeater {
+                                    model: [
+                                        {"on": "reverbOn", "name": "Reverb", "icon": "🏛️", "h": 168,
+                                         "subEn": "Room & studio acoustic space", "subEs": "Ambiente de sala y estudio",
+                                         "params": [
+                                            {"p": "reverbMix", "l": "Level", "lEs": "Nivel", "d": 0.5, "f": 0, "t": 1, "k": "pct"},
+                                            {"p": "reverbModel", "l": "Size", "lEs": "Tamaño", "d": 0.6, "f": 0, "t": 1, "k": "size"}]},
+                                        {"on": "echoOn", "name": "Echo", "icon": "🔊", "h": 168,
+                                         "subEn": "Repeating rhythmic delay", "subEs": "Repeticiones rítmicas",
+                                         "params": [
+                                            {"p": "echoMix", "l": "Level", "lEs": "Nivel", "d": 0.5, "f": 0, "t": 1, "k": "pct"},
+                                            {"p": "echoDelay", "l": "Delay", "lEs": "Retardo", "d": 0.165, "f": 0, "t": 1, "k": "pct"},
+                                            {"p": "echoDecay", "l": "Decay", "lEs": "Caída", "d": 0.5, "f": 0, "t": 1, "k": "pct"}]},
+                                        {"on": "distortionOn", "name": "Megaphone", "icon": "📢", "h": 118,
+                                         "subEn": "Lo-fi speaker distortion", "subEs": "Distorsión estilo megáfono",
+                                         "params": [
+                                            {"p": "distortionIntensity", "l": "Intensity", "lEs": "Intensidad", "d": 0.7, "f": 0, "t": 1, "k": "pct"}]},
+                                        {"on": "pitchShiftOn", "name": "Pitch Shift", "icon": "🎼", "h": 118,
+                                         "subEn": "Shift pitch in semitones", "subEs": "Cambia el tono en semitonos",
+                                         "params": [
+                                            {"p": "pitchShiftSemitones", "l": "Semitones", "lEs": "Semitonos", "d": 7, "f": -12, "t": 12, "k": "st"}]},
+                                        {"on": "robotOn", "name": "Robot", "icon": "🤖", "h": 68,
+                                         "subEn": "Metallic robotic voice", "subEs": "Voz robótica metálica",
+                                         "params": []},
+                                        {"on": "voiceDisguiseOn", "name": "Voice Disguise", "icon": "🎭", "h": 68,
+                                         "subEn": "Pitch-masked anonymity", "subEs": "Oculta tu timbre de voz",
+                                         "params": []}
+                                    ]
+
+                                    Rectangle {
+                                        id: fxCard
+                                        readonly property var fx: (root.selectedPad && root.selectedPad.type === "fx" && root.selectedPad.fx) ? root.selectedPad.fx : ({})
+                                        readonly property bool active: Boolean(fx[modelData.on])
+                                        readonly property var cardData: modelData
+                                        Layout.fillWidth: true
+                                        Layout.preferredHeight: Math.max(modelData.h, fxCardCol.implicitHeight + 24)
+                                        radius: 10
+                                        color: active ? "#2D2820" : "#1C1C20"
+                                        border.color: active ? "#CBA158" : "#2C2C34"
+                                        border.width: active ? 2 : 1
+
+                                        ColumnLayout {
+                                            id: fxCardCol
                                             anchors.fill: parent
-                                            hoverEnabled: true
-                                            cursorShape: Qt.PointingHandCursor
-                                            onClicked: {
-                                                if (stateManager) stateManager.loadFactorySound(modelData.id);
+                                            anchors.margins: 12
+                                            spacing: 8
+
+                                            RowLayout {
+                                                Layout.fillWidth: true
+                                                spacing: 10
+
+                                                Rectangle {
+                                                    width: 34
+                                                    height: 34
+                                                    radius: 8
+                                                    color: fxCard.active ? "#3A311E" : "#26262E"
+                                                    border.color: fxCard.active ? "#CBA158" : "#34343E"
+                                                    border.width: 1
+
+                                                    Text {
+                                                        anchors.centerIn: parent
+                                                        text: fxCard.cardData.icon
+                                                        font.pixelSize: 17
+                                                    }
+                                                }
+
+                                                ColumnLayout {
+                                                    Layout.fillWidth: true
+                                                    spacing: 1
+
+                                                    Text {
+                                                        Layout.fillWidth: true
+                                                        text: fxCard.cardData.name
+                                                        font.pixelSize: 13
+                                                        font.bold: true
+                                                        color: fxCard.active ? "#CBA158" : "#FFFFFF"
+                                                        elide: Text.ElideRight
+                                                    }
+
+                                                    Text {
+                                                        Layout.fillWidth: true
+                                                        text: (stateManager && stateManager.language === "en") ? fxCard.cardData.subEn : fxCard.cardData.subEs
+                                                        font.pixelSize: 10
+                                                        color: "#8E8E93"
+                                                        elide: Text.ElideRight
+                                                    }
+                                                }
+
+                                                Switch {
+                                                    checked: fxCard.active
+                                                    onToggled: if (stateManager) stateManager.setPadFxParam(fxCard.cardData.on, checked)
+                                                }
+                                            }
+
+                                            Rectangle {
+                                                visible: fxCard.cardData.params.length > 0
+                                                Layout.fillWidth: true
+                                                height: 1
+                                                color: fxCard.active ? "#463B22" : "#2A2A32"
+                                            }
+
+                                            Repeater {
+                                                model: fxCard.cardData.params
+                                                RowLayout {
+                                                    Layout.fillWidth: true
+                                                    spacing: 8
+                                                    enabled: fxCard.active
+                                                    opacity: enabled ? 1.0 : 0.45
+                                                    Text {
+                                                        text: stateManager && stateManager.language === "en" ? modelData.l : modelData.lEs
+                                                        font.pixelSize: 11; color: "#9A9A9E"
+                                                        Layout.preferredWidth: 70
+                                                    }
+                                                    Slider {
+                                                        id: fxSlider
+                                                        Layout.fillWidth: true
+                                                        implicitHeight: 22
+                                                        from: modelData.f
+                                                        to: modelData.t
+                                                        stepSize: modelData.k === "st" ? 0.5 : (modelData.k === "size" ? 0.25 : 0.01)
+                                                        snapMode: Slider.SnapAlways
+                                                        value: fxCard.fx[modelData.p] !== undefined ? fxCard.fx[modelData.p] : modelData.d
+                                                        onMoved: if (stateManager) stateManager.setPadFxParam(modelData.p, value)
+                                                    }
+                                                    Text {
+                                                        font.pixelSize: 11; font.bold: true; color: "#CBA158"
+                                                        Layout.preferredWidth: 44
+                                                        horizontalAlignment: Text.AlignRight
+                                                        text: modelData.k === "st" ? ((fxSlider.value > 0 ? "+" : "") + fxSlider.value.toFixed(1))
+                                                              : modelData.k === "size" ? ["S", "M", "L", "XL", "XXL"][Math.round(fxSlider.value * 4)]
+                                                              : Math.round(fxSlider.value * 100) + "%"
+                                                    }
+                                                }
+                                            }
+
+                                            Item {
+                                                visible: fxCard.cardData.params.length > 0
+                                                Layout.fillHeight: true
                                             }
                                         }
                                     }
                                 }
                             }
                         }
-                    }
 
-                    // Playback options (Toggle, Loop, Replay)
-                    RowLayout {
-                        Layout.alignment: Qt.AlignHCenter
-                        spacing: 40
-
-                        // Mode (Toggle / One Shot / Hold)
+                        // TAB 2: MIXER
                         ColumnLayout {
-                            spacing: 6
-                            Layout.alignment: Qt.AlignHCenter
+                            Layout.fillWidth: true
+                            spacing: 14
+                            visible: root.activeCategory === 2
 
+                            // Mixer pad trigger bar (matches FX tab top bar)
                             Rectangle {
-                                width: 44
-                                height: 44
-                                radius: 22
-                                color: modeArea.containsMouse ? "#2C2C32" : "#222226"
-                                border.color: modeArea.containsMouse ? "#44444D" : "#323238"
+                                visible: Boolean(root.selectedPad && root.selectedPad.type === "mixer")
+                                Layout.fillWidth: true
+                                height: 52
+                                radius: 10
+                                color: "#1C1C20"
+                                border.color: "#2C2C34"
                                 border.width: 1
-                                Layout.alignment: Qt.AlignHCenter
 
-                                FlatIcon {
-                                    anchors.centerIn: parent
-                                    name: {
-                                        let m = (root.selectedPad && root.selectedPad.mode !== undefined) ? root.selectedPad.mode : "toggle";
-                                        return (m === "oneshot") ? "oneshot" : ((m === "hold") ? "hold" : "toggle");
-                                    }
-                                    implicitWidth: 20
-                                    implicitHeight: 20
-                                    color: "#FFFFFF"
-                                }
-
-                                MouseArea {
-                                    id: modeArea
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: {
-                                        let current = (root.selectedPad && root.selectedPad.mode !== undefined) ? root.selectedPad.mode : "toggle";
-                                        let next = (current === "toggle") ? "oneshot" : ((current === "oneshot") ? "hold" : "toggle");
-                                        stateManager.updatePadPlayMode(next);
-                                    }
-                                }
-                            }
-
-                            Text {
-                                Layout.alignment: Qt.AlignHCenter
-                                text: {
-                                    let m = (root.selectedPad && root.selectedPad.mode !== undefined) ? root.selectedPad.mode : "toggle";
-                                    return (m === "oneshot") ? (stateManager ? stateManager.strings.mode_oneshot : "One Shot") : ((m === "hold") ? (stateManager ? stateManager.strings.mode_hold : "Hold") : (stateManager ? stateManager.strings.mode_toggle : "Toggle"));
-                                }
-                                font.pixelSize: 11
-                                font.weight: Font.Medium
-                                color: "#FFFFFF"
-                            }
-                        }
-
-                        // Loop (Loop Off / On)
-                        ColumnLayout {
-                            spacing: 6
-                            Layout.alignment: Qt.AlignHCenter
-
-                            Rectangle {
-                                width: 44
-                                height: 44
-                                radius: 22
-                                color: root.selectedPad && root.selectedPad.loop ? "#2C271E" : (loopArea.containsMouse ? "#2C2C32" : "#222226")
-                                border.color: root.selectedPad && root.selectedPad.loop ? "#CBA158" : (loopArea.containsMouse ? "#44444D" : "#323238")
-                                border.width: 1
-                                Layout.alignment: Qt.AlignHCenter
-
-                                FlatIcon {
-                                    anchors.centerIn: parent
-                                    name: root.selectedPad && root.selectedPad.loop ? "loop_on" : "loop_off"
-                                    implicitWidth: 20
-                                    implicitHeight: 20
-                                    color: root.selectedPad && root.selectedPad.loop ? "#CBA158" : "#8E8E93"
-                                }
-
-                                MouseArea {
-                                    id: loopArea
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: {
-                                        let current = (root.selectedPad && root.selectedPad.loop !== undefined) ? root.selectedPad.loop : false;
-                                        stateManager.updatePadLoop(!current);
-                                    }
-                                }
-                            }
-
-                            Text {
-                                Layout.alignment: Qt.AlignHCenter
-                                text: root.selectedPad && root.selectedPad.loop ? (stateManager ? stateManager.strings.loop_on : "Loop On") : (stateManager ? stateManager.strings.loop_off : "Loop Off")
-                                font.pixelSize: 11
-                                font.weight: Font.Medium
-                                color: root.selectedPad && root.selectedPad.loop ? "#CBA158" : "#8E8E93"
-                            }
-                        }
-
-                        // Replay
-                        ColumnLayout {
-                            spacing: 6
-                            Layout.alignment: Qt.AlignHCenter
-
-                            Rectangle {
-                                width: 44
-                                height: 44
-                                radius: 22
-                                color: root.selectedPad && root.selectedPad.replay ? "#2C271E" : (replayArea.containsMouse ? "#2C2C32" : "#222226")
-                                border.color: root.selectedPad && root.selectedPad.replay ? "#CBA158" : (replayArea.containsMouse ? "#44444D" : "#323238")
-                                border.width: 1
-                                Layout.alignment: Qt.AlignHCenter
-
-                                FlatIcon {
-                                    anchors.centerIn: parent
-                                    name: "replay"
-                                    implicitWidth: 20
-                                    implicitHeight: 20
-                                    color: root.selectedPad && root.selectedPad.replay ? "#CBA158" : "#8E8E93"
-                                }
-
-                                MouseArea {
-                                    id: replayArea
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: {
-                                        let current = (root.selectedPad && root.selectedPad.replay !== undefined) ? root.selectedPad.replay : false;
-                                        stateManager.updatePadReplay(!current);
-                                    }
-                                }
-                            }
-
-                            Text {
-                                Layout.alignment: Qt.AlignHCenter
-                                text: stateManager ? stateManager.strings.replay : "Replay"
-                                font.pixelSize: 11
-                                font.weight: Font.Medium
-                                color: root.selectedPad && root.selectedPad.replay ? "#CBA158" : "#8E8E93"
-                            }
-                        }
-                    }
-
-                    // Gain Level Slider
-                    RowLayout {
-                        Layout.alignment: Qt.AlignHCenter
-                        spacing: 14
-
-                        Text {
-                            text: stateManager ? stateManager.strings.gain : "Ganancia:"
-                            font.pixelSize: 12
-                            color: "#8E8E93"
-                        }
-
-                        Slider {
-                            id: gainSlider
-                            from: -12.0
-                            to: 12.0
-                            stepSize: 0.5
-                            value: (root.selectedPad && root.selectedPad.gain !== undefined) ? root.selectedPad.gain : 0.0
-
-                            onMoved: {
-                                stateManager.updatePadGain(value);
-                            }
-                        }
-
-                        Text {
-                            text: (gainSlider.value > 0 ? "+" : "") + gainSlider.value.toFixed(1) + " dB"
-                            font.pixelSize: 12
-                            font.bold: true
-                            color: "#CBA158"
-                        }
-                    }
-                }
-
-                // TAB 1: FX EFFECTS
-                ColumnLayout {
-                    width: root.width - 320 - 48
-                    anchors.horizontalCenter: parent ? parent.horizontalCenter : undefined
-                    spacing: 16
-                    visible: root.activeCategory === 1
-
-                    // Trigger mode + (Duo / Pro II) target microphone
-                    Rectangle {
-                        Layout.fillWidth: true
-                        implicitHeight: fxCtl.implicitHeight + 24
-                        radius: 8
-                        color: "#1C1C1F"
-                        border.color: "#2C2C32"
-
-                        Flow {
-                            id: fxCtl
-                            anchors.left: parent.left
-                            anchors.right: parent.right
-                            anchors.top: parent.top
-                            anchors.margins: 12
-                            spacing: 24
-
-                            Repeater {
-                                // One segmented selector per row: trigger mode, and microphone on Duo / Pro II
-                                model: (stateManager && stateManager.isStreamerX) ? ["trigger"] : ["trigger", "input"]
                                 RowLayout {
-                                    readonly property bool isTrigger: modelData === "trigger"
+                                    anchors.fill: parent
+                                    anchors.leftMargin: 12
+                                    anchors.rightMargin: 12
                                     spacing: 10
+
                                     Text {
-                                        text: parent.isTrigger
-                                              ? (stateManager && stateManager.language === "en" ? "Mode:" : "Modo:")
-                                              : (stateManager && stateManager.language === "en" ? "Microphone:" : "Micrófono:")
+                                        text: stateManager && stateManager.language === "en" ? "Mode:" : "Modo:"
                                         font.pixelSize: 12; font.bold: true; color: "#FFFFFF"
                                     }
+
                                     Row {
                                         spacing: 4
                                         Repeater {
-                                            model: parent.parent.isTrigger
-                                                ? [{"v": 1, "t": stateManager && stateManager.language === "en" ? "Latching" : "Enclavado"}, {"v": 0, "t": stateManager && stateManager.language === "en" ? "Momentary" : "Momentáneo"}]
-                                                : [{"v": 0, "t": "Mic 1"}, {"v": 1, "t": "Mic 2"}]
+                                            model: [{"v": 1, "t": stateManager && stateManager.language === "en" ? "Latching" : "Enclavado"},
+                                                    {"v": 0, "t": stateManager && stateManager.language === "en" ? "Momentary" : "Momentáneo"}]
                                             Rectangle {
-                                                readonly property bool trig: parent.parent.isTrigger
-                                                readonly property bool sel: trig ? root.fxTriggerMode === modelData.v : root.fxTargetChannel === modelData.v
-                                                width: segText.implicitWidth + 24
-                                                height: 30
+                                                readonly property bool sel: Boolean(root.selectedPad) && (root.selectedPad.mixer_trigger === undefined ? 0 : root.selectedPad.mixer_trigger) === modelData.v
+                                                width: mtText.implicitWidth + 20
+                                                height: 28
                                                 radius: 6
                                                 color: sel ? "#CBA158" : "#26262C"
                                                 Text {
-                                                    id: segText
+                                                    id: mtText
                                                     anchors.centerIn: parent
                                                     text: modelData.t
                                                     font.pixelSize: 11
@@ -672,409 +1037,279 @@ Item {
                                                 MouseArea {
                                                     anchors.fill: parent
                                                     cursorShape: Qt.PointingHandCursor
-                                                    onClicked: {
-                                                        if (!stateManager) return;
-                                                        if (parent.trig) stateManager.setPadFxTrigger(modelData.v);
-                                                        else stateManager.setPadFxInput(modelData.v);
-                                                    }
+                                                    onClicked: if (stateManager) stateManager.setPadMixerTrigger(modelData.v)
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    Item { Layout.fillWidth: true }
+
+                                    Rectangle {
+                                        height: 24
+                                        width: mixActiveBadge.implicitWidth + 18
+                                        radius: 12
+                                        color: "#2D2820"
+                                        border.color: "#CBA158"
+                                        border.width: 1
+
+                                        Text {
+                                            id: mixActiveBadge
+                                            anchors.centerIn: parent
+                                            font.pixelSize: 10
+                                            font.bold: true
+                                            color: "#CBA158"
+                                            text: (root.selectedPad && root.selectedPad.name) ? root.selectedPad.name : "Mixer"
+                                        }
+                                    }
+                                }
+                            }
+
+                            Repeater {
+                                // mode = PAD.padMixerMode. Back Channel (3) is not offered: on the Streamer X it
+                                // fired the Censor tone and reset the unit, and it is untested on Duo / Pro II.
+                                // Streamer X (RØDE Unify): Censor, Fade In/Out and Ducking only
+                                model: [
+                                    {"mode": 0, "name": "Censor", "desc": (stateManager && stateManager.language === "en" ? "While pressed, a sound plays and all channels are muted" : "Mientras lo pulsas suena un pitido y se silencian todos los canales"), "icon": "🔇"},
+                                    {"mode": 1, "name": "Trash Talk", "desc": (stateManager && stateManager.language === "en" ? "Mutes the audio sent to remote guests, so they can't hear you" : "Silencia el audio que se envía a los invitados remotos para que no te escuchen"), "icon": "🗣️"},
+                                    {"mode": 2, "name": "Fade In/Out", "desc": (stateManager && stateManager.language === "en" ? "Fades all channels out; pressing again fades them back in" : "Funde todos los canales a silencio; al pulsarlo otra vez vuelven a entrar"), "icon": "🌗"},
+                                    {"mode": 4, "name": "Ducking", "desc": (stateManager && stateManager.language === "en" ? "While active, other channels drop whenever the microphone picks up sound" : "Mientras está activo, baja los demás canales cada vez que el micrófono capta sonido"), "icon": "📉"}
+                                ].filter(function(m) { return !(stateManager && stateManager.isStreamerX && m.mode === 1); })
+
+                                Rectangle {
+                                    readonly property bool isCurrent: Boolean(root.selectedPad && root.selectedPad.type === "mixer"
+                                                                              && root.selectedPad.mixer_mode === modelData.mode)
+                                    Layout.fillWidth: true
+                                    height: 76
+                                    radius: 10
+                                    color: isCurrent ? "#2E281C" : (mixCardArea.containsMouse ? "#25252B" : "#1C1C20")
+                                    border.color: isCurrent ? "#CBA158" : (mixCardArea.containsMouse ? "#5A5040" : "#2C2C34")
+                                    border.width: isCurrent ? 2 : 1
+
+                                    RowLayout {
+                                        anchors.fill: parent
+                                        anchors.margins: 14
+                                        spacing: 14
+
+                                        Text { text: modelData.icon; font.pixelSize: 26 }
+                                        ColumnLayout {
+                                            Layout.fillWidth: true
+                                            spacing: 4
+                                            Text { text: modelData.name; font.pixelSize: 14; font.bold: true; color: parent.parent.parent.isCurrent ? "#CBA158" : "#FFFFFF" }
+                                            Text { text: modelData.desc; font.pixelSize: 11; color: "#9A9A9E"; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+                                        }
+                                        Text {
+                                            visible: parent.parent.isCurrent
+                                            text: "✓"
+                                            font.pixelSize: 16; font.bold: true; color: "#CBA158"
+                                        }
+                                    }
+
+                                    MouseArea {
+                                        id: mixCardArea
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: {
+                                            if (stateManager) stateManager.assignPadMixer(modelData.mode);
+                                        }
+                                    }
+                                }
+                            }
+                            // Back Channel pad (Duo / Pro II): which channels join the private mix with Mic 1
+                            Rectangle {
+                                visible: Boolean(root.selectedPad && root.selectedPad.type === "mixer" && root.selectedPad.mixer_mode === 3
+                                                 && stateManager && !stateManager.isStreamerX)
+                                Layout.fillWidth: true
+                                height: bcCol.height + 28
+                                radius: 10
+                                color: "#1C1C20"
+                                border.color: "#2C2C34"
+                                border.width: 1
+                                ColumnLayout {
+                                    id: bcCol
+                                    anchors.top: parent.top
+                                    anchors.left: parent.left
+                                    anchors.right: parent.right
+                                    anchors.margins: 14
+                                    spacing: 8
+                                    Text {
+                                        text: stateManager && stateManager.language === "en" ? "Back Channel participants (Microphone 1 is always included)" : "Participantes del Back Channel (el Micrófono 1 siempre está incluido)"
+                                        font.pixelSize: 13; font.bold: true; color: "#FFFFFF"
+                                        wrapMode: Text.WordWrap; Layout.fillWidth: true
+                                    }
+                                    Flow {
+                                        Layout.fillWidth: true
+                                        spacing: 8
+                                        Repeater {
+                                            model: (stateManager && stateManager.isDuo)
+                                                ? [{"key": "Mic2", "label": "Mic 2"}, {"key": "Usb1Comms", "label": "USB 1 Chat"}, {"key": "Usb2Main", "label": "USB 2 Main"}, {"key": "Bluetooth", "label": "Bluetooth"}]
+                                                : [{"key": "Mic2", "label": "Mic 2"}, {"key": "Mic3", "label": "Mic 3"}, {"key": "Mic4", "label": "Mic 4"}, {"key": "Usb1Comms", "label": "USB 1 Chat"}, {"key": "Usb2Main", "label": "USB 2 Main"}, {"key": "Bluetooth", "label": "Bluetooth"}]
+                                            Rectangle {
+                                                readonly property bool on: Boolean(root.selectedPad && root.selectedPad.back_channel && root.selectedPad.back_channel[modelData.key])
+                                                width: bcLabel.implicitWidth + 28
+                                                height: 30
+                                                radius: 6
+                                                color: on ? "#CBA158" : "#28282E"
+                                                Text {
+                                                    id: bcLabel
+                                                    anchors.centerIn: parent
+                                                    text: modelData.label
+                                                    font.pixelSize: 11
+                                                    font.bold: parent.on
+                                                    color: parent.on ? "#121214" : "#D0D0D0"
+                                                }
+                                                MouseArea {
+                                                    anchors.fill: parent
+                                                    cursorShape: Qt.PointingHandCursor
+                                                    onClicked: if (stateManager) stateManager.setPadBackChannel(modelData.key, !parent.on)
                                                 }
                                             }
                                         }
                                     }
                                 }
                             }
-                        }
-                    }
 
-                    Text {
-                        Layout.fillWidth: true
-                        wrapMode: Text.WordWrap
-                        font.pixelSize: 11
-                        color: "#8E8E93"
-                        text: stateManager && stateManager.language === "en"
-                              ? "Turn on one or several effects: they all apply together while the pad is active."
-                              : "Activa uno o varios efectos: se aplican todos juntos mientras el pad está activo."
-                    }
-
-                    // Stackable voice effects (PADEFFECTS / EFFECTS_PARAMETERS of this pad)
-                    GridLayout {
-                        Layout.fillWidth: true
-                        columns: 2
-                        rowSpacing: 10
-                        columnSpacing: 10
-
-                        Repeater {
-                            model: [
-                                {"on": "reverbOn", "name": "Reverb", "icon": "🏛️", "params": [
-                                    {"p": "reverbMix", "l": "Level", "lEs": "Nivel", "d": 0.5, "f": 0, "t": 1, "k": "pct"},
-                                    {"p": "reverbModel", "l": "Size", "lEs": "Tamaño", "d": 0.6, "f": 0, "t": 1, "k": "size"}]},
-                                {"on": "echoOn", "name": "Echo", "icon": "🔊", "params": [
-                                    {"p": "echoMix", "l": "Level", "lEs": "Nivel", "d": 0.5, "f": 0, "t": 1, "k": "pct"},
-                                    {"p": "echoDelay", "l": "Delay", "lEs": "Retardo", "d": 0.165, "f": 0, "t": 1, "k": "pct"},
-                                    {"p": "echoDecay", "l": "Decay", "lEs": "Caída", "d": 0.5, "f": 0, "t": 1, "k": "pct"}]},
-                                {"on": "distortionOn", "name": "Megaphone", "icon": "📢", "params": [
-                                    {"p": "distortionIntensity", "l": "Intensity", "lEs": "Intensidad", "d": 0.7, "f": 0, "t": 1, "k": "pct"}]},
-                                {"on": "robotOn", "name": "Robot", "icon": "🤖", "params": []},
-                                {"on": "voiceDisguiseOn", "name": "Voice Disguise", "icon": "🎭", "params": []},
-                                {"on": "pitchShiftOn", "name": "Pitch Shift", "icon": "🎼", "params": [
-                                    {"p": "pitchShiftSemitones", "l": "Semitones", "lEs": "Semitonos", "d": 7, "f": -12, "t": 12, "k": "st"}]}
-                            ]
-
+                            // Fade In/Out pad option: exclude the host microphone from the fade
                             Rectangle {
-                                id: fxCard
-                                readonly property var fx: (root.selectedPad && root.selectedPad.type === "fx" && root.selectedPad.fx) ? root.selectedPad.fx : ({})
-                                readonly property bool active: Boolean(fx[modelData.on])
-                                readonly property var cardData: modelData
+                                visible: Boolean(root.selectedPad && root.selectedPad.type === "mixer" && root.selectedPad.mixer_mode === 2)
                                 Layout.fillWidth: true
-                                Layout.alignment: Qt.AlignTop
-                                implicitHeight: fxCardCol.implicitHeight + 24
-                                radius: 8
-                                color: active ? "#2D2820" : "#202024"
-                                border.color: active ? "#CBA158" : "#2E2E36"
-                                border.width: active ? 2 : 1
+                                height: 60
+                                radius: 10
+                                color: "#1C1C20"
+                                border.color: "#2C2C34"
+                                border.width: 1
+                                RowLayout {
+                                    anchors.fill: parent
+                                    anchors.margins: 14
+                                    spacing: 12
+                                    Text { text: "🎙️"; font.pixelSize: 20 }
+                                    ColumnLayout {
+                                        Layout.fillWidth: true
+                                        spacing: 2
+                                        Text {
+                                            text: stateManager && stateManager.language === "en" ? "Exclude microphone from the fade" : "Excluir el micrófono del fundido"
+                                            font.pixelSize: 13; font.bold: true; color: "#FFFFFF"
+                                        }
+                                        Text {
+                                            text: stateManager && stateManager.language === "en" ? "Your voice stays live while everything else fades out" : "Tu voz sigue sonando mientras todo lo demás se funde a silencio"
+                                            font.pixelSize: 11; color: "#9A9A9E"
+                                        }
+                                    }
+                                    Switch {
+                                        checked: Boolean(root.selectedPad && root.selectedPad.fade_exclude_host)
+                                        onToggled: if (stateManager) stateManager.setPadFadeExcludeHost(checked)
+                                    }
+                                }
+                            }
+
+                            // Ducking depth (DUCKER.duckerDepth): global setting, only relevant to Ducking pads
+                            Rectangle {
+                                visible: Boolean(root.selectedPad && root.selectedPad.type === "mixer" && root.selectedPad.mixer_mode === 4)
+                                Layout.fillWidth: true
+                                height: duckCol.height + 28
+                                radius: 10
+                                color: "#1C1C20"
+                                border.color: "#2C2C34"
+                                border.width: 1
 
                                 ColumnLayout {
-                                    id: fxCardCol
+                                    id: duckCol
+                                    anchors.top: parent.top
                                     anchors.left: parent.left
                                     anchors.right: parent.right
-                                    anchors.top: parent.top
-                                    anchors.margins: 12
-                                    spacing: 6
+                                    anchors.margins: 14
+                                    spacing: 10
 
                                     RowLayout {
                                         Layout.fillWidth: true
-                                        spacing: 10
-                                        Text { text: fxCard.cardData.icon; font.pixelSize: 20 }
-                                        Text { text: fxCard.cardData.name; font.pixelSize: 13; font.bold: true; color: "#FFFFFF"; Layout.fillWidth: true }
-                                        Switch {
-                                            checked: fxCard.active
-                                            onToggled: if (stateManager) stateManager.setPadFxParam(fxCard.cardData.on, checked)
-                                        }
-                                    }
-
-                                    Repeater {
-                                        model: fxCard.cardData.params
-                                        RowLayout {
+                                        spacing: 12
+                                        Text { text: "🎚️"; font.pixelSize: 22 }
+                                        ColumnLayout {
                                             Layout.fillWidth: true
-                                            spacing: 8
-                                            enabled: fxCard.active
-                                            opacity: enabled ? 1.0 : 0.4
+                                            spacing: 2
                                             Text {
-                                                text: stateManager && stateManager.language === "en" ? modelData.l : modelData.lEs
-                                                font.pixelSize: 11; color: "#9A9A9E"
-                                                Layout.preferredWidth: 70
-                                            }
-                                            Slider {
-                                                id: fxSlider
-                                                Layout.fillWidth: true
-                                                from: modelData.f
-                                                to: modelData.t
-                                                stepSize: modelData.k === "st" ? 0.5 : (modelData.k === "size" ? 0.25 : 0.01)
-                                                snapMode: Slider.SnapAlways
-                                                value: fxCard.fx[modelData.p] !== undefined ? fxCard.fx[modelData.p] : modelData.d
-                                                onMoved: if (stateManager) stateManager.setPadFxParam(modelData.p, value)
+                                                text: stateManager && stateManager.language === "en" ? "Ducking depth" : "Profundidad del Ducking"
+                                                font.pixelSize: 14; font.bold: true; color: "#FFFFFF"
                                             }
                                             Text {
-                                                font.pixelSize: 11; font.bold: true; color: "#CBA158"
-                                                Layout.preferredWidth: 46
-                                                text: modelData.k === "st" ? ((fxSlider.value > 0 ? "+" : "") + fxSlider.value.toFixed(1))
-                                                      : modelData.k === "size" ? ["S", "M", "L", "XL", "XXL"][Math.round(fxSlider.value * 4)]
-                                                      : Math.round(fxSlider.value * 100) + "%"
+                                                text: stateManager && stateManager.language === "en"
+                                                      ? "How much the other channels drop when a Ducking pad is active and the microphone picks up sound. Off = no attenuation."
+                                                      : "Cuánto bajan los demás canales cuando un pad de Ducking está activo y el micrófono capta sonido. Desactivado = sin atenuación."
+                                                font.pixelSize: 11; color: "#9A9A9E"; wrapMode: Text.WordWrap; Layout.fillWidth: true
                                             }
                                         }
+                                        Switch {
+                                            checked: stateManager ? stateManager.duckingEnabled : false
+                                            onToggled: if (stateManager) stateManager.setDuckingEnabled(checked)
+                                        }
                                     }
-                                }
-                            }
-                        }
-                    }
-                }
 
-                // TAB 2: MIXER
-                ColumnLayout {
-                    width: root.width - 320 - 48
-                    anchors.horizontalCenter: parent ? parent.horizontalCenter : undefined
-                    spacing: 16
-                    visible: root.activeCategory === 2
-
-                    // Mixer pad trigger: Latching / Momentary (padMixerTriggerMode)
-                    Row {
-                        visible: Boolean(root.selectedPad && root.selectedPad.type === "mixer")
-                        spacing: 4
-                        Text {
-                            text: stateManager && stateManager.language === "en" ? "Mode:  " : "Modo:  "
-                            font.pixelSize: 12; font.bold: true; color: "#FFFFFF"
-                            anchors.verticalCenter: parent.verticalCenter
-                        }
-                        Repeater {
-                            model: [{"v": 1, "t": stateManager && stateManager.language === "en" ? "Latching" : "Enclavado"},
-                                    {"v": 0, "t": stateManager && stateManager.language === "en" ? "Momentary" : "Momentáneo"}]
-                            Rectangle {
-                                readonly property bool sel: Boolean(root.selectedPad) && (root.selectedPad.mixer_trigger === undefined ? 0 : root.selectedPad.mixer_trigger) === modelData.v
-                                width: mtText.implicitWidth + 24
-                                height: 30
-                                radius: 6
-                                color: sel ? "#CBA158" : "#26262C"
-                                Text {
-                                    id: mtText
-                                    anchors.centerIn: parent
-                                    text: modelData.t
-                                    font.pixelSize: 11
-                                    font.bold: parent.sel
-                                    color: parent.sel ? "#121214" : "#D0D0D0"
-                                }
-                                MouseArea {
-                                    anchors.fill: parent
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: if (stateManager) stateManager.setPadMixerTrigger(modelData.v)
-                                }
-                            }
-                        }
-                    }
-
-                    Repeater {
-                        // mode = PAD.padMixerMode. Back Channel (3) is not offered: on the Streamer X it
-                        // fired the Censor tone and reset the unit, and it is untested on Duo / Pro II.
-                        // Streamer X (RØDE Unify): Censor, Fade In/Out and Ducking only
-                        model: [
-                            {"mode": 0, "name": "Censor", "desc": (stateManager && stateManager.language === "en" ? "While pressed, a sound plays and all channels are muted" : "Mientras lo pulsas suena un pitido y se silencian todos los canales"), "icon": "🔇"},
-                            {"mode": 1, "name": "Trash Talk", "desc": (stateManager && stateManager.language === "en" ? "Mutes the audio sent to remote guests, so they can't hear you" : "Silencia el audio que se envía a los invitados remotos para que no te escuchen"), "icon": "🗣️"},
-                            {"mode": 2, "name": "Fade In/Out", "desc": (stateManager && stateManager.language === "en" ? "Fades all channels out; pressing again fades them back in" : "Funde todos los canales a silencio; al pulsarlo otra vez vuelven a entrar"), "icon": "🌗"},
-                            {"mode": 4, "name": "Ducking", "desc": (stateManager && stateManager.language === "en" ? "While active, other channels drop whenever the microphone picks up sound" : "Mientras está activo, baja los demás canales cada vez que el micrófono capta sonido"), "icon": "📉"}
-                        ].filter(function(m) { return !(stateManager && stateManager.isStreamerX && m.mode === 1); })
-
-                        Rectangle {
-                            readonly property bool isCurrent: Boolean(root.selectedPad && root.selectedPad.type === "mixer"
-                                                                      && root.selectedPad.mixer_mode === modelData.mode)
-                            Layout.fillWidth: true
-                            height: 76
-                            radius: 10
-                            color: isCurrent ? "#2E281C" : (mixCardArea.containsMouse ? "#2A2A30" : "#202024")
-                            border.color: isCurrent ? "#CBA158" : (mixCardArea.containsMouse ? "#5A5040" : "#2E2E36")
-                            border.width: isCurrent ? 2 : 1
-
-                            RowLayout {
-                                anchors.fill: parent
-                                anchors.margins: 14
-                                spacing: 14
-
-                                Text { text: modelData.icon; font.pixelSize: 26 }
-                                ColumnLayout {
-                                    Layout.fillWidth: true
-                                    spacing: 4
-                                    Text { text: modelData.name; font.pixelSize: 14; font.bold: true; color: parent.parent.parent.isCurrent ? "#CBA158" : "#FFFFFF" }
-                                    Text { text: modelData.desc; font.pixelSize: 11; color: "#9A9A9E"; wrapMode: Text.WordWrap; Layout.fillWidth: true }
-                                }
-                                Text {
-                                    visible: parent.parent.isCurrent
-                                    text: "✓"
-                                    font.pixelSize: 16; font.bold: true; color: "#CBA158"
-                                }
-                            }
-
-                            MouseArea {
-                                id: mixCardArea
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: {
-                                    if (stateManager) stateManager.assignPadMixer(modelData.mode);
-                                }
-                            }
-                        }
-                    }
-                    // Back Channel pad (Duo / Pro II): which channels join the private mix with Mic 1
-                    Rectangle {
-                        visible: Boolean(root.selectedPad && root.selectedPad.type === "mixer" && root.selectedPad.mixer_mode === 3
-                                         && stateManager && !stateManager.isStreamerX)
-                        Layout.fillWidth: true
-                        height: bcCol.height + 28
-                        radius: 10
-                        color: "#202024"
-                        border.color: "#2E2E36"
-                        border.width: 1
-                        ColumnLayout {
-                            id: bcCol
-                            anchors.top: parent.top
-                            anchors.left: parent.left
-                            anchors.right: parent.right
-                            anchors.margins: 14
-                            spacing: 8
-                            Text {
-                                text: stateManager && stateManager.language === "en" ? "Back Channel participants (Microphone 1 is always included)" : "Participantes del Back Channel (el Micrófono 1 siempre está incluido)"
-                                font.pixelSize: 13; font.bold: true; color: "#FFFFFF"
-                                wrapMode: Text.WordWrap; Layout.fillWidth: true
-                            }
-                            Flow {
-                                Layout.fillWidth: true
-                                spacing: 8
-                                Repeater {
-                                    model: (stateManager && stateManager.isDuo)
-                                        ? [{"key": "Mic2", "label": "Mic 2"}, {"key": "Usb1Comms", "label": "USB 1 Chat"}, {"key": "Usb2Main", "label": "USB 2 Main"}, {"key": "Bluetooth", "label": "Bluetooth"}]
-                                        : [{"key": "Mic2", "label": "Mic 2"}, {"key": "Mic3", "label": "Mic 3"}, {"key": "Mic4", "label": "Mic 4"}, {"key": "Usb1Comms", "label": "USB 1 Chat"}, {"key": "Usb2Main", "label": "USB 2 Main"}, {"key": "Bluetooth", "label": "Bluetooth"}]
-                                    Rectangle {
-                                        readonly property bool on: Boolean(root.selectedPad && root.selectedPad.back_channel && root.selectedPad.back_channel[modelData.key])
-                                        width: bcLabel.implicitWidth + 28
-                                        height: 30
-                                        radius: 6
-                                        color: on ? "#CBA158" : "#28282E"
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        spacing: 12
+                                        enabled: Boolean(stateManager && stateManager.duckingEnabled)
+                                        opacity: enabled ? 1.0 : 0.4
+                                        Slider {
+                                            id: duckSlider
+                                            Layout.fillWidth: true
+                                            from: -40; to: -1; stepSize: 1
+                                            value: stateManager ? stateManager.duckingDepth : -9
+                                            onMoved: if (stateManager) stateManager.setDuckingDepth(value)
+                                        }
                                         Text {
-                                            id: bcLabel
-                                            anchors.centerIn: parent
-                                            text: modelData.label
-                                            font.pixelSize: 11
-                                            font.bold: parent.on
-                                            color: parent.on ? "#121214" : "#D0D0D0"
-                                        }
-                                        MouseArea {
-                                            anchors.fill: parent
-                                            cursorShape: Qt.PointingHandCursor
-                                            onClicked: if (stateManager) stateManager.setPadBackChannel(modelData.key, !parent.on)
+                                            text: Math.round(duckSlider.value) + " dB"
+                                            font.pixelSize: 12; font.bold: true; color: "#CBA158"
+                                            Layout.preferredWidth: 50
                                         }
                                     }
                                 }
                             }
                         }
-                    }
 
-                    // Fade In/Out pad option: exclude the host microphone from the fade
-                    Rectangle {
-                        visible: Boolean(root.selectedPad && root.selectedPad.type === "mixer" && root.selectedPad.mixer_mode === 2)
-                        Layout.fillWidth: true
-                        height: 60
-                        radius: 10
-                        color: "#202024"
-                        border.color: "#2E2E36"
-                        border.width: 1
-                        RowLayout {
-                            anchors.fill: parent
-                            anchors.margins: 14
-                            spacing: 12
-                            Text { text: "🎙️"; font.pixelSize: 20 }
-                            ColumnLayout {
-                                Layout.fillWidth: true
-                                spacing: 2
-                                Text {
-                                    text: stateManager && stateManager.language === "en" ? "Exclude microphone from the fade" : "Excluir el micrófono del fundido"
-                                    font.pixelSize: 13; font.bold: true; color: "#FFFFFF"
-                                }
-                                Text {
-                                    text: stateManager && stateManager.language === "en" ? "Your voice stays live while everything else fades out" : "Tu voz sigue sonando mientras todo lo demás se funde a silencio"
-                                    font.pixelSize: 11; color: "#9A9A9E"
-                                }
-                            }
-                            Switch {
-                                checked: Boolean(root.selectedPad && root.selectedPad.fade_exclude_host)
-                                onToggled: if (stateManager) stateManager.setPadFadeExcludeHost(checked)
-                            }
-                        }
-                    }
-
-                    // Ducking depth (DUCKER.duckerDepth): global setting, only relevant to Ducking pads
-                    Rectangle {
-                        visible: Boolean(root.selectedPad && root.selectedPad.type === "mixer" && root.selectedPad.mixer_mode === 4)
-                        Layout.fillWidth: true
-                        height: duckCol.height + 28
-                        radius: 10
-                        color: "#202024"
-                        border.color: "#2E2E36"
-                        border.width: 1
-
+                        // TAB 3: MIDI
                         ColumnLayout {
-                            id: duckCol
-                            anchors.top: parent.top
-                            anchors.left: parent.left
-                            anchors.right: parent.right
-                            anchors.margins: 14
-                            spacing: 10
+                            Layout.fillWidth: true
+                            spacing: 16
+                            visible: root.activeCategory === 3
 
-                            RowLayout {
+                            Rectangle {
                                 Layout.fillWidth: true
-                                spacing: 12
-                                Text { text: "🎚️"; font.pixelSize: 22 }
+                                height: midiCol.height + 28
+                                radius: 10
+                                color: "#1C1C20"
+                                border.color: "#2C2C34"
+                                border.width: 1
+
                                 ColumnLayout {
-                                    Layout.fillWidth: true
-                                    spacing: 2
-                                    Text {
-                                        text: stateManager && stateManager.language === "en" ? "Ducking depth" : "Profundidad del Ducking"
-                                        font.pixelSize: 14; font.bold: true; color: "#FFFFFF"
+                                    id: midiCol
+                                    anchors.top: parent.top
+                                    anchors.left: parent.left
+                                    anchors.right: parent.right
+                                    anchors.margins: 14
+                                    spacing: 14
+
+                                    Text { text: (stateManager && stateManager.language === "en" ? "USB MIDI Command" : "Comando MIDI USB"); font.pixelSize: 14; font.bold: true; color: "#FFFFFF" }
+
+                                    RowLayout {
+                                        Text { text: (stateManager && stateManager.language === "en" ? "Message Type:" : "Tipo de Mensaje:"); font.pixelSize: 12; color: "#8E8E93"; Layout.preferredWidth: 140 }
+                                        Row {
+                                            spacing: 8
+                                            Rectangle { width: 90; height: 30; radius: 6; color: "#CBA158"; Text { anchors.centerIn: parent; text: "Control (CC)"; font.pixelSize: 11; font.bold: true; color: "#121214" } }
+                                            Rectangle { width: 90; height: 30; radius: 6; color: "#28282E"; Text { anchors.centerIn: parent; text: (stateManager && stateManager.language === "en" ? "Note" : "Nota (Note)"); font.pixelSize: 11; color: "#D0D0D0" } }
+                                        }
                                     }
-                                    Text {
-                                        text: stateManager && stateManager.language === "en"
-                                              ? "How much the other channels drop when a Ducking pad is active and the microphone picks up sound. Off = no attenuation."
-                                              : "Cuánto bajan los demás canales cuando un pad de Ducking está activo y el micrófono capta sonido. Desactivado = sin atenuación."
-                                        font.pixelSize: 11; color: "#9A9A9E"; wrapMode: Text.WordWrap; Layout.fillWidth: true
+
+                                    RowLayout {
+                                        Text { text: (stateManager && stateManager.language === "en" ? "MIDI Channel (1-16):" : "Canal MIDI (1-16):"); font.pixelSize: 12; color: "#8E8E93"; Layout.preferredWidth: 140 }
+                                        Text { text: (stateManager && stateManager.language === "en" ? "Channel 1" : "Canal 1"); font.pixelSize: 12; font.bold: true; color: "#FFFFFF" }
+                                    }
+
+                                    RowLayout {
+                                        Text { text: (stateManager && stateManager.language === "en" ? "Control / Note:" : "Control / Nota:"); font.pixelSize: 12; color: "#8E8E93"; Layout.preferredWidth: 140 }
+                                        Text { text: "#" + (stateManager ? (stateManager.selectedPadIndex + 1) : 1); font.pixelSize: 12; font.bold: true; color: "#CBA158" }
                                     }
                                 }
-                                Switch {
-                                    checked: stateManager ? stateManager.duckingEnabled : false
-                                    onToggled: if (stateManager) stateManager.setDuckingEnabled(checked)
-                                }
-                            }
-
-                            RowLayout {
-                                Layout.fillWidth: true
-                                spacing: 12
-                                enabled: Boolean(stateManager && stateManager.duckingEnabled)
-                                opacity: enabled ? 1.0 : 0.4
-                                Slider {
-                                    id: duckSlider
-                                    Layout.fillWidth: true
-                                    from: -40; to: -1; stepSize: 1
-                                    value: stateManager ? stateManager.duckingDepth : -9
-                                    onMoved: if (stateManager) stateManager.setDuckingDepth(value)
-                                }
-                                Text {
-                                    text: Math.round(duckSlider.value) + " dB"
-                                    font.pixelSize: 12; font.bold: true; color: "#CBA158"
-                                    Layout.preferredWidth: 50
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // TAB 3: MIDI
-                ColumnLayout {
-                    width: root.width - 320 - 48
-                    anchors.horizontalCenter: parent ? parent.horizontalCenter : undefined
-                    spacing: 16
-                    visible: root.activeCategory === 3
-
-                    Rectangle {
-                        Layout.fillWidth: true
-                        height: midiCol.height + 28
-                        radius: 10
-                        color: "#202024"
-                        border.color: "#2E2E36"
-                        border.width: 1
-
-                        ColumnLayout {
-                            id: midiCol
-                            anchors.top: parent.top
-                            anchors.left: parent.left
-                            anchors.right: parent.right
-                            anchors.margins: 14
-                            spacing: 14
-
-                            Text { text: (stateManager && stateManager.language === "en" ? "USB MIDI Command" : "Comando MIDI USB"); font.pixelSize: 14; font.bold: true; color: "#FFFFFF" }
-
-                            RowLayout {
-                                Text { text: (stateManager && stateManager.language === "en" ? "Message Type:" : "Tipo de Mensaje:"); font.pixelSize: 12; color: "#8E8E93"; Layout.preferredWidth: 140 }
-                                Row {
-                                    spacing: 8
-                                    Rectangle { width: 90; height: 30; radius: 6; color: "#CBA158"; Text { anchors.centerIn: parent; text: "Control (CC)"; font.pixelSize: 11; font.bold: true; color: "#121214" } }
-                                    Rectangle { width: 90; height: 30; radius: 6; color: "#28282E"; Text { anchors.centerIn: parent; text: (stateManager && stateManager.language === "en" ? "Note" : "Nota (Note)"); font.pixelSize: 11; color: "#D0D0D0" } }
-                                }
-                            }
-
-                            RowLayout {
-                                Text { text: (stateManager && stateManager.language === "en" ? "MIDI Channel (1-16):" : "Canal MIDI (1-16):"); font.pixelSize: 12; color: "#8E8E93"; Layout.preferredWidth: 140 }
-                                Text { text: (stateManager && stateManager.language === "en" ? "Channel 1" : "Canal 1"); font.pixelSize: 12; font.bold: true; color: "#FFFFFF" }
-                            }
-
-                            RowLayout {
-                                Text { text: (stateManager && stateManager.language === "en" ? "Control / Note:" : "Control / Nota:"); font.pixelSize: 12; color: "#8E8E93"; Layout.preferredWidth: 140 }
-                                Text { text: "#" + (stateManager ? (stateManager.selectedPadIndex + 1) : 1); font.pixelSize: 12; font.bold: true; color: "#CBA158" }
                             }
                         }
                     }
