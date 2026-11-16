@@ -173,6 +173,22 @@ Rectangle {
                             height: 38
                             z: 20
 
+                            // Direct click on storage meter row navigates to recordings (kept behind ejectArea)
+                            MouseArea {
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: (stateManager && stateManager.hasMicroSD) ? Qt.PointingHandCursor : Qt.ArrowCursor
+                                onClicked: {
+                                    if (stateManager) {
+                                        if (stateManager.hasMicroSD) {
+                                            stateManager.navigateTo("recordings");
+                                        } else {
+                                            stateManager.toastMessage(stateManager.strings.no_microsd_title || "No hay tarjeta MicroSD instalada");
+                                        }
+                                    }
+                                }
+                            }
+
                             ColumnLayout {
                                 anchors.fill: parent
                                 spacing: 6
@@ -186,6 +202,7 @@ Rectangle {
 
                                     // Eject / Unmount Button when Transfer Mode is active
                                     Rectangle {
+                                        z: 10
                                         visible: Boolean(stateManager && stateManager.transferModeActive && devCard.isSelectedDevice)
                                         width: 20
                                         height: 20
@@ -206,6 +223,7 @@ Rectangle {
                                             id: ejectArea
                                             anchors.fill: parent
                                             hoverEnabled: true
+                                            enabled: !(stateManager && stateManager.transferExiting)
                                             cursorShape: Qt.PointingHandCursor
                                             onClicked: {
                                                 if (stateManager) stateManager.exitTransferMode();
@@ -233,22 +251,6 @@ Rectangle {
                                         height: parent.height
                                         radius: 2
                                         color: "#CBA158"
-                                    }
-                                }
-                            }
-
-                            // Direct click on storage meter row navigates to recordings
-                            MouseArea {
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                cursorShape: (stateManager && stateManager.hasMicroSD) ? Qt.PointingHandCursor : Qt.ArrowCursor
-                                onClicked: {
-                                    if (stateManager) {
-                                        if (stateManager.hasMicroSD) {
-                                            stateManager.navigateTo("recordings");
-                                        } else {
-                                            stateManager.toastMessage(stateManager.strings.no_microsd_title || "No hay tarjeta MicroSD instalada");
-                                        }
                                     }
                                 }
                             }
@@ -283,6 +285,22 @@ Rectangle {
                 color: (hasCard && isSelectedView) ? "#24242A" : (sdHover.containsMouse && hasCard ? "#202024" : "#19191C")
                 border.color: (hasCard && isSelectedView) ? "#CBA158" : (sdHover.containsMouse && hasCard ? "#3A3A42" : "#28282E")
                 border.width: (hasCard && isSelectedView) ? 1.5 : 1
+
+                MouseArea {
+                    id: sdHover
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: sdCardEntry.hasCard ? Qt.PointingHandCursor : Qt.ArrowCursor
+                    onClicked: {
+                        if (stateManager) {
+                            if (sdCardEntry.hasCard) {
+                                stateManager.navigateTo("recordings");
+                            } else {
+                                stateManager.toastMessage(stateManager.strings.no_microsd_title || "No hay tarjeta MicroSD instalada");
+                            }
+                        }
+                    }
+                }
 
                 RowLayout {
                     anchors.fill: parent
@@ -338,45 +356,33 @@ Rectangle {
                         }
                     }
 
-                    // Eject / Mount indicator
+                    // Eject / Mount indicator (sits above sdHover so clicks always eject)
                     Rectangle {
-                        visible: Boolean(stateManager && stateManager.isMicroSDMounted)
-                        width: 18
-                        height: 18
-                        radius: 3
-                        color: "#282830"
+                        z: 10
+                        visible: Boolean(stateManager && (stateManager.transferModeActive || stateManager.isMicroSDMounted))
+                        width: 24
+                        height: 24
+                        radius: 5
+                        color: sdEjectArea.containsMouse ? "#442A2A" : "#282830"
                         border.color: "#CBA158"
                         border.width: 1
 
                         Text {
                             anchors.centerIn: parent
                             text: "⏏"
-                            font.pixelSize: 10
+                            font.pixelSize: 11
                             font.bold: true
                             color: "#CBA158"
                         }
 
                         MouseArea {
+                            id: sdEjectArea
                             anchors.fill: parent
+                            hoverEnabled: true
+                            enabled: !(stateManager && stateManager.transferExiting)
                             cursorShape: Qt.PointingHandCursor
                             onClicked: {
                                 if (stateManager) stateManager.exitTransferMode();
-                            }
-                        }
-                    }
-                }
-
-                MouseArea {
-                    id: sdHover
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: sdCardEntry.hasCard ? Qt.PointingHandCursor : Qt.ArrowCursor
-                    onClicked: {
-                        if (stateManager) {
-                            if (sdCardEntry.hasCard) {
-                                stateManager.navigateTo("recordings");
-                            } else {
-                                stateManager.toastMessage(stateManager.strings.no_microsd_title || "No hay tarjeta MicroSD instalada");
                             }
                         }
                     }

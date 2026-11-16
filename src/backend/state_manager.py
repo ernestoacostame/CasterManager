@@ -672,6 +672,9 @@ class StateManager(QObject):
         # Live Recording State
         self._is_recording = False
         self._record_time_ms = 0
+        self._record_transition_until = 0.0
+        self._record_target_state = None
+        self._record_started_monotonic = None
 
         # Device Configuration State (Display, Outputs, System)
         self._screen_brightness = 250
@@ -2736,7 +2739,11 @@ class StateManager(QObject):
             mount_path = ""
             deadline = time.time() + 30
             while time.time() < deadline and not mount_path:
+                if not self._transfer_mode or getattr(self, "_transfer_exiting", False):
+                    return
                 time.sleep(1.0)
+                if not self._transfer_mode or getattr(self, "_transfer_exiting", False):
+                    return
                 for dev in self._find_rode_partitions():
                     if not os.path.exists(dev):
                         continue
@@ -2756,6 +2763,9 @@ class StateManager(QObject):
                     if mount_path:
                         break
                     logger.debug(f"udisksctl mount {dev}: {(out.stderr or out.stdout).strip()}")
+
+            if not self._transfer_mode or getattr(self, "_transfer_exiting", False):
+                return
 
             logger.info(f"Transfer mode: SD card mount point = {mount_path or '(none)'}")
             self._mount_point = mount_path
@@ -2792,61 +2802,59 @@ class StateManager(QObject):
         def _do_exit():
             import subprocess
             sys_node = self._system_node()
-            time.sleep(0.6)  # let the audio player close the WAV it has open on the card
-            # The unit only leaves transfer mode once the host has released the volume:
-            # if it is still mounted (e.g. a file manager has it open) it ignores the request.
+            time.sleep(0.5)  # let the audio player close the WAV it has open on the card
+            try:
+                subprocess.run(["sync"], timeout=5)
+            except Exception as e:
+                logger.debug(f"sync failed: {e}")
+
+            # Unmount every mounted RØDE partition using the proven sequence
             for dev in self._find_rode_partitions():
-                if not os.path.exists(dev) or not self._mount_point_of(dev):
+                mp = self._mount_point_of(dev)
+                if not mp:
                     continue
                 for args in (["udisksctl", "unmount", "--no-user-interaction", "-b", dev],
+                             ["umount", mp],
                              ["udisksctl", "unmount", "--no-user-interaction", "--force", "-b", dev]):
                     try:
                         out = subprocess.run(args, capture_output=True, text=True, timeout=15)
-                        logger.info(f"Transfer mode: {' '.join(args[1:])}: {(out.stdout or out.stderr).strip()}")
+                        logger.info(f"Transfer mode: {' '.join(args[:2])}: {(out.stdout or out.stderr).strip()}")
                     except Exception as e:
                         logger.warning(f"Transfer mode: unmount {dev} failed: {e}")
                     if not self._mount_point_of(dev):
                         break
 
-            # transferModeType may already read 0 (a previous exit attempt while the card
-            # was still mounted), and writing the same value is a no-op: toggle 1 -> 0.
-            left = False
-            for _attempt in range(3):
-                self.bridge.run_cmd(["set-property", sys_node, "transferModeType", "u32:0"])
-                for _ in range(8):
-                    time.sleep(0.5)
-                    if not self._rode_media_present():
-                        left = True
-                        break
-                if left:
-                    break
-                logger.info("Transfer mode: unit still exposes the card, toggling transferModeType 1 -> 0")
-                self.bridge.run_cmd(["set-property", sys_node, "transferModeType", "u32:1"])
-                time.sleep(1.5)
-                for dev in self._find_rode_partitions():
-                    if self._mount_point_of(dev):
-                        subprocess.run(["udisksctl", "unmount", "--no-user-interaction", "--force", "-b", dev],
-                                       capture_output=True, text=True, timeout=15)
+            # Fallback unmount on self._mount_point if still mounted
+            cur_mp = getattr(self, "_mount_point", "")
+            if cur_mp and os.path.ismount(cur_mp):
+                try:
+                    subprocess.run(["umount", cur_mp], capture_output=True, text=True, timeout=10)
+                except Exception as e:
+                    logger.warning(f"Transfer mode: fallback umount {cur_mp} failed: {e}")
 
-            logger.info(f"Transfer mode: exit {'confirmed' if left else 'NOT confirmed'}")
-            if left:
-                self.bridge.run_cmd(["set-property", sys_node, "remountPadStorage", "bool:true"])
-                self._transfer_mode = False
-                self._mount_point = ""
-                self._transfer_status = ""
-                self._recordings = []
-                self.recordingsChanged.emit()
-                self.transferStateChanged.emit()
-                self.toastMessage.emit("MicroSD desmontada de forma segura" if self._language == "es" else "MicroSD safely unmounted")
-            else:
-                # Something on the PC still has files open on the card (file manager, player...):
-                # stay in transfer mode so the user can retry once it is closed.
+            # Verify no RØDE partition remains mounted on the host (checking kernel sysfs size
+            # is unreliable because events_poll_msecs=-1 leaves cached non-zero size after eject).
+            still_mounted = any(self._mount_point_of(d) for d in self._find_rode_partitions())
+            if still_mounted:
                 self._mount_point = ""
                 self._transfer_status = ("Cierra las ventanas o programas que usan la MicroSD y pulsa ⏏ de nuevo"
                                          if self._language == "es" else
                                          "Close any window or app using the MicroSD and press ⏏ again")
                 self.transferStateChanged.emit()
                 self.toastMessage.emit(self._transfer_status)
+                return
+
+            time.sleep(0.5)
+            self.bridge.run_cmd(["set-property", sys_node, "transferModeType", "u32:0"])
+            time.sleep(0.6)
+            self.bridge.run_cmd(["set-property", sys_node, "remountPadStorage", "bool:true"])
+            self._transfer_mode = False
+            self._mount_point = ""
+            self._transfer_status = ""
+            self._recordings = []
+            self.recordingsChanged.emit()
+            self.transferStateChanged.emit()
+            self.toastMessage.emit("MicroSD desmontada de forma segura" if self._language == "es" else "MicroSD safely unmounted")
 
         self.executor.submit(do_exit)
 
@@ -2871,14 +2879,20 @@ class StateManager(QObject):
     @pyqtSlot(str)
     def navigateTo(self, view):
         if self._current_view != view:
+            leaving_recordings = (self._current_view == "recordings" and view != "recordings")
             self._current_view = view
             self.viewChanged.emit()
+            if leaving_recordings and self._transfer_mode:
+                self.exitTransferMode()
 
     @pyqtSlot()
     def navigateHome(self):
         if self._current_view != "home":
+            leaving_recordings = (self._current_view == "recordings")
             self._current_view = "home"
             self.viewChanged.emit()
+            if leaving_recordings and self._transfer_mode:
+                self.exitTransferMode()
 
     # Factory Sounds
     @pyqtProperty(QVariant, notify=stateChanged)
@@ -3234,12 +3248,21 @@ class StateManager(QObject):
     def toggleRecord(self):
         new_state = not self._is_recording
         self._is_recording = new_state
+        self._record_target_state = new_state
+        self._record_transition_until = time.time() + 4.5
+        if new_state:
+            self._record_time_ms = 0
+            self._record_started_monotonic = time.monotonic()
+        else:
+            self._record_started_monotonic = None
+            self._record_time_ms = 0
         self.recordingChanged.emit()
         target_val = "u32:2" if new_state else "u32:0"
         if self._connected and not self._permission_error:
+            rec_node = str(getattr(self, "_root_child_index", {}).get("RECORDER", 3))
             self.executor.submit(
                 self.bridge.run_cmd,
-                ["set-property", "3", "requestRecordState", target_val]
+                ["set-property", rec_node, "requestRecordState", target_val]
             )
         is_en = (self._language == "en")
         if new_state:
@@ -3630,14 +3653,32 @@ class StateManager(QObject):
                 except Exception:
                     pass
 
+            if self._is_recording and self._record_started_monotonic is not None:
+                self._record_time_ms = int((time.monotonic() - self._record_started_monotonic) * 1000)
+                self.recordingChanged.emit()
+
             rout, _ = self.bridge.run_cmd(["record", "status", "--json"], timeout=2)
             if rout:
                 try:
                     rec_now = json.loads(rout).get("state") == "recording"
                 except Exception:
                     rec_now = rout.strip().upper().startswith("REC")
+                if self._record_target_state is not None:
+                    if rec_now == self._record_target_state:
+                        self._record_target_state = None
+                        self._record_transition_until = 0.0
+                    elif time.time() < self._record_transition_until:
+                        return
+                    else:
+                        self._record_target_state = None
+                        self._record_transition_until = 0.0
                 if rec_now != self._is_recording:
                     self._is_recording = rec_now
+                    if rec_now:
+                        self._record_started_monotonic = time.monotonic()
+                    else:
+                        self._record_started_monotonic = None
+                        self._record_time_ms = 0
                     self.recordingChanged.emit()
 
         self._submit_poll(do_poll)

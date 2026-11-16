@@ -17,12 +17,22 @@ Item {
     property real currentSeconds: 4.0
     property real totalSeconds: (activeRecording && activeRecording.duration_seconds) ? activeRecording.duration_seconds : 24.0
 
-    // Zoom level for waveform
+    // Zoom level for waveform (1.0x to 4.0x)
     property real zoomFactor: 1.0
+    readonly property real viewSpan: 1.0 / Math.max(1.0, root.zoomFactor)
+    readonly property real viewStart: Math.max(0.0, Math.min(1.0 - viewSpan, root.playbackPos - viewSpan * 0.5))
+    readonly property real viewEnd: Math.min(1.0, viewStart + viewSpan)
 
-    // Waveform data
+    function formatDurationSec(sec) {
+        var s = Math.max(0, Math.floor(sec));
+        var mins = Math.floor(s / 60);
+        var rem = s % 60;
+        return (mins < 10 ? "0" : "") + mins + ":" + (rem < 10 ? "0" : "") + rem;
+    }
+
+    // Waveform data (higher sample count for zoomed detail)
     property var waveformPeaks: (stateManager && activeRecording) 
-        ? stateManager.getWaveformPeaks(activeRecording.stereo_wav || "", 90) 
+        ? stateManager.getWaveformPeaks(activeRecording.stereo_wav || "", 180) 
         : []
 
     // Media Player for real audio playback
@@ -43,6 +53,16 @@ Item {
         }
         onPlaybackStateChanged: {
             root.isPlaying = (player.playbackState === MediaPlayer.PlayingState);
+        }
+    }
+
+    Connections {
+        target: stateManager
+        function onTransferStateChanged() {
+            if (stateManager && stateManager.transferExiting) {
+                player.stop();
+                root.isPlaying = false;
+            }
         }
     }
 
@@ -137,25 +157,80 @@ Item {
 
                         // Zoom buttons
                         Row {
-                            spacing: 8
-                            Text {
-                                text: "🔍 -"
-                                font.pixelSize: 10
-                                color: "#8E8E93"
+                            spacing: 6
+                            Rectangle {
+                                width: 34
+                                height: 20
+                                radius: 4
+                                color: zMinusArea.containsMouse ? "#2A2A34" : "#1C1C22"
+                                border.color: "#32323C"
+                                border.width: 1
+                                opacity: root.zoomFactor > 1.0 ? 1.0 : 0.45
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: "🔍 -"
+                                    font.pixelSize: 10
+                                    color: zMinusArea.containsMouse ? "#FFFFFF" : "#C8C8D0"
+                                }
                                 MouseArea {
+                                    id: zMinusArea
                                     anchors.fill: parent
+                                    hoverEnabled: true
                                     cursorShape: Qt.PointingHandCursor
-                                    onClicked: root.zoomFactor = Math.max(0.6, root.zoomFactor - 0.2)
+                                    onClicked: {
+                                        root.zoomFactor = Math.max(1.0, Math.round((root.zoomFactor - 0.5) * 2) / 2);
+                                        waveCanvas.requestPaint();
+                                    }
                                 }
                             }
-                            Text {
-                                text: "🔍 +"
-                                font.pixelSize: 10
-                                color: "#8E8E93"
+                            Rectangle {
+                                width: 42
+                                height: 20
+                                radius: 4
+                                color: zResetArea.containsMouse ? "#2A2A34" : "#18181E"
+                                border.color: root.zoomFactor > 1.0 ? "#CBA158" : "#2C2C34"
+                                border.width: 1
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: Math.round(root.zoomFactor * 100) + "%"
+                                    font.pixelSize: 9
+                                    font.bold: root.zoomFactor > 1.0
+                                    color: root.zoomFactor > 1.0 ? "#CBA158" : "#8E8E93"
+                                }
                                 MouseArea {
+                                    id: zResetArea
                                     anchors.fill: parent
+                                    hoverEnabled: true
                                     cursorShape: Qt.PointingHandCursor
-                                    onClicked: root.zoomFactor = Math.min(2.0, root.zoomFactor + 0.2)
+                                    onClicked: {
+                                        root.zoomFactor = 1.0;
+                                        waveCanvas.requestPaint();
+                                    }
+                                }
+                            }
+                            Rectangle {
+                                width: 34
+                                height: 20
+                                radius: 4
+                                color: zPlusArea.containsMouse ? "#2A2A34" : "#1C1C22"
+                                border.color: "#32323C"
+                                border.width: 1
+                                opacity: root.zoomFactor < 4.0 ? 1.0 : 0.45
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: "🔍 +"
+                                    font.pixelSize: 10
+                                    color: zPlusArea.containsMouse ? "#FFFFFF" : "#C8C8D0"
+                                }
+                                MouseArea {
+                                    id: zPlusArea
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        root.zoomFactor = Math.min(4.0, Math.round((root.zoomFactor + 0.5) * 2) / 2);
+                                        waveCanvas.requestPaint();
+                                    }
                                 }
                             }
                         }
@@ -184,48 +259,52 @@ Item {
                             if (!peaks || peaks.length === 0) {
                                 // Default wave shape if peaks empty
                                 peaks = [];
-                                for (var k = 0; k < 90; k++) {
+                                for (var k = 0; k < 180; k++) {
                                     peaks.push(0.12 + 0.38 * Math.abs(Math.sin(k * 0.14)) + 0.35 * Math.abs(Math.cos(k * 0.28)));
                                 }
                             }
 
-                            var count = peaks.length;
-                            var barW = Math.max(2, (width / count) * 0.65);
-                            var gap = Math.max(1, (width / count) * 0.35);
+                            var numBars = 90;
+                            var barW = Math.max(2, (width / numBars) * 0.65);
+                            var gap = Math.max(1, (width / numBars) * 0.35);
                             var midY = height * 0.42;
 
-                            for (var i = 0; i < count; i++) {
+                            for (var i = 0; i < numBars; i++) {
+                                var pos = root.viewStart + ((i + 0.5) / numBars) * root.viewSpan;
+                                var peakIdx = Math.max(0, Math.min(peaks.length - 1, Math.floor(pos * peaks.length)));
                                 var x = i * (barW + gap) + gap / 2;
-                                var p = peaks[i];
+                                var p = peaks[peakIdx];
                                 var h = Math.max(4, p * (height * 0.65));
 
-                                // Draw waveform bar with smooth pill shape
-                                ctx.fillStyle = (x <= root.playbackPos * width) ? "#FFFFFF" : "#72727C";
+                                // Draw waveform bar
+                                ctx.fillStyle = (pos <= root.playbackPos) ? "#FFFFFF" : "#72727C";
                                 ctx.beginPath();
-                                var r = Math.min(barW / 2, 2.5);
                                 var topY = midY - h / 2;
                                 ctx.rect(x, topY, barW, h);
                                 ctx.fill();
                             }
 
-                            // Draw Playhead line
-                            var playheadX = root.playbackPos * width;
-                            ctx.fillStyle = "#3B82F6";
-                            ctx.fillRect(playheadX - 1, 2, 2, height - 16);
+                            // Draw Playhead line inside zoomed view
+                            var playheadX = ((root.playbackPos - root.viewStart) / root.viewSpan) * width;
+                            if (playheadX >= 0 && playheadX <= width) {
+                                ctx.fillStyle = "#3B82F6";
+                                ctx.fillRect(playheadX - 1, 2, 2, height - 16);
 
-                            // Playhead top marker
-                            ctx.beginPath();
-                            ctx.moveTo(playheadX - 5, 2);
-                            ctx.lineTo(playheadX + 5, 2);
-                            ctx.lineTo(playheadX, 9);
-                            ctx.closePath();
-                            ctx.fill();
+                                // Playhead top marker
+                                ctx.beginPath();
+                                ctx.moveTo(playheadX - 5, 2);
+                                ctx.lineTo(playheadX + 5, 2);
+                                ctx.lineTo(playheadX, 9);
+                                ctx.closePath();
+                                ctx.fill();
+                            }
                         }
 
                         Connections {
                             target: root
                             function onPlaybackPosChanged() { waveCanvas.requestPaint(); }
                             function onWaveformPeaksChanged() { waveCanvas.requestPaint(); }
+                            function onZoomFactorChanged() { waveCanvas.requestPaint(); }
                         }
                     }
 
@@ -234,7 +313,8 @@ Item {
                         anchors.fill: parent
                         cursorShape: Qt.PointingHandCursor
                         onClicked: (mouse) => {
-                            var frac = Math.max(0.0, Math.min(1.0, mouse.x / width));
+                            var localFrac = Math.max(0.0, Math.min(1.0, mouse.x / width));
+                            var frac = Math.max(0.0, Math.min(1.0, root.viewStart + localFrac * root.viewSpan));
                             root.playbackPos = frac;
                             root.currentSeconds = frac * root.totalSeconds;
                             if (player.duration > 0) {
@@ -251,13 +331,13 @@ Item {
                         anchors.right: parent.right
                         anchors.leftMargin: 10
                         anchors.rightMargin: 10
-                        height: 28
+                        height: 22
 
                         Repeater {
                             model: 9
                             Item {
                                 width: (waveArea.width - 20) / 9
-                                height: 28
+                                height: 22
 
                                 Column {
                                     anchors.left: parent.left
@@ -266,14 +346,9 @@ Item {
                                     Rectangle { width: 1; height: 5; color: "#44444C" }
 
                                     Text {
-                                        text: "00:0" + index
+                                        text: root.formatDurationSec((root.viewStart + (index / 9.0) * root.viewSpan) * root.totalSeconds)
                                         font.pixelSize: 9
                                         color: "#7E7E86"
-                                    }
-                                    Text {
-                                        text: "17:08:" + (12 + index)
-                                        font.pixelSize: 8
-                                        color: "#55555C"
                                     }
                                 }
                             }
@@ -479,6 +554,36 @@ Item {
                     }
 
                     Item { Layout.fillWidth: true }
+
+                    // Exit Transfer Mode button when recordings are visible
+                    Rectangle {
+                        visible: Boolean(stateManager && stateManager.transferModeActive)
+                        height: 28
+                        width: exitRecLabel.implicitWidth + 20
+                        radius: 6
+                        color: exitRecMouse.containsMouse ? "#3A3A44" : "#2A2A32"
+                        border.color: "#CBA158"
+                        border.width: 1
+                        opacity: (stateManager && stateManager.transferExiting) ? 0.5 : 1.0
+
+                        Text {
+                            id: exitRecLabel
+                            anchors.centerIn: parent
+                            text: "⏏ " + (stateManager && stateManager.language === "en" ? "Exit Transfer" : "Salir")
+                            font.pixelSize: 10
+                            font.bold: true
+                            color: "#CBA158"
+                        }
+
+                        MouseArea {
+                            id: exitRecMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            enabled: !(stateManager && stateManager.transferExiting)
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: if (stateManager) stateManager.exitTransferMode()
+                        }
+                    }
                 }
 
                 // Sort and Channel Filter dropdowns
