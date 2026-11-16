@@ -1505,6 +1505,425 @@ Item {
                         }
                     }
                 }
+
+                // Firmware Update Card (OTA via Console Network + Official RØDE Manifest Check)
+                Rectangle {
+                    id: fwCard
+                    visible: Boolean(stateManager && !stateManager.isStreamerX)
+                    Layout.fillWidth: true
+                    implicitHeight: visible ? (fwCol.implicitHeight + 36) : 0
+                    Layout.preferredHeight: implicitHeight
+                    radius: 12
+                    color: "#1A1A1D"
+                    border.color: (stateManager && (stateManager.firmwareUpdateAvailable || stateManager.firmwareUpdateComplete)) ? "#CBA158" : "#2C2C32"
+                    border.width: (stateManager && (stateManager.firmwareUpdateAvailable || stateManager.firmwareUpdateComplete)) ? 1.5 : 1
+
+                    readonly property string fwUiState: {
+                        if (!stateManager) return "uptodate";
+                        if (stateManager.firmwareUpdateComplete) return "complete";
+                        if (stateManager.firmwareUpdateInstalling) return "installing";
+                        if (stateManager.firmwareUpdateDownloaded) return "downloaded";
+                        if (stateManager.firmwareUpdateDownloading) return "downloading";
+                        if (stateManager.firmwareUpdateChecking) return "checking";
+                        if (stateManager.firmwareUpdateAvailable) return "available";
+                        return "uptodate";
+                    }
+
+                    ColumnLayout {
+                        id: fwCol
+                        anchors.top: parent.top
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.margins: 18
+                        spacing: 16
+
+                        // Card Header Row
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 12
+
+                            Text {
+                                text: "🔄 " + (stateManager ? stateManager.strings.fw_update_title : "Actualización de Firmware")
+                                font.pixelSize: 15
+                                font.bold: true
+                                color: "#FFFFFF"
+                            }
+
+                            Item { Layout.fillWidth: true }
+
+                            // Live Status Badge
+                            Rectangle {
+                                implicitWidth: fwBadgeText.implicitWidth + 20
+                                height: 24
+                                radius: 12
+                                color: {
+                                    if (fwCard.fwUiState === "complete" || fwCard.fwUiState === "downloaded") return "#153820";
+                                    if (fwCard.fwUiState === "downloading") return "#162436";
+                                    if (fwCard.fwUiState === "installing" || fwCard.fwUiState === "checking" || fwCard.fwUiState === "available") return "#2A2314";
+                                    return "#152A1D";
+                                }
+                                border.color: {
+                                    if (fwCard.fwUiState === "complete" || fwCard.fwUiState === "downloaded") return "#28C850";
+                                    if (fwCard.fwUiState === "downloading") return "#3B82F6";
+                                    if (fwCard.fwUiState === "installing" || fwCard.fwUiState === "checking" || fwCard.fwUiState === "available") return "#CBA158";
+                                    return "#28C850";
+                                }
+                                border.width: 1
+
+                                Text {
+                                    id: fwBadgeText
+                                    anchors.centerIn: parent
+                                    text: {
+                                        if (!stateManager) return "✓ AL DÍA";
+                                        if (fwCard.fwUiState === "complete") return stateManager.strings.fw_badge_complete;
+                                        if (fwCard.fwUiState === "installing") return stateManager.strings.fw_badge_installing;
+                                        if (fwCard.fwUiState === "downloaded") return stateManager.strings.fw_badge_downloaded;
+                                        if (fwCard.fwUiState === "downloading") return stateManager.strings.fw_badge_downloading;
+                                        if (fwCard.fwUiState === "checking") return stateManager.strings.fw_badge_checking;
+                                        if (fwCard.fwUiState === "available") return stateManager.strings.fw_badge_available;
+                                        return stateManager.strings.fw_badge_uptodate;
+                                    }
+                                    font.pixelSize: 10
+                                    font.bold: true
+                                    color: {
+                                        if (fwCard.fwUiState === "complete" || fwCard.fwUiState === "downloaded") return "#28C850";
+                                        if (fwCard.fwUiState === "downloading") return "#60A5FA";
+                                        if (fwCard.fwUiState === "installing" || fwCard.fwUiState === "checking" || fwCard.fwUiState === "available") return "#F5D061";
+                                        return "#34C759";
+                                    }
+                                }
+                            }
+                        }
+
+                        // Status & Actions Container
+                        Rectangle {
+                            Layout.fillWidth: true
+                            implicitHeight: fwStatusBoxCol.implicitHeight + 28
+                            Layout.preferredHeight: implicitHeight
+                            radius: 10
+                            color: "#141418"
+                            border.color: "#25252C"
+                            border.width: 1
+
+                            ColumnLayout {
+                                id: fwStatusBoxCol
+                                anchors.top: parent.top
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                anchors.margins: 14
+                                spacing: 14
+
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 16
+
+                                    ColumnLayout {
+                                        Layout.fillWidth: true
+                                        spacing: 6
+
+                                        // Versions & Channel Row
+                                        Flow {
+                                            Layout.fillWidth: true
+                                            spacing: 10
+
+                                            Text {
+                                                text: (stateManager ? stateManager.strings.fw_installed_version : "Versión instalada") + ": v" + (stateManager ? stateManager.firmwareVersion : "1.7.7")
+                                                font.pixelSize: 12
+                                                font.bold: true
+                                                color: "#FFFFFF"
+                                            }
+
+                                            Text {
+                                                text: "•"
+                                                font.pixelSize: 12
+                                                color: "#55555E"
+                                            }
+
+                                            Text {
+                                                text: (stateManager ? stateManager.strings.fw_latest_version : "Última versión oficial") + ": v" + (stateManager ? stateManager.firmwareUpdateVersion : "1.7.7")
+                                                font.pixelSize: 12
+                                                font.bold: true
+                                                color: (stateManager && stateManager.firmwareUpdateAvailable) ? "#F5D061" : "#B0B0B8"
+                                            }
+
+                                            Rectangle {
+                                                implicitWidth: fwChanTxt.implicitWidth + 14
+                                                height: 18
+                                                radius: 4
+                                                color: (stateManager && stateManager.betaFirmwareMode) ? "#2B1E38" : "#22222A"
+                                                border.color: (stateManager && stateManager.betaFirmwareMode) ? "#8B5CF6" : "#363642"
+                                                border.width: 1
+
+                                                Text {
+                                                    id: fwChanTxt
+                                                    anchors.centerIn: parent
+                                                    text: (stateManager && stateManager.betaFirmwareMode) ? (stateManager.strings.fw_channel_beta).toUpperCase() : (stateManager ? (stateManager.strings.fw_channel_stable).toUpperCase() : "ESTABLE")
+                                                    font.pixelSize: 9
+                                                    font.bold: true
+                                                    color: (stateManager && stateManager.betaFirmwareMode) ? "#C4B5FD" : "#A0A0AA"
+                                                }
+                                            }
+                                        }
+
+                                        // Dynamic Status Line
+                                        Text {
+                                            Layout.fillWidth: true
+                                            text: stateManager ? stateManager.firmwareUpdateStatusText : ""
+                                            font.pixelSize: 12
+                                            wrapMode: Text.WordWrap
+                                            color: {
+                                                if (!stateManager) return "#A0A0A8";
+                                                if (stateManager.firmwareUpdateComplete) return "#28C850";
+                                                if (stateManager.firmwareUpdateAvailable || stateManager.firmwareUpdateInstalling) return "#F5D061";
+                                                if (stateManager.firmwareUpdateDownloading) return "#60A5FA";
+                                                return "#A0A0A8";
+                                            }
+                                        }
+
+                                        // Offline Hint when Update is Available but Console Has No Internet
+                                        Text {
+                                            visible: Boolean(stateManager && stateManager.firmwareUpdateAvailable && stateManager.firmwareUpdateNoInternet && !stateManager.firmwareUpdateDownloaded && !stateManager.firmwareUpdateComplete)
+                                            Layout.fillWidth: true
+                                            text: "💡 " + (stateManager ? stateManager.strings.fw_no_internet_hint : "")
+                                            font.pixelSize: 11
+                                            wrapMode: Text.WordWrap
+                                            color: "#8E8E98"
+                                        }
+                                    }
+
+                                    // Action Buttons Column
+                                    RowLayout {
+                                        spacing: 8
+                                        Layout.alignment: Qt.AlignVCenter
+
+                                        // Check for Updates Button
+                                        Button {
+                                            visible: Boolean(!stateManager || (!stateManager.firmwareUpdateDownloading && !stateManager.firmwareUpdateInstalling && !stateManager.firmwareUpdateComplete))
+                                            enabled: Boolean(stateManager && !stateManager.firmwareUpdateChecking)
+                                            text: (stateManager && stateManager.firmwareUpdateChecking)
+                                                  ? stateManager.strings.fw_btn_checking
+                                                  : (stateManager ? stateManager.strings.fw_btn_check : "Buscar actualizaciones")
+                                            opacity: enabled ? 1.0 : 0.65
+                                            HoverHandler { enabled: parent.enabled; cursorShape: Qt.PointingHandCursor }
+                                            contentItem: Text {
+                                                text: parent.text
+                                                font.pixelSize: 12
+                                                font.bold: true
+                                                color: "#FFFFFF"
+                                                horizontalAlignment: Text.AlignHCenter
+                                                verticalAlignment: Text.AlignVCenter
+                                            }
+                                            background: Rectangle {
+                                                implicitWidth: 165
+                                                implicitHeight: 34
+                                                radius: 7
+                                                color: parent.down ? "#363640" : (parent.hovered ? "#2E2E38" : "#25252E")
+                                                border.color: "#3C3C48"
+                                                border.width: 1
+                                            }
+                                            onClicked: {
+                                                if (stateManager) stateManager.checkForFirmwareUpdates();
+                                            }
+                                        }
+
+                                        // Download Firmware Button
+                                        Button {
+                                            visible: Boolean(stateManager && stateManager.firmwareUpdateAvailable && !stateManager.firmwareUpdateDownloaded && !stateManager.firmwareUpdateDownloading && !stateManager.firmwareUpdateInstalling && !stateManager.firmwareUpdateComplete)
+                                            enabled: Boolean(stateManager && !stateManager.firmwareUpdateNoInternet)
+                                            text: stateManager ? stateManager.strings.fw_btn_download : "Descargar Firmware"
+                                            opacity: enabled ? 1.0 : 0.45
+                                            HoverHandler { enabled: parent.enabled; cursorShape: Qt.PointingHandCursor }
+                                            contentItem: Text {
+                                                text: parent.text
+                                                font.pixelSize: 12
+                                                font.bold: true
+                                                color: "#121214"
+                                                horizontalAlignment: Text.AlignHCenter
+                                                verticalAlignment: Text.AlignVCenter
+                                            }
+                                            background: Rectangle {
+                                                implicitWidth: 155
+                                                implicitHeight: 34
+                                                radius: 7
+                                                color: parent.down ? "#B48E48" : (parent.hovered ? "#D8AE62" : "#CBA158")
+                                                border.color: "#E0BC76"
+                                                border.width: 1
+                                            }
+                                            onClicked: {
+                                                if (stateManager) stateManager.startFirmwareDownload();
+                                            }
+                                        }
+
+                                        // Cancel Download Button
+                                        Button {
+                                            visible: Boolean(stateManager && stateManager.firmwareUpdateDownloading)
+                                            text: stateManager ? stateManager.strings.fw_btn_cancel : "Cancelar descarga"
+                                            HoverHandler { cursorShape: Qt.PointingHandCursor }
+                                            contentItem: Text {
+                                                text: parent.text
+                                                font.pixelSize: 12
+                                                font.bold: true
+                                                color: "#FFFFFF"
+                                                horizontalAlignment: Text.AlignHCenter
+                                                verticalAlignment: Text.AlignVCenter
+                                            }
+                                            background: Rectangle {
+                                                implicitWidth: 145
+                                                implicitHeight: 34
+                                                radius: 7
+                                                color: parent.down ? "#641E1E" : (parent.hovered ? "#8E2B2B" : "#7D2525")
+                                                border.color: "#B23636"
+                                                border.width: 1
+                                            }
+                                            onClicked: {
+                                                if (stateManager) stateManager.cancelFirmwareDownload();
+                                            }
+                                        }
+
+                                        // Install Firmware Button
+                                        Button {
+                                            visible: Boolean(stateManager && stateManager.firmwareUpdateDownloaded && !stateManager.firmwareUpdateInstalling && !stateManager.firmwareUpdateComplete)
+                                            text: stateManager ? stateManager.strings.fw_btn_install : "Instalar Firmware"
+                                            HoverHandler { cursorShape: Qt.PointingHandCursor }
+                                            contentItem: Text {
+                                                text: parent.text
+                                                font.pixelSize: 12
+                                                font.bold: true
+                                                color: "#FFFFFF"
+                                                horizontalAlignment: Text.AlignHCenter
+                                                verticalAlignment: Text.AlignVCenter
+                                            }
+                                            background: Rectangle {
+                                                implicitWidth: 155
+                                                implicitHeight: 34
+                                                radius: 7
+                                                color: parent.down ? "#1C6335" : (parent.hovered ? "#2A924E" : "#237A42")
+                                                border.color: "#32A056"
+                                                border.width: 1
+                                            }
+                                            onClicked: {
+                                                if (stateManager) stateManager.startFirmwareInstall();
+                                            }
+                                        }
+
+                                        // Reboot Console Button
+                                        Button {
+                                            visible: Boolean(stateManager && stateManager.firmwareUpdateComplete)
+                                            text: stateManager ? stateManager.strings.fw_btn_reboot : "Reiniciar Consola"
+                                            HoverHandler { cursorShape: Qt.PointingHandCursor }
+                                            contentItem: Text {
+                                                text: parent.text
+                                                font.pixelSize: 12
+                                                font.bold: true
+                                                color: "#121214"
+                                                horizontalAlignment: Text.AlignHCenter
+                                                verticalAlignment: Text.AlignVCenter
+                                            }
+                                            background: Rectangle {
+                                                implicitWidth: 155
+                                                implicitHeight: 34
+                                                radius: 7
+                                                color: parent.down ? "#27A844" : (parent.hovered ? "#42D466" : "#34C759")
+                                                border.color: "#5BE07C"
+                                                border.width: 1
+                                            }
+                                            onClicked: {
+                                                if (stateManager) stateManager.rebootForFirmwareUpdate();
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // Progress Bar Section (Download / Install)
+                                ColumnLayout {
+                                    visible: Boolean(stateManager && (stateManager.firmwareUpdateDownloading || stateManager.firmwareUpdateInstalling))
+                                    Layout.fillWidth: true
+                                    spacing: 6
+
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        Text {
+                                            text: (stateManager && stateManager.firmwareUpdateInstalling)
+                                                  ? stateManager.strings.fw_btn_install
+                                                  : (stateManager ? stateManager.strings.fw_btn_download : "")
+                                            font.pixelSize: 11
+                                            font.bold: true
+                                            color: "#D0D0D6"
+                                        }
+                                        Item { Layout.fillWidth: true }
+                                        Text {
+                                            text: ((stateManager && stateManager.firmwareUpdateInstalling)
+                                                   ? stateManager.firmwareUpdateInstallProgress
+                                                   : (stateManager ? stateManager.firmwareUpdateDownloadProgress : 0)) + "%"
+                                            font.pixelSize: 11
+                                            font.bold: true
+                                            color: (stateManager && stateManager.firmwareUpdateInstalling) ? "#CBA158" : "#60A5FA"
+                                        }
+                                    }
+
+                                    Rectangle {
+                                        Layout.fillWidth: true
+                                        height: 8
+                                        radius: 4
+                                        color: "#24242A"
+                                        clip: true
+
+                                        Rectangle {
+                                            anchors.left: parent.left
+                                            anchors.top: parent.top
+                                            anchors.bottom: parent.bottom
+                                            radius: 4
+                                            width: parent.width * Math.max(0, Math.min(100, (stateManager && stateManager.firmwareUpdateInstalling) ? stateManager.firmwareUpdateInstallProgress : (stateManager ? stateManager.firmwareUpdateDownloadProgress : 0))) / 100.0
+                                            color: (stateManager && stateManager.firmwareUpdateInstalling) ? "#CBA158" : "#3B82F6"
+                                        }
+                                    }
+
+                                    Text {
+                                        visible: Boolean(stateManager && stateManager.firmwareUpdateInstalling)
+                                        Layout.fillWidth: true
+                                        text: "⚠️ " + (stateManager ? stateManager.strings.fw_warning_do_not_unplug : "")
+                                        font.pixelSize: 11
+                                        wrapMode: Text.WordWrap
+                                        color: "#F59E0B"
+                                    }
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            visible: Boolean(stateManager && !stateManager.isStreamerX)
+                            Layout.fillWidth: true
+                            height: 1
+                            color: "#28282E"
+                        }
+
+                        // Beta Firmware Channel Toggle
+                        RowLayout {
+                            visible: Boolean(stateManager && !stateManager.isStreamerX)
+                            Layout.fillWidth: true
+                            ColumnLayout {
+                                spacing: 2
+                                Text {
+                                    text: stateManager ? stateManager.strings.fw_beta_title : "Canal de Firmware Beta"
+                                    font.pixelSize: 13
+                                    color: "#E0E0E0"
+                                }
+                                Text {
+                                    text: stateManager ? stateManager.strings.fw_beta_desc : "Recibir versiones preliminares de prueba (Beta) publicadas por RØDE"
+                                    font.pixelSize: 11
+                                    color: "#8E8E93"
+                                }
+                            }
+                            Item { Layout.fillWidth: true }
+                            Switch {
+                                checked: stateManager ? stateManager.betaFirmwareMode : false
+                                onToggled: {
+                                    if (stateManager) stateManager.setBetaFirmwareMode(checked);
+                                }
+                            }
+                        }
+                    }
+                }
                 Item { Layout.fillHeight: true }
             }
         }

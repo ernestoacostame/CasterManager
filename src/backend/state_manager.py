@@ -4,6 +4,7 @@ import threading
 import time
 import json
 import logging
+import urllib.request
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
 from PyQt6.QtCore import QObject, pyqtSignal, pyqtProperty, pyqtSlot, QVariant, QSettings, QTimer
@@ -285,6 +286,28 @@ TRANSLATIONS = {
         "auto_brightness_desc": "Ajustar el sensor de luz ambiental automáticamente",
         "haptics_desc": "Vibración al tocar los pads y controles táctiles",
         "device_label": "Dispositivo",
+        "fw_update_title": "Actualización de Firmware",
+        "fw_installed_version": "Versión instalada",
+        "fw_latest_version": "Última versión oficial",
+        "fw_channel_stable": "Estable",
+        "fw_channel_beta": "Beta",
+        "fw_beta_title": "Canal de Firmware Beta",
+        "fw_beta_desc": "Recibir versiones preliminares de prueba (Beta) publicadas por RØDE",
+        "fw_btn_check": "Buscar actualizaciones",
+        "fw_btn_checking": "Buscando...",
+        "fw_btn_download": "Descargar Firmware",
+        "fw_btn_cancel": "Cancelar descarga",
+        "fw_btn_install": "Instalar Firmware",
+        "fw_btn_reboot": "Reiniciar Consola",
+        "fw_badge_uptodate": "✓ AL DÍA",
+        "fw_badge_available": "● NUEVA VERSIÓN",
+        "fw_badge_checking": "● BUSCANDO...",
+        "fw_badge_downloading": "● DESCARGANDO...",
+        "fw_badge_downloaded": "● LISTO PARA INSTALAR",
+        "fw_badge_installing": "● INSTALANDO...",
+        "fw_badge_complete": "● REINICIO PENDIENTE",
+        "fw_warning_do_not_unplug": "No apagues ni desconectes tu RØDECaster mientras se instala la actualización.",
+        "fw_no_internet_hint": "Conecta tu RØDECaster a Wi-Fi o Ethernet para descargar e instalar directamente en la consola.",
     },
     "en": {
         "settings": "Settings",
@@ -541,6 +564,28 @@ TRANSLATIONS = {
         "auto_brightness_desc": "Automatically adjust to ambient light sensor",
         "haptics_desc": "Vibration feedback when tapping pads and touch controls",
         "device_label": "Device",
+        "fw_update_title": "Firmware Update",
+        "fw_installed_version": "Installed version",
+        "fw_latest_version": "Latest official version",
+        "fw_channel_stable": "Stable",
+        "fw_channel_beta": "Beta",
+        "fw_beta_title": "Beta Firmware Channel",
+        "fw_beta_desc": "Receive preview (Beta) firmware builds published by RØDE",
+        "fw_btn_check": "Check for Updates",
+        "fw_btn_checking": "Checking...",
+        "fw_btn_download": "Download Firmware",
+        "fw_btn_cancel": "Cancel Download",
+        "fw_btn_install": "Install Firmware",
+        "fw_btn_reboot": "Reboot Console",
+        "fw_badge_uptodate": "✓ UP TO DATE",
+        "fw_badge_available": "● UPDATE AVAILABLE",
+        "fw_badge_checking": "● CHECKING...",
+        "fw_badge_downloading": "● DOWNLOADING...",
+        "fw_badge_downloaded": "● READY TO INSTALL",
+        "fw_badge_installing": "● INSTALLING...",
+        "fw_badge_complete": "● REBOOT REQUIRED",
+        "fw_warning_do_not_unplug": "Do not power off or unplug your RØDECaster while the update is installing.",
+        "fw_no_internet_hint": "Connect your RØDECaster to Wi-Fi or Ethernet to download and install directly on the console.",
     }
 }
 
@@ -626,6 +671,7 @@ class StateManager(QObject):
     dspChanged = pyqtSignal()
     activeDspChannelChanged = pyqtSignal()
     headphoneVolumeChanged = pyqtSignal()
+    firmwareUpdateChanged = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -717,6 +763,22 @@ class StateManager(QObject):
         self._listen_prefader = False
         self._multitrack_mode = 2
         self._midi_control = False
+        # OTA Firmware Update State (Node 15: SYSTEM)
+        self._beta_mode = False
+        self._update_checking = False
+        self._update_available = False
+        self._update_version = ""
+        self._update_no_internet = False
+        self._update_downloading = False
+        self._update_download_progress = 0
+        self._update_downloaded = False
+        self._update_installing = False
+        self._update_install_progress = 0
+        self._update_complete = False
+        self._manifest_latest_version = ""
+        self._fw_check_started_at = 0.0
+        self._fw_dl_started_at = 0.0
+        self._fw_inst_started_at = 0.0
         # DUCKER.duckerDepth (dB, 0 = off). Used by SMART Pads in Ducking mode.
         self._ducker_depth = -9.0
         try:
@@ -1006,6 +1068,18 @@ class StateManager(QObject):
         self._pending_dsp_updates.clear()
         self._fx_presets = []
         self._copied_pad = None
+        self._beta_mode = False
+        self._update_checking = False
+        self._update_available = False
+        self._update_version = ""
+        self._update_no_internet = False
+        self._update_downloading = False
+        self._update_download_progress = 0
+        self._update_downloaded = False
+        self._update_installing = False
+        self._update_install_progress = 0
+        self._update_complete = False
+        self._manifest_latest_version = ""
         if self._selected_pad_index >= self._pads_per_bank:
             self._selected_pad_index = 0
 
@@ -1015,6 +1089,7 @@ class StateManager(QObject):
         self.fadersChanged.emit()
         self.dspChanged.emit()
         self.activeDspChannelChanged.emit()
+        self.firmwareUpdateChanged.emit()
 
         if info.get("has_permission"):
             self.executor.submit(self._sync_hardware_state)
@@ -1229,6 +1304,7 @@ class StateManager(QObject):
                     self._midi_control = bool(sprops["systemMidiControl"])
                 if "systemSerialNumber" in sprops and sprops["systemSerialNumber"] != "REDACTED":
                     self._serial = sprops["systemSerialNumber"]
+                self._update_firmware_state_from_sys_props(sprops)
 
             # Headphone nodes (children 9 and 10)
             children = dump.get("children", [])
@@ -1504,6 +1580,7 @@ class StateManager(QObject):
             self.dspChanged.emit()
             self.fadersChanged.emit()
             self.stateChanged.emit()
+            self.firmwareUpdateChanged.emit()
             msg = "Idioma cambiado a Español" if lang == "es" else "Language changed to English"
             self.toastMessage.emit(msg)
 
@@ -3603,31 +3680,42 @@ class StateManager(QObject):
         self._poll_tick += 1
         refresh_dsp = (self._current_view == "audio_processing" and self._poll_tick % 3 == 0)
         refresh_channels = (self._current_view == "audio_setup" and self._poll_tick % 5 == 0)
+        fw_active = (self._update_checking or self._update_downloading or self._update_installing)
+        refresh_system = (not self._is_streamer_x) and (
+            fw_active or (self._current_view == "device_config" and self._poll_tick % 4 == 0)
+        )
 
         def do_poll():
             if refresh_dsp:
                 self._refresh_dsp_from_device()
-            if refresh_channels:
+            if refresh_channels or refresh_system:
                 try:
                     dump = self.bridge.dump_state()
                     if dump:
-                        ch_nodes = [c for c in dump.get("children", []) if c.get("name") == "CHANNEL"]
-                        max_f = 6 if self._is_duo else 9
-                        phys_c = 4 if self._is_duo else 6
-                        src_changed = False
-                        for f_i in range(min(len(ch_nodes), len(self._faders), max_f)):
-                            s_u32 = ch_nodes[f_i].get("properties", {}).get("channelInputSource", {}).get("U32")
-                            s_inf = self._source_info_for_id(s_u32)
-                            if self._faders[f_i].get("name") != s_inf["name"]:
-                                self._faders[f_i]["name"] = s_inf["name"]
-                                self._faders[f_i]["icon"] = s_inf["icon"]
-                                self._faders[f_i]["color"] = s_inf["color"]
-                                self._faders[f_i]["is_virtual"] = (f_i >= phys_c)
-                                src_changed = True
-                        if src_changed:
-                            self.fadersChanged.emit()
+                        children = dump.get("children", [])
+                        if refresh_channels:
+                            ch_nodes = [c for c in children if c.get("name") == "CHANNEL"]
+                            max_f = 6 if self._is_duo else 9
+                            phys_c = 4 if self._is_duo else 6
+                            src_changed = False
+                            for f_i in range(min(len(ch_nodes), len(self._faders), max_f)):
+                                s_u32 = ch_nodes[f_i].get("properties", {}).get("channelInputSource", {}).get("U32")
+                                s_inf = self._source_info_for_id(s_u32)
+                                if self._faders[f_i].get("name") != s_inf["name"]:
+                                    self._faders[f_i]["name"] = s_inf["name"]
+                                    self._faders[f_i]["icon"] = s_inf["icon"]
+                                    self._faders[f_i]["color"] = s_inf["color"]
+                                    self._faders[f_i]["is_virtual"] = (f_i >= phys_c)
+                                    src_changed = True
+                            if src_changed:
+                                self.fadersChanged.emit()
+                        if refresh_system:
+                            sys_node = next((c for c in children if c.get("name") == "SYSTEM"), None)
+                            if sys_node:
+                                sprops = {k: list(v.values())[0] for k, v in sys_node.get("properties", {}).items()}
+                                self._update_firmware_state_from_sys_props(sprops)
                 except Exception as e:
-                    logger.debug(f"Error checking channel source poll: {e}")
+                    logger.debug(f"Error checking hardware state poll: {e}")
 
             fout, _ = self.bridge.run_cmd(["fader", "list", "--json"], timeout=2)
             if fout:
@@ -3853,7 +3941,7 @@ class StateManager(QObject):
     def _find_root_child_index(self, name):
         """Index of the first root child with this node name (layouts differ per model)."""
         idx = getattr(self, "_root_child_index", {}).get(name)
-        return idx if idx is not None else {"DUCKER": 1}.get(name)
+        return idx if idx is not None else {"DUCKER": 1, "SYSTEM": 15}.get(name)
 
     @pyqtProperty(bool, notify=deviceConfigChanged)
     def midiControl(self):
@@ -3865,6 +3953,351 @@ class StateManager(QObject):
         self.deviceConfigChanged.emit()
         if self._connected and not self._permission_error:
             self.executor.submit(self.bridge.run_cmd, ["set-property", "15", "systemMidiControl", f"bool:{str(val).lower()}"])
+
+    # ------------------------------------------------------------------
+    # OTA Firmware Updates (SYSTEM node)
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _version_tuple(ver_str):
+        """Parse dotted version strings (e.g. '1.7.7') into integer tuples."""
+        if not ver_str:
+            return ()
+        nums = []
+        for part in str(ver_str).strip().lstrip("vV").split("."):
+            digits = ""
+            for ch in part:
+                if ch.isdigit():
+                    digits += ch
+                else:
+                    break
+            nums.append(int(digits) if digits else 0)
+        return tuple(nums)
+
+    def _fetch_official_manifest_version(self):
+        """Query RØDE's official OTA manifest for the active Duo / Pro II model."""
+        if self._is_streamer_x:
+            return ""
+        url = "http://update.rode.com/rcp2-mini-manifest.json" if self._is_duo else "http://update.rode.com/manifest.json"
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "RodeCaster/1.0"})
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                data = json.loads(resp.read().decode("utf-8", errors="ignore"))
+            if self._beta_mode:
+                entries = [data.get("beta-version"), data.get("main-version"), data.get("master-version")]
+            else:
+                entries = [data.get("main-version"), data.get("master-version")]
+            candidates = []
+            for entry in entries:
+                if not isinstance(entry, dict):
+                    continue
+                for key in ("os-version", "app-version"):
+                    val = str(entry.get(key, "") or "").strip()
+                    if val:
+                        candidates.append(val)
+            if candidates:
+                return max(candidates, key=self._version_tuple)
+        except Exception as e:
+            logger.debug(f"Manifest fetch failed ({url}): {e}")
+        return ""
+
+    def _update_firmware_state_from_sys_props(self, sprops, from_check_finish=False):
+        """Synchronize local firmware update properties from SYSTEM node values."""
+        if not sprops:
+            return
+        if sprops.get("systemFirmwareVersion"):
+            self._firmware = str(sprops["systemFirmwareVersion"])
+        if "systemBetaMode" in sprops:
+            self._beta_mode = bool(sprops["systemBetaMode"])
+
+        hw_checking = bool(sprops.get("updateChecking", False))
+        if hw_checking:
+            self._update_checking = True
+        elif from_check_finish or (self._update_checking and time.time() - self._fw_check_started_at > 10.0):
+            self._update_checking = False
+
+        hw_avail = bool(sprops.get("osUpdateAvailable", False) or sprops.get("appUpdateAvailable", False))
+        hw_ver = str(sprops.get("updateVersion", "") or "").strip()
+
+        self._update_no_internet = bool(sprops.get("updateNoInternet", False))
+        self._update_downloaded = bool(sprops.get("updateDownloaded", False))
+        self._update_complete = bool(sprops.get("updateComplete", False))
+
+        dl_req = bool(sprops.get("downloadInitiateRequested", False))
+        dl_raw = int(sprops.get("updateDownloadProgress", 0) or 0)
+        dl_pct = int(round(dl_raw / 100.0)) if dl_raw > 100 else dl_raw
+        dl_pct = max(0, min(100, dl_pct))
+
+        if self._update_downloaded:
+            self._update_downloading = False
+            self._update_download_progress = 100
+        elif dl_req or (0 < dl_pct < 100):
+            self._update_downloading = True
+            self._update_download_progress = dl_pct
+        elif self._update_downloading and (time.time() - self._fw_dl_started_at > 5.0):
+            self._update_downloading = False
+            self._update_download_progress = 0
+
+        inst_req = bool(sprops.get("updateInitiateRequested", False))
+        inst_raw = int(sprops.get("updateInstalledProgress", 0) or 0)
+        inst_pct = int(round(inst_raw / 100.0)) if inst_raw > 100 else inst_raw
+        inst_pct = max(0, min(100, inst_pct))
+
+        if self._update_complete:
+            self._update_installing = False
+            self._update_install_progress = 100
+        elif inst_req or (0 < inst_raw < 10000 and self._update_downloaded):
+            self._update_installing = True
+            if inst_raw == 10000 and (time.time() - self._fw_inst_started_at < 5.0):
+                self._update_install_progress = 0
+            else:
+                self._update_install_progress = inst_pct
+        elif self._update_installing:
+            if inst_raw == 10000 and (time.time() - self._fw_inst_started_at < 5.0):
+                self._update_install_progress = 0
+            elif 0 < inst_raw < 10000:
+                self._update_install_progress = inst_pct
+            elif time.time() - self._fw_inst_started_at >= 5.0:
+                self._update_installing = False
+                self._update_install_progress = 0
+        else:
+            self._update_install_progress = 0
+
+        manifest_newer = False
+        if self._manifest_latest_version and self._firmware:
+            manifest_newer = self._version_tuple(self._manifest_latest_version) > self._version_tuple(self._firmware)
+
+        self._update_available = bool(hw_avail or manifest_newer)
+        if hw_ver:
+            self._update_version = hw_ver
+        elif self._manifest_latest_version:
+            self._update_version = self._manifest_latest_version
+        else:
+            self._update_version = ""
+
+        self.firmwareUpdateChanged.emit()
+
+    @pyqtProperty(bool, notify=firmwareUpdateChanged)
+    def betaFirmwareMode(self):
+        return self._beta_mode
+
+    @pyqtProperty(bool, notify=firmwareUpdateChanged)
+    def firmwareUpdateChecking(self):
+        return self._update_checking
+
+    @pyqtProperty(bool, notify=firmwareUpdateChanged)
+    def firmwareUpdateAvailable(self):
+        return self._update_available
+
+    @pyqtProperty(str, notify=firmwareUpdateChanged)
+    def firmwareUpdateVersion(self):
+        return self._update_version or self._manifest_latest_version or self._firmware
+
+    @pyqtProperty(bool, notify=firmwareUpdateChanged)
+    def firmwareUpdateNoInternet(self):
+        return self._update_no_internet
+
+    @pyqtProperty(bool, notify=firmwareUpdateChanged)
+    def firmwareUpdateDownloading(self):
+        return self._update_downloading
+
+    @pyqtProperty(int, notify=firmwareUpdateChanged)
+    def firmwareUpdateDownloadProgress(self):
+        return self._update_download_progress
+
+    @pyqtProperty(bool, notify=firmwareUpdateChanged)
+    def firmwareUpdateDownloaded(self):
+        return self._update_downloaded
+
+    @pyqtProperty(bool, notify=firmwareUpdateChanged)
+    def firmwareUpdateInstalling(self):
+        return self._update_installing
+
+    @pyqtProperty(int, notify=firmwareUpdateChanged)
+    def firmwareUpdateInstallProgress(self):
+        return self._update_install_progress
+
+    @pyqtProperty(bool, notify=firmwareUpdateChanged)
+    def firmwareUpdateComplete(self):
+        return self._update_complete
+
+    @pyqtProperty(str, notify=firmwareUpdateChanged)
+    def firmwareUpdateStatusText(self):
+        is_en = (self._language == "en")
+        target_ver = self.firmwareUpdateVersion
+        if self._update_checking:
+            return ("Checking for firmware updates on console and RØDE servers..."
+                    if is_en else "Buscando actualizaciones en la consola y servidores de RØDE...")
+        if self._update_complete:
+            return (f"Firmware v{target_ver} installed. Reboot the console to finish."
+                    if is_en else f"Firmware v{target_ver} instalado. Reinicia la consola para completar.")
+        if self._update_installing:
+            return (f"Installing firmware update ({self._update_install_progress}%)..."
+                    if is_en else f"Instalando actualización de firmware ({self._update_install_progress}%)...")
+        if self._update_downloaded:
+            return (f"Firmware v{target_ver} downloaded and ready to install."
+                    if is_en else f"Firmware v{target_ver} descargado y listo para instalar.")
+        if self._update_downloading:
+            return (f"Downloading firmware v{target_ver} on console ({self._update_download_progress}%)..."
+                    if is_en else f"Descargando firmware v{target_ver} en la consola ({self._update_download_progress}%)...")
+        if self._update_available:
+            if self._update_no_internet:
+                return (f"Firmware v{target_ver} is available, but the RØDECaster has no internet connection."
+                        if is_en else f"Firmware v{target_ver} disponible, pero la RØDECaster no tiene conexión a internet.")
+            return (f"New firmware version v{target_ver} is available to download."
+                    if is_en else f"Nueva versión de firmware v{target_ver} disponible para descargar.")
+        if self._update_no_internet and not self._manifest_latest_version:
+            return ("Console is offline. Connect to Wi-Fi/Ethernet or check again from this PC."
+                    if is_en else "La consola no tiene internet. Conéctala por Wi-Fi/Ethernet o busca desde esta PC.")
+        if self._update_no_internet and self._manifest_latest_version:
+            return (f"Your firmware (v{self._firmware}) matches the latest official release (console offline)."
+                    if is_en else f"Tu firmware (v{self._firmware}) coincide con la última versión oficial (consola sin internet).")
+        return (f"Your RØDECaster is up to date (v{self._firmware})."
+                if is_en else f"Tu RØDECaster está actualizada (v{self._firmware}).")
+
+    def _run_firmware_check(self, new_beta=None):
+        """Worker that optionally toggles systemBetaMode, triggers updateCheckRequested,
+        fetches the official manifest from RØDE, and refreshes SYSTEM properties."""
+        gen = self._device_generation
+        sys_node = self._find_root_child_index("SYSTEM")
+        if self._connected and not self._permission_error and not self._is_streamer_x:
+            if new_beta is not None:
+                self.bridge.run_cmd(["set-property", str(sys_node), "systemBetaMode", f"bool:{str(new_beta).lower()}"])
+            self.bridge.run_cmd(["set-property", str(sys_node), "updateCheckRequested", "bool:true"])
+
+        latest = self._fetch_official_manifest_version()
+        if gen != self._device_generation:
+            return
+        if latest:
+            self._manifest_latest_version = latest
+
+        sprops = None
+        if self._connected and not self._permission_error and not self._is_streamer_x:
+            for attempt in range(5):
+                time.sleep(1.0 if attempt == 0 else 0.8)
+                if gen != self._device_generation:
+                    return
+                dump = self.bridge.dump_state()
+                if not dump:
+                    continue
+                sys_child = next((c for c in dump.get("children", []) if c.get("name") == "SYSTEM"), None)
+                if sys_child:
+                    sprops = {k: list(v.values())[0] for k, v in sys_child.get("properties", {}).items()}
+                    if not bool(sprops.get("updateChecking", False)):
+                        break
+
+        if gen != self._device_generation:
+            return
+        if sprops:
+            self._update_firmware_state_from_sys_props(sprops, from_check_finish=True)
+        else:
+            manifest_newer = bool(
+                self._manifest_latest_version
+                and self._firmware
+                and self._version_tuple(self._manifest_latest_version) > self._version_tuple(self._firmware)
+            )
+            self._update_available = manifest_newer
+            if self._manifest_latest_version:
+                self._update_version = self._manifest_latest_version
+            self._update_checking = False
+            self.firmwareUpdateChanged.emit()
+
+        is_en = (self._language == "en")
+        if not self._update_checking:
+            if self._update_available:
+                ver = self.firmwareUpdateVersion
+                msg = f"New firmware available: v{ver}" if is_en else f"Nueva versión disponible: v{ver}"
+            else:
+                msg = f"Firmware is up to date (v{self._firmware})" if is_en else f"Firmware actualizado (v{self._firmware})"
+            self.toastMessage.emit(msg)
+
+    @pyqtSlot(bool)
+    def setBetaFirmwareMode(self, val):
+        if self._is_streamer_x:
+            return
+        val = bool(val)
+        self._beta_mode = val
+        self._manifest_latest_version = ""
+        self._fw_check_started_at = time.time()
+        self._update_checking = True
+        self.firmwareUpdateChanged.emit()
+        is_en = (self._language == "en")
+        if is_en:
+            self.toastMessage.emit("Beta firmware channel enabled" if val else "Stable firmware channel selected")
+        else:
+            self.toastMessage.emit("Canal de firmware Beta activado" if val else "Canal de firmware Estable seleccionado")
+        self.executor.submit(self._run_firmware_check, val)
+
+    @pyqtSlot()
+    def checkForFirmwareUpdates(self):
+        if self._is_streamer_x or self._update_checking:
+            return
+        self._fw_check_started_at = time.time()
+        self._update_checking = True
+        self.firmwareUpdateChanged.emit()
+        self.executor.submit(self._run_firmware_check, None)
+
+    @pyqtSlot()
+    def startFirmwareDownload(self):
+        if self._is_streamer_x or not self._connected or self._permission_error:
+            return
+        if self._update_no_internet or self._update_downloading or self._update_downloaded or self._update_installing:
+            return
+        self._fw_dl_started_at = time.time()
+        self._update_downloading = True
+        self._update_download_progress = 0
+        self.firmwareUpdateChanged.emit()
+        sys_node = self._find_root_child_index("SYSTEM")
+        self.executor.submit(
+            self.bridge.run_cmd,
+            ["set-property", str(sys_node), "downloadInitiateRequested", "bool:true"]
+        )
+        is_en = (self._language == "en")
+        self.toastMessage.emit("Starting firmware download on console..." if is_en else "Iniciando descarga de firmware en la consola...")
+
+    @pyqtSlot()
+    def cancelFirmwareDownload(self):
+        if self._is_streamer_x or not self._connected or self._permission_error:
+            return
+        self._update_downloading = False
+        self._update_download_progress = 0
+        self.firmwareUpdateChanged.emit()
+        sys_node = self._find_root_child_index("SYSTEM")
+        self.executor.submit(
+            self.bridge.run_cmd,
+            ["set-property", str(sys_node), "downloadCancelRequested", "bool:true"]
+        )
+        is_en = (self._language == "en")
+        self.toastMessage.emit("Firmware download cancelled" if is_en else "Descarga de firmware cancelada")
+
+    @pyqtSlot()
+    def startFirmwareInstall(self):
+        if self._is_streamer_x or not self._connected or self._permission_error:
+            return
+        if not self._update_downloaded or self._update_installing or self._update_complete:
+            return
+        self._fw_inst_started_at = time.time()
+        self._update_installing = True
+        self._update_install_progress = 0
+        self.firmwareUpdateChanged.emit()
+        sys_node = self._find_root_child_index("SYSTEM")
+        self.executor.submit(
+            self.bridge.run_cmd,
+            ["set-property", str(sys_node), "updateInitiateRequested", "bool:true"]
+        )
+        is_en = (self._language == "en")
+        self.toastMessage.emit("Installing firmware on console..." if is_en else "Instalando firmware en la consola...")
+
+    @pyqtSlot()
+    def rebootForFirmwareUpdate(self):
+        if self._is_streamer_x or not self._connected or self._permission_error:
+            return
+        sys_node = self._find_root_child_index("SYSTEM")
+        self.executor.submit(
+            self.bridge.run_cmd,
+            ["set-property", str(sys_node), "updateRebootRequested", "bool:true"]
+        )
+        is_en = (self._language == "en")
+        self.toastMessage.emit("Rebooting RØDECaster to finish update..." if is_en else "Reiniciando RØDECaster para completar la actualización...")
 
     @staticmethod
     def _raw_matches(raw_val, val_str):
