@@ -29,6 +29,9 @@ class RcpBridge:
         self._lock = threading.Lock()
         self._known_pads = {}
         self._pads_seeded = False
+        # Bumped whenever nodes are added/removed on the device: child indices of
+        # SOUNDPADS / PADEFFECTS shift, so any cached "parent,child" path is stale.
+        self.structure_gen = 0
         base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         if not cli_path:
             # Check local bin/ first, then Resources target
@@ -90,6 +93,7 @@ class RcpBridge:
         # Slot is empty: this call creates the node. Wait until the device
         # reports it before letting any further set-prop through.
         result = self.run_cmd(args, timeout=timeout, _raw=True)
+        self.structure_gen += 1
         for _ in range(15):
             time.sleep(0.2)
             if self.pad_exists(bank, pad):
@@ -119,6 +123,7 @@ class RcpBridge:
             if not out or "already empty" in out:
                 break
             removed += 1
+            self.structure_gen += 1
             time.sleep(0.15)
         if removed > 1:
             logger.info(f"Removed {removed} duplicated nodes for bank {bank} pad {pad}")
@@ -129,9 +134,12 @@ class RcpBridge:
             return self._set_pad_prop(args, timeout)
         if not _raw and len(args) >= 4 and args[0] == "pad" and args[1] == "upload":
             out, err = self.run_cmd(args, timeout=timeout, _raw=True)
+            self.structure_gen += 1
             if not err:
                 self._known_pads[(self.target_pid, str(args[2]), str(args[3]))] = 1
             return out, err
+        if args and args[0] == "add-child":
+            self.structure_gen += 1
         if not self.is_available():
             logger.warning(f"CLI binary not found at {self.cli_path}")
             return None, "Binary not found"

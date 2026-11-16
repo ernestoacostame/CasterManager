@@ -216,6 +216,17 @@ Item {
                     spacing: 20
                     visible: root.activeCategory === 0
 
+                    // Audio file actually stored in this pad (the name is just a label)
+                    Text {
+                        visible: Boolean(root.selectedPad && root.selectedPad.type === "sound" && root.selectedPad.file)
+                        Layout.fillWidth: true
+                        elide: Text.ElideMiddle
+                        font.pixelSize: 11
+                        color: "#8E8E93"
+                        text: (stateManager && stateManager.language === "en" ? "Audio file: " : "Archivo de audio: ")
+                              + (root.selectedPad && root.selectedPad.file ? String(root.selectedPad.file).split("/").pop() : "")
+                    }
+
                     // Three Main Sound Actions Box
                     Rectangle {
                         Layout.fillWidth: true
@@ -1097,6 +1108,8 @@ Item {
 
                     TextField {
                         id: nameField
+                        // Pad being edited, captured when the field gets focus
+                        property int editingPadIndex: -1
                         Layout.fillWidth: true
                         text: (root.selectedPad && root.selectedPad.name !== undefined) ? root.selectedPad.name : ""
                         font.pixelSize: 16
@@ -1110,8 +1123,43 @@ Item {
                             border.color: nameField.activeFocus ? "#CBA158" : "transparent"
                         }
 
+                        onActiveFocusChanged: {
+                            if (activeFocus && stateManager) {
+                                editingPadIndex = stateManager.selectedPadIndex;
+                                typedText = "";
+                                dirty = false;
+                            }
+                        }
+
+                        // Only text typed by the user is ever written to the console
+                        property string typedText: ""
+                        property bool dirty: false
+                        onTextEdited: { typedText = text; dirty = true; }
+
                         onEditingFinished: {
-                            stateManager.updatePadName(text);
+                            if (stateManager && dirty && editingPadIndex >= 0)
+                                stateManager.renamePad(editingPadIndex, typedText);
+                            dirty = false;
+                            editingPadIndex = -1;
+                        }
+
+                        Connections {
+                            target: stateManager
+                            function onSelectedPadChanged() {
+                                // Another pad was picked: commit the edit to the pad it belongs to
+                                if (nameField.activeFocus && stateManager
+                                        && nameField.editingPadIndex >= 0
+                                        && nameField.editingPadIndex !== stateManager.selectedPadIndex) {
+                                    var idx = nameField.editingPadIndex;
+                                    var txt = nameField.typedText;
+                                    var wasDirty = nameField.dirty;
+                                    nameField.dirty = false;
+                                    nameField.editingPadIndex = -1;
+                                    nameField.focus = false;
+                                    if (wasDirty)
+                                        stateManager.renamePad(idx, txt);
+                                }
+                            }
                         }
                     }
 

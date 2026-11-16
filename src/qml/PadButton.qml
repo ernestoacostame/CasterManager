@@ -16,6 +16,11 @@ Item {
 
     implicitWidth: 105
     implicitHeight: 95
+    // Keep the dragged tile above its sibling pads
+    z: mouseArea.drag.active ? 100 : 0
+
+    readonly property bool isDropTarget: Boolean(dropArea.containsDrag && dropArea.drag.source
+                                         && dropArea.drag.source.padIndex !== root.padIndex)
 
     DropArea {
         id: dropArea
@@ -24,6 +29,7 @@ Item {
 
         onDropped: (drop) => {
             if (drop.source && drop.source.padIndex !== undefined && drop.source.padIndex !== root.padIndex) {
+                drop.acceptProposedAction();
                 if (stateManager) {
                     stateManager.copyPad(drop.source.padIndex, root.padIndex);
                 }
@@ -36,18 +42,18 @@ Item {
         anchors.fill: parent
         radius: 8
         color: {
-            if (dropArea.containsDrag && root.padType === "empty") return "#332B1C";
+            if (root.isDropTarget) return "#332B1C";
             if (mouseArea.pressed) return Qt.darker(root.padColor, 2.5);
             if (mouseArea.containsMouse) return "#262628";
             return "#1C1C1E";
         }
         border.color: {
-            if (dropArea.containsDrag && root.padType === "empty") return "#CBA158";
+            if (root.isDropTarget) return "#CBA158";
             if (root.isSelected) return root.padColor;
             if (mouseArea.containsMouse) return Qt.rgba(root.padColor.r, root.padColor.g, root.padColor.b, 0.4);
             return "#2A2A2D";
         }
-        border.width: (dropArea.containsDrag && root.padType === "empty") ? 2 : (root.isSelected ? 2 : 1)
+        border.width: (root.isDropTarget) ? 2 : (root.isSelected ? 2 : 1)
 
         Behavior on color { ColorAnimation { duration: 100 } }
         Behavior on border.color { ColorAnimation { duration: 120 } }
@@ -58,9 +64,9 @@ Item {
             anchors.margins: -4
             radius: 12
             color: "transparent"
-            border.color: (dropArea.containsDrag && root.padType === "empty") ? "#CBA158" : root.padColor
+            border.color: (root.isDropTarget) ? "#CBA158" : root.padColor
             border.width: 2
-            opacity: (root.isSelected || (dropArea.containsDrag && root.padType === "empty")) ? 0.4 : 0.0
+            opacity: (root.isSelected || (root.isDropTarget)) ? 0.4 : 0.0
             visible: opacity > 0
             Behavior on opacity { NumberAnimation { duration: 150 } }
         }
@@ -178,6 +184,16 @@ Item {
 
         drag.target: root.padType !== "empty" ? dragItem : undefined
         drag.axis: Drag.XAndYAxis
+        drag.threshold: 8
+
+        onReleased: {
+            if (dragItem.Drag.active) {
+                // Internal drags only reach a DropArea when drop() is called explicitly
+                dragItem.Drag.drop();
+            }
+            dragItem.x = 0;
+            dragItem.y = 0;
+        }
 
         onClicked: (mouse) => {
             if (mouse.button === Qt.RightButton) {
@@ -198,7 +214,7 @@ Item {
         id: contextMenu
 
         MenuItem {
-            text: "Copiar Pad"
+            text: (stateManager && stateManager.language === "en") ? "Copy Pad" : "Copiar Pad"
             visible: root.padType !== "empty"
             onTriggered: {
                 if (stateManager) {
@@ -209,7 +225,7 @@ Item {
         }
 
         MenuItem {
-            text: "Pegar Pad"
+            text: (stateManager && stateManager.language === "en") ? "Paste Pad" : "Pegar Pad"
             enabled: stateManager ? stateManager.canPastePad : false
             onTriggered: {
                 if (stateManager) {
@@ -223,7 +239,7 @@ Item {
         }
 
         MenuItem {
-            text: "Limpiar Pad"
+            text: (stateManager && stateManager.language === "en") ? "Clear Pad" : "Limpiar Pad"
             visible: root.padType !== "empty"
             onTriggered: {
                 if (stateManager) {

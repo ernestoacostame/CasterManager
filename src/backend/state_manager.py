@@ -1343,7 +1343,7 @@ class StateManager(QObject):
                         pass
 
             # Per-pad voice FX live in PADEFFECTS/EFFECTS_PARAMETERS (effectsIdx == padIdx)
-            self._pad_fx_nodes = self._map_pad_fx_nodes(dump)
+            self._set_pad_fx_nodes(dump)
 
             # Populate Pads from SOUNDPADS
             soundpads_node = find_node(dump, "SOUNDPADS")
@@ -1731,11 +1731,25 @@ class StateManager(QObject):
 
     @pyqtSlot(str)
     def updatePadName(self, name):
-        pad = self._get_current_pad()
-        if not pad:
+        self.renamePad(self._selected_pad_index, name)
+
+    @pyqtSlot(int, str)
+    def renamePad(self, display_index, name):
+        """Rename the pad at display_index of the current bank. The editor passes the
+        index captured when editing started, so clicking another pad before the
+        field loses focus can no longer move the name onto that other pad."""
+        if not (0 <= display_index < self._pads_per_bank):
             return
+        order = STREAMER_X_PHYSICAL_ORDER if self._is_streamer_x else (DUO_PHYSICAL_ORDER if self._is_duo else PRO_II_PHYSICAL_ORDER)
+        logical = order[display_index] if display_index < len(order) else display_index
+        if not (0 <= self._current_bank < len(self._banks)) or not (0 <= logical < len(self._banks[self._current_bank])):
+            return
+        pad = self._banks[self._current_bank][logical]
+        name = (name or "").strip()
+        if not name or name == pad.get("name", ""):
+            return  # nothing changed: never rewrite the hardware
         pad["name"] = name
-        if pad["type"] == "empty" and name:
+        if pad["type"] == "empty":
             pad["type"] = "sound"
         self.padsChanged.emit()
         self.selectedPadChanged.emit()
@@ -1743,7 +1757,7 @@ class StateManager(QObject):
         if self._connected and not self._permission_error:
             self.executor.submit(
                 self.bridge.run_cmd,
-                ["pad", "set-prop", str(self._current_bank), str(self._selected_pad_index), "padName", f"str:{name}"]
+                ["pad", "set-prop", str(self._current_bank), str(display_index), "padName", f"str:{name}"]
             )
         is_en = (self._language == "en")
         self.toastMessage.emit(f"Name saved: {name}" if is_en else f"Nombre guardado: {name}")
@@ -1752,8 +1766,8 @@ class StateManager(QObject):
     def updatePadColor(self, color_idx):
         if 0 <= color_idx < len(PAD_COLORS):
             pad = self._get_current_pad()
-            if not pad:
-                return
+            if not pad or pad.get("type") == "empty" or pad.get("color_idx") == color_idx:
+                return  # empty slot: writing would create a bogus PAD node
             pad["color_idx"] = color_idx
             pad["color_hex"] = PAD_COLORS[color_idx]["hex"]
             self.padsChanged.emit()
@@ -1982,9 +1996,16 @@ class StateManager(QObject):
             return
 
         target = bank[dst_logical]
-        for k in ["name", "color_idx", "color_hex", "type", "mode", "loop", "replay", "gain", "file", "file_path", "fx_id", "fx_channel", "fx_mode"]:
+        for k in ["name", "color_idx", "color_hex", "type", "mode", "loop", "replay", "gain", "file", "file_path",
+                  "fx_id", "fx_channel", "fx_mode", "mixer_mode", "mixer_trigger", "fade_exclude_host"]:
             if k in pad_data:
                 target[k] = pad_data[k]
+        target["fx"] = dict(pad_data.get("fx") or {})
+        if "back_channel" in pad_data:
+            target["back_channel"] = dict(pad_data["back_channel"] or {})
+        target["idx"] = self._current_bank * self._pads_per_bank + dst_logical
+        src_raw = dict(pad_data.get("_raw") or {})
+        target["_raw"] = {}
 
         self.padsChanged.emit()
         self.selectedPadChanged.emit()
@@ -2002,26 +2023,39 @@ class StateManager(QObject):
                 return  # pasting a pad onto itself: nothing to do on hardware
             def do_sync():
                 if ptype == "fx":
+                    # Voice FX pad = PAD node + its own PADEFFECTS block (effectsIdx == padIdx)
                     self.bridge.clear_pad(b_str, p_str)
-                    fx_id = target.get("fx_id", 8)
-                    fx_channel = target.get("fx_channel", 0)
-                    fx_mode = target.get("fx_mode", 1)
-                    col = target.get("color_idx", 8)
-                    self._send_pad_props(b_str, p_str, [
-                        ("padType", "u32:2"),
-                        ("padFilePath", "str:"),
-                        ("padName", f"str:{target.get('name', '')}"),
-                        ("padColourIndex", f"u32:{col}"),
-                        ("padEffectTriggerMode", f"u32:{fx_mode}"),
-                        ("padEffectInput", f"u32:{fx_channel}"),
-                        ("padTriggerControl", f"u32:{fx_id}"),
-                        ("padTriggerSend", "u32:2"),
-                        ("padTriggerChannel", "u32:1"),
-                        ("padTriggerMode", "u32:1"),
-                        ("padTriggerOn", "u32:127"),
-                        ("padTriggerOff", "u32:0"),
-                        ("padActive", "bool:false"),
-                    ])
+                    tgt = {"idx": dst_idx_chk, "color_idx": target.get("color_idx", 7),
+                           "fx_channel": target.get("fx_channel", 0), "fx_mode": target.get("fx_mode", 1)}
+                    if not self._hw_make_fx_pad(tgt, b_str, p_str):
+                        logger.warning(f"Could not create FX pad {dst_idx_chk} while copying")
+                    else:
+                        self._send_pad_props(b_str, p_str, [
+                            ("padName", f"str:{target.get('name', '')}"),
+                            ("padColourIndex", f"u32:{target.get('color_idx', 7)}"),
+                            ("padEffectInput", f"u32:{target.get('fx_channel', 0)}"),
+                            ("padEffectTriggerMode", f"u32:{target.get('fx_mode', 1)}"),
+                        ], tgt.get("_raw", {}))
+                        path = self._pad_fx_path(dst_idx_chk)
+                        if path:
+                            src_fx = target.get("fx") or {}
+                            for k, default in self.PAD_FX_DEFAULTS:
+                                v = self._fx_val_str(k, src_fx[k]) if k in src_fx else default
+                                self.bridge.run_cmd(["set-property", path, k, v])
+                elif ptype == "mixer":
+                    self.bridge.clear_pad(b_str, p_str)
+                    props = [("padType", "u32:3"), ("padFilePath", "str:"),
+                             ("padName", f"str:{target.get('name', '').replace(' ', '_')}"),
+                             ("padColourIndex", f"u32:{target.get('color_idx', 4)}")]
+                    for k in ("padMixerFadeInSeconds", "padMixerFadeOutSeconds", "padMixerFadeExcludeHost",
+                              "padMixerCensorCustom", "padMixerCensorFilePath", "padMixerMode",
+                              "padMixerTriggerMode", "padPlayMode"):
+                        if k in src_raw:
+                            v = src_raw[k]
+                            kind = "bool" if isinstance(v, bool) else "u32" if isinstance(v, int) else "f64" if isinstance(v, float) else "str"
+                            props.append((k, f"{kind}:{str(v).lower() if kind == 'bool' else v}"))
+                    props.append(("padActive", "bool:false"))
+                    self._send_pad_props(b_str, p_str, props, {})
                 elif ptype == "sound":
                     sound_p = target.get("file_path") or ""
                     tmp_path = None
@@ -2305,16 +2339,42 @@ class StateManager(QObject):
                     snapshot = [[dict(p) for p in bank] for bank in self._banks[:8]]
 
                     def do_sync_pads():
+                        # A profile only carries names / colours, not the audio or the
+                        # effect blocks. Renaming a slot that holds different content
+                        # gives "Crickets" a Trombone sound, so only touch pads whose
+                        # current hardware content matches the profile entry.
+                        dump = self.bridge.dump_state()
+                        hw = {}
+                        sp = find_node(dump, "SOUNDPADS") if dump else None
+                        for c in (sp or {}).get("children", []):
+                            pr = {k: list(v.values())[0] for k, v in c.get("properties", {}).items()}
+                            if pr.get("padIdx") is not None:
+                                hw[int(pr["padIdx"])] = pr
+                        skipped = 0
                         for b, bank in enumerate(snapshot):
                             for p, cur in enumerate(bank):
-                                # Writing to an empty slot creates a PAD node: only touch real pads
                                 if not cur.get("name") and cur.get("type", "empty") == "empty":
                                     continue
+                                h = hw.get(b * ppb + p)
+                                if h is None:
+                                    skipped += 1
+                                    continue
+                                same_file = os.path.basename(str(h.get("padFilePath", ""))) == os.path.basename(str(cur.get("file", "")))
+                                h_type = {0: "sound", 1: "sound", 2: "fx", 3: "mixer"}.get(h.get("padType"), "")
+                                if h_type != cur.get("type") or (h_type == "sound" and not same_file):
+                                    skipped += 1
+                                    continue
                                 disp = order.index(p) if p in order else p
-                                if cur.get("name"):
+                                if cur.get("name") and cur["name"].replace(" ", "_") != str(h.get("padName", "")).replace(" ", "_"):
                                     self.bridge.run_cmd(["pad", "set-prop", str(b), str(disp), "padName", f"str:{cur['name']}"])
-                                if "color_idx" in cur:
+                                if "color_idx" in cur and int(cur["color_idx"]) != int(h.get("padColourIndex", -1)):
                                     self.bridge.run_cmd(["pad", "set-prop", str(b), str(disp), "padColourIndex", f"u32:{cur['color_idx']}"])
+                        if skipped:
+                            en = self._language == "en"
+                            self.toastMessage.emit(
+                                f"{skipped} pad(s) kept as on the console: their audio/effect differs from the profile" if en
+                                else f"{skipped} pad(s) se dejaron como en la consola: su audio/efecto no coincide con el perfil")
+                        self._sync_hardware_state()
                     self.executor.submit(do_sync_pads)
 
             # 3. Update Faders
@@ -3881,15 +3941,25 @@ class StateManager(QObject):
         return res
 
     def _pad_fx_path(self, pad_idx):
+        """Current "PADEFFECTS,child" path of a pad's effect block.
+
+        Child indices shift whenever nodes are added or removed (here or on the
+        console itself), and a stale path writes to ANOTHER pad's effects. So the
+        cached map is only trusted for a couple of seconds and only if no structural
+        change happened since it was built."""
+        fresh = (getattr(self, "_pad_fx_gen", None) == self.bridge.structure_gen
+                 and time.time() - getattr(self, "_pad_fx_time", 0) < 2.0)
+        if not fresh:
+            dump = self.bridge.dump_state()  # worker thread
+            if dump:
+                self._set_pad_fx_nodes(dump)
         info = getattr(self, "_pad_fx_nodes", {}).get(pad_idx)
-        if info:
-            return info["path"]
-        dump = self.bridge.dump_state()  # worker thread: node may have just been created
-        if dump:
-            self._pad_fx_nodes = self._map_pad_fx_nodes(dump)
-            info = self._pad_fx_nodes.get(pad_idx)
-            return info["path"] if info else None
-        return None
+        return info["path"] if info else None
+
+    def _set_pad_fx_nodes(self, dump):
+        self._pad_fx_nodes = self._map_pad_fx_nodes(dump)
+        self._pad_fx_gen = self.bridge.structure_gen
+        self._pad_fx_time = time.time()
 
     # Defaults of a fresh EFFECTS_PARAMETERS block (as RØDE Unify creates it)
     PAD_FX_DEFAULTS = [
@@ -3992,7 +4062,7 @@ class StateManager(QObject):
 
         dump = self.bridge.dump_state()
         if dump:
-            self._pad_fx_nodes = self._map_pad_fx_nodes(dump)
+            self._set_pad_fx_nodes(dump)
             hw = pad_node(dump)
             if hw:
                 pad["_raw"] = {k: v for k, v in hw.items() if isinstance(v, (int, float, str, bool))}
