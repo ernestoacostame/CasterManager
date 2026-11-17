@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <strong>Native Linux Desktop Management Suite & Audio Controller for RØDECaster Duo and Pro II</strong>
+  <strong>Native Linux Desktop Management Suite & Audio Controller for RØDECaster Duo, Pro II, Streamer X and PodMic USB</strong>
 </p>
 
 <p align="center">
@@ -30,7 +30,7 @@
 
 ## Overview
 
-**CasterManager** is a native, modern, and comprehensive Linux desktop suite created for the **RØDECaster Duo**, **RØDECaster Pro II** and **RØDE Streamer X** audio production devices. Built on Qt 6 (PyQt6 + QML) with a high-performance Rust protocol bridge (`rcp2-cli`), it delivers a complete management interface matching and extending official desktop utilities: live fader mixing, input routing, per-channel audio processing (APHEX®, compressor, gate, EQ, VoxLab), SMART Pads customization (sounds & hardware Voice FX), MicroSD recording transfers, and device configuration. Several RØDE devices can be connected at the same time and switched from the sidebar.
+**CasterManager** is a native, modern, and comprehensive Linux desktop suite created for the **RØDECaster Duo**, **RØDECaster Pro II**, **RØDE Streamer X**, and **RØDE PodMic USB** audio devices. Built on Qt 6 (PyQt6 + QML) with a high-performance Rust protocol bridge (`rcp2-cli`) and a native USB HID controller, it delivers a complete management interface matching and extending official desktop utilities: live fader mixing, input routing, per-channel audio processing (APHEX®, compressor, gate, EQ, VoxLab™), SMART Pads customization (sounds & hardware Voice FX), MicroSD recording transfers, OTA firmware updates with Beta channel support, and hardware device configuration. Multiple RØDE devices can be connected simultaneously and switched seamlessly from the sidebar.
 
 ---
 
@@ -67,9 +67,19 @@
 - **USB Multitrack mode (what RØDE UNIFY unlocks on macOS/Windows):** one switch writes `outputMultiMode = 2`; the unit re-enumerates as *Streamer X Main Multitrack* (USB PID `0x0055`) with **9 capture channels**. CasterManager then creates named sources for your DAW: **Streamer X - Micrófono** (ch 1), **Headset** (ch 2), **Wireless** (ch 3), **SMART Pads** (ch 4-5, stereo) and **Canales 6-7 / 8-9**. The UNIFY virtual devices are rebuilt automatically for the new layout. Note: PC audio is not part of the hardware multitrack (UNIFY mixes it in software on macOS too); record it from `UNIFY-Music`, `UNIFY-Game`, etc.
 - **4 SMART Pads per bank** with sounds and Voice FX.
 
+### 🎙️ RØDE PodMic USB Support
+- **Native USB HID Driver:** Communicates directly with `/dev/hidraw*` on the PodMic USB (USB PID `0x004a`) without external daemons or proprietary dependencies.
+- **Digital Preamp & Mute Control:** Dedicated 0–63 dB preamp gain fader with real-time level and hardware mute synchronization.
+- **Integrated APHEX® DSP Processing:**
+  - **VoxLab™ Mode:** Intuitive *Depth / Sparkle / Punch* macro controls and voice preset switching matching the internal DSP.
+  - **Advanced Channel Mode:** Granular control over the onboard High-Pass Filter (discrete *75 Hz* and *150 Hz* modes), Noise Gate, Compressor, and APHEX® (Aural Exciter & Big Bottom).
+- **Tailored Adaptive UI:** Automatically hides console-only features (SMART Pads, MicroSD storage & recording transfers, phantom power, phase flip, monitor routing, and screen brightness), displaying a clean, responsive layout suited specifically for a USB dynamic broadcast microphone.
+- **Zero-Latency Headphone Monitoring:** Detects and documents the onboard 3.5mm headphone amplifier and rotary volume wheel.
+- **Firmware Version Checking:** Compares installed firmware directly against official RØDE releases (v1.1.9).
+
 ### 🔀 Multiple Devices
-- Connect a RØDECaster and a Streamer X simultaneously and switch between them from the sidebar.
-- Each device keeps its own node layout, faders, DSP and pads; queued writes and in-flight syncs from the previous device are discarded on switch.
+- Connect a RØDECaster, Streamer X, and PodMic USB simultaneously and switch between them seamlessly from the sidebar.
+- Each device maintains its own hardware icon, node layout, faders, DSP parameters, and pads; queued writes and in-flight syncs from the previous device are discarded on switch.
 - A device without USB permission no longer blocks the one you are controlling.
 
 ### 🎛️ SMART Pads Customizer (Sounds & Voice FX)
@@ -98,6 +108,11 @@
 - **Headphone Profiles:** Configure output impedance and tuning (RØDE NTH-100, High Sensitivity, Low Sensitivity).
 - **Audio Routing & Protection:** Auto-mute monitor outputs when faders are raised, auto-mute Bluetooth when mic is live, pre/post-fader listen (PFL/AFL), and multitrack modes.
 - **Haptics & USB MIDI:** Enable or adjust tactile vibration and USB MIDI bi-directional communication.
+- **OTA Firmware Updates & Beta Channel (RØDECaster Duo & Pro II):**
+  - Integrated update checking against online official RØDE manifests (`http://update.rode.com/manifest.json` and `rcp2-mini-manifest.json`).
+  - Full update lifecycle management: checking, downloading, installing, and rebooting the console.
+  - Optional **Beta Firmware Channel** toggle to test early pre-release builds published by RØDE.
+  - Safe firmware status detection for Streamer X and PodMic USB.
 
 ### 🌐 Bilingual Interface & Desktop Polish
 - **i18n Support:** Fully translated interface in **English** and **Spanish** with instant switching and persistent `QSettings`.
@@ -169,6 +184,7 @@ Launch CasterManager from your application menu or start it from terminal:
 | **RØDECaster Duo** | Yes | 4 Faders, 2 Pots | 2 Software Faders | 6 per bank (2x3) |
 | **RØDECaster Pro II** | Yes | 6 Faders, 4 Pots | 3 Software Faders | 8 per bank (2x4) |
 | **RØDE Streamer X** | Yes | Input dial, Headphone dial, Mic Mute | Stream mix levels | 4 per bank (2x2) |
+| **RØDE PodMic USB** | Yes | Headphone volume dial | Preamp gain fader (0–63 dB) | N/A (Microphone) |
 
 ### Known Limitations
 - The SMART Pads **MIDI** tab and Reverb/Echo pad effects are not yet written to the hardware.
@@ -234,7 +250,7 @@ This project is licensed under the [MIT License](LICENSE).
 </p>
 
 <p align="center">
-  <strong>Suite de gestión de escritorio y controlador de audio para RØDECaster Duo y Pro II en Linux</strong>
+  <strong>Suite de gestión de escritorio y controlador de audio para RØDECaster Duo, Pro II, Streamer X y PodMic USB en Linux</strong>
 </p>
 
 <p align="center">
@@ -259,7 +275,7 @@ This project is licensed under the [MIT License](LICENSE).
 
 ## Descripción
 
-**CasterManager** es una suite de escritorio nativa, moderna y completa para Linux, diseñada para los dispositivos de producción de audio **RØDECaster Duo**, **RØDECaster Pro II** y **RØDE Streamer X**. Construida con Qt 6 (PyQt6 + QML) y respaldada por un puente de protocolo en Rust (`rcp2-cli`), proporciona una suite completa equivalente y superior a las herramientas de escritorio oficiales: mezclador de faders en vivo, matriz de enrutamiento, procesamiento de audio por canal (APHEX®, compresor, puerta de ruido, EQ, VoxLab), personalización de SMART Pads (sonidos y efectos de voz por hardware), transferencia de tomas grabadas en la MicroSD y configuración general del hardware. Puedes conectar varios dispositivos RØDE a la vez y cambiar entre ellos desde la barra lateral.
+**CasterManager** es una suite de escritorio nativa, moderna y completa para Linux, diseñada para los dispositivos de audio **RØDECaster Duo**, **RØDECaster Pro II**, **RØDE Streamer X** y **RØDE PodMic USB**. Construida con Qt 6 (PyQt6 + QML), respaldada por un puente de protocolo en Rust (`rcp2-cli`) y un controlador nativo USB HID, proporciona una suite de gestión completa equivalente y superior a las herramientas de escritorio oficiales: mezclador de faders en vivo, matriz de enrutamiento, procesamiento de audio por canal (APHEX®, compresor, puerta de ruido, EQ, VoxLab™), personalización de SMART Pads (sonidos y efectos de voz por hardware), transferencia de grabaciones en MicroSD, actualizaciones de firmware OTA con canal Beta y configuración general del hardware. Puedes conectar varios dispositivos RØDE a la vez y cambiar entre ellos fluidamente desde la barra lateral.
 
 ---
 
@@ -296,9 +312,19 @@ This project is licensed under the [MIT License](LICENSE).
 - **Modo Multipista USB (lo que RØDE UNIFY desbloquea en macOS/Windows):** un interruptor escribe `outputMultiMode = 2`; la unidad se vuelve a anunciar como *Streamer X Main Multitrack* (PID USB `0x0055`) con **9 canales de captura**. CasterManager crea entonces fuentes con nombre para tu DAW: **Streamer X - Micrófono** (canal 1), **Headset** (2), **Wireless** (3), **SMART Pads** (4-5, estéreo) y **Canales 6-7 / 8-9**. Los dispositivos virtuales UNIFY se reconstruyen solos para el nuevo modo. Nota: el audio del PC no forma parte de la multipista del hardware (en macOS UNIFY también lo mezcla por software); grábalo desde `UNIFY-Music`, `UNIFY-Game`, etc.
 - **4 SMART Pads por banco** con sonidos y efectos de voz.
 
+### 🎙️ Soporte para RØDE PodMic USB
+- **Controlador Nativo USB HID:** Comunicación directa mediante `/dev/hidraw*` con el PodMic USB (PID USB `0x004a`) sin demonios externos ni dependencias privativas.
+- **Control de Ganancia de Preamp Digital y Mute:** Fader dedicado de 0 a 63 dB con nivel en tiempo real y sincronización bidireccional del botón de silencio físico.
+- **Procesamiento DSP APHEX® Integrado:**
+  - **Modo VoxLab™:** Ajustes macro intuitivos de *Profundidad / Brillo / Pegada* y cambio de presets de voz adaptados al DSP interno.
+  - **Modo de Canal Avanzado:** Control granular sobre el Filtro Paso Alto (modos discretos de *75 Hz* y *150 Hz*), Puerta de Ruido, Compresor y APHEX® (Aural Exciter y Big Bottom).
+- **Interfaz Adaptativa a la Medida:** Oculta automáticamente funciones exclusivas de consolas (SMART Pads, almacenamiento MicroSD, alimentación phantom +48V, inversión de fase, matriz de monitores y brillo de pantalla), ofreciendo un diseño limpio y optimizado para un micrófono broadcast dinámico USB.
+- **Monitoreo de Auriculares con Latencia Cero:** Detección y documentación del amplificador de auriculares de 3.5 mm integrado y dial físico de volumen.
+- **Verificación de Versión de Firmware:** Comprobación directa de la versión instalada frente a las versiones oficiales publicadas por RØDE (v1.1.9).
+
 ### 🔀 Varios Dispositivos a la Vez
-- Conecta una RØDECaster y una Streamer X simultáneamente y cambia entre ellas desde la barra lateral.
-- Cada dispositivo conserva su propio mapa de nodos, faders, DSP y pads; al cambiar se descartan las escrituras pendientes y las sincronizaciones en curso del dispositivo anterior.
+- Conecta una RØDECaster, una Streamer X y un PodMic USB simultáneamente y cambia entre ellos fluidamente desde la barra lateral.
+- Cada dispositivo conserva su propio icono de hardware, mapa de nodos, faders, parámetros DSP y pads; al cambiar se descartan las escrituras pendientes y las sincronizaciones en curso del dispositivo anterior.
 - Un dispositivo sin permisos USB ya no bloquea al que estás controlando.
 
 ### 🎛️ Gestor de SMART Pads (Sonidos y Efectos de Voz FX)
@@ -327,6 +353,11 @@ This project is licensed under the [MIT License](LICENSE).
 - **Perfiles de Auriculares:** Ajustes para RØDE NTH-100, alta sensibilidad y baja sensibilidad.
 - **Enrutamiento y Protección:** Silenciado automático de monitores al subir faders de micro, silenciado de Bluetooth, escucha pre/post-fader (PFL/AFL) y modos de grabación multitrack.
 - **Vibración Háptica y Control MIDI:** Configura la respuesta táctil de los pads y la comunicación MIDI bidireccional por USB.
+- **Actualizaciones de Firmware OTA y Canal Beta (RØDECaster Duo y Pro II):**
+  - Comprobación integrada contra los manifiestos oficiales de RØDE en línea (`http://update.rode.com/manifest.json` y `rcp2-mini-manifest.json`).
+  - Ciclo completo de actualización: comprobación, descarga, instalación y reinicio de la consola.
+  - Selector opcional de **Canal de Firmware Beta** para probar versiones previas publicadas por RØDE.
+  - Detección segura de estado de firmware para Streamer X y PodMic USB.
 
 ### 🌐 Soporte Bilingüe e Integración con el Escritorio
 - **Idiomas:** Interfaz completa en **Español** e **Inglés**, configurable desde la ventana de ajustes y guardada con persistencia en `QSettings`.
@@ -398,6 +429,7 @@ Puedes abrir CasterManager desde el menú de aplicaciones de tu entorno (KDE Pla
 | **RØDECaster Duo** | Sí | 4 Faders, 2 Pots | 2 Faders Virtuales | 6 por banco (2x3) |
 | **RØDECaster Pro II** | Sí | 6 Faders, 4 Pots | 3 Faders Virtuales | 8 por banco (2x4) |
 | **RØDE Streamer X** | Sí | Dial de entrada, dial de auriculares, Mute de micro | Niveles de Stream Mix | 4 por banco (2x2) |
+| **RØDE PodMic USB** | Sí | Dial de volumen de auriculares | Fader de ganancia de preamp (0–63 dB) | N/A (Micrófono) |
 
 ### Limitaciones Conocidas
 - La pestaña **MIDI** de los SMART Pads y los efectos Reverb/Echo aún no se escriben en el hardware.
