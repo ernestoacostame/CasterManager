@@ -8,6 +8,15 @@ Item {
 
     property int activeTab: 0 // 0: Output, 1: Display, 2: System
 
+    Connections {
+        target: stateManager
+        function onStateChanged() {
+            if (stateManager && stateManager.isPodMic && root.activeTab === 1) {
+                root.activeTab = 0;
+            }
+        }
+    }
+
     readonly property var hoursList: ["00","01","02","03","04","05","06","07","08","09","10","11","12","13","14","15","16","17","18","19","20","21","22","23"]
     readonly property var minutesList: ["00","01","02","03","04","05","06","07","08","09","10","11","12","13","14","15","16","17","18","19","20","21","22","23","24","25","26","27","28","29","30","31","32","33","34","35","36","37","38","39","40","41","42","43","44","45","46","47","48","49","50","51","52","53","54","55","56","57","58","59"]
 
@@ -66,8 +75,9 @@ Item {
                         }
                     }
 
-                    // Tab 1: Display (Streamer X has no LCD: only the button lighting is shown)
+                    // Tab 1: Display (Streamer X has no LCD; PodMic USB has no screen or RGB buttons)
                     Rectangle {
+                        visible: !(stateManager && stateManager.isPodMic)
                         width: 90
                         height: 30
                         radius: 6
@@ -406,7 +416,7 @@ Item {
                     // 2. Headphones Card
                     Rectangle {
                         Layout.fillWidth: true
-                        implicitHeight: (stateManager && stateManager.isStreamerX) ? 104 : 150
+                        implicitHeight: (stateManager && (stateManager.isStreamerX || stateManager.isPodMic)) ? (hpCol.implicitHeight + 36) : 150
                         Layout.preferredHeight: implicitHeight
                         radius: 12
                         color: "#1A1A1D"
@@ -422,16 +432,30 @@ Item {
                             Text {
                                 text: "🎧 " + (stateManager && stateManager.isStreamerX 
                                       ? (stateManager ? stateManager.strings.hp_front_output : "Salida de Auriculares (Frontal TRRS 3.5mm)") 
-                                      : (stateManager ? stateManager.strings.headphones : "Auriculares"))
+                                      : (stateManager && stateManager.isPodMic
+                                         ? (stateManager.language === "en" ? "Headphone Output (3.5mm Zero-Latency)" : "Salida de Auriculares (3.5mm Latencia Cero)")
+                                         : (stateManager ? stateManager.strings.headphones : "Auriculares")))
                                 font.pixelSize: 15
                                 font.bold: true
                                 color: "#FFFFFF"
                             }
 
+                            Text {
+                                visible: Boolean(stateManager && stateManager.isPodMic)
+                                Layout.fillWidth: true
+                                wrapMode: Text.WordWrap
+                                font.pixelSize: 12
+                                color: "#9A9A9E"
+                                text: (stateManager && stateManager.language === "en")
+                                      ? "The RØDE PodMic USB includes a 3.5mm zero-latency monitoring output with dedicated rotary volume control directly on the microphone."
+                                      : "El RØDE PodMic USB incluye una salida de auriculares de 3.5 mm con monitoreo de latencia cero y control de volumen rotatorio integrado en el micrófono."
+                            }
+
                             // Headphone 1 (or Main Headphone for Streamer X)
                             RowLayout {
+                                visible: !(stateManager && stateManager.isPodMic)
                                 Layout.fillWidth: true
-                                Layout.preferredHeight: 32
+                                Layout.preferredHeight: visible ? 32 : 0
                                 spacing: 14
 
                                 Text {
@@ -473,9 +497,9 @@ Item {
                                 }
                             }
 
-                            // Headphone 2 (Hidden for Streamer X since it only has 1 headphone output)
+                            // Headphone 2 (Hidden for Streamer X / PodMic USB since they don't have a 2nd headphone jack)
                             RowLayout {
-                                visible: Boolean(stateManager && !stateManager.isStreamerX)
+                                visible: Boolean(stateManager && !stateManager.isStreamerX && !stateManager.isPodMic)
                                 Layout.fillWidth: true
                                 Layout.preferredHeight: visible ? 32 : 0
                                 spacing: 14
@@ -521,9 +545,9 @@ Item {
                         }
                     }
 
-                    // 3. Monitor & Routing Options Card (Hidden for Streamer X: no monitor speakers or solo buttons)
+                    // 3. Monitor & Routing Options Card (Hidden for Streamer X / PodMic USB)
                     Rectangle {
-                        visible: Boolean(stateManager && !stateManager.isStreamerX)
+                        visible: Boolean(stateManager && !stateManager.isStreamerX && !stateManager.isPodMic)
                         Layout.fillWidth: true
                         implicitHeight: visible ? (monCol.implicitHeight + 36) : 0
                         Layout.preferredHeight: implicitHeight
@@ -1477,10 +1501,16 @@ Item {
                             Text { text: stateManager && stateManager.serialNumber ? stateManager.serialNumber : "N/A"; font.pixelSize: 13; font.bold: true; color: "#FFFFFF" }
                         }
 
-                        Rectangle { Layout.fillWidth: true; height: 1; color: "#28282E" }
+                        Rectangle {
+                            visible: !(stateManager && stateManager.isPodMic)
+                            Layout.fillWidth: true
+                            height: 1
+                            color: "#28282E"
+                        }
 
                         // USB MIDI Control Toggle
                         RowLayout {
+                            visible: !(stateManager && stateManager.isPodMic)
                             Layout.fillWidth: true
                             ColumnLayout {
                                 spacing: 2
@@ -1891,7 +1921,7 @@ Item {
                         }
 
                         Rectangle {
-                            visible: Boolean(stateManager && !stateManager.isStreamerX)
+                            visible: Boolean(stateManager && !stateManager.isStreamerX && !stateManager.isPodMic)
                             Layout.fillWidth: true
                             height: 1
                             color: "#28282E"
@@ -1899,7 +1929,7 @@ Item {
 
                         // Beta Firmware Channel Toggle
                         RowLayout {
-                            visible: Boolean(stateManager && !stateManager.isStreamerX)
+                            visible: Boolean(stateManager && !stateManager.isStreamerX && !stateManager.isPodMic)
                             Layout.fillWidth: true
                             ColumnLayout {
                                 spacing: 2

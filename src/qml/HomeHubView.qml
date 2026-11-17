@@ -22,9 +22,16 @@ Item {
             }
 
             Text {
-                text: stateManager && stateManager.language === "es" 
-                      ? "Selecciona una opción para gestionar tu consola" 
-                      : "Select an option to manage your console"
+                text: {
+                    if (stateManager && stateManager.isPodMic) {
+                        return stateManager.language === "es"
+                            ? "Micrófono dinámico USB con procesamiento APHEX® integrado"
+                            : "USB dynamic microphone with built-in APHEX® processing";
+                    }
+                    return stateManager && stateManager.language === "es"
+                        ? "Selecciona una opción para gestionar tu consola"
+                        : "Select an option to manage your console";
+                }
                 font.pixelSize: 14
                 color: "#8E8E93"
             }
@@ -33,7 +40,7 @@ Item {
         // Feature Cards Grid
         GridLayout {
             Layout.fillWidth: true
-            columns: (stateManager && stateManager.isStreamerX) ? 2 : (root.width > 900 ? 3 : 2)
+            columns: (stateManager && (stateManager.isStreamerX || stateManager.isPodMic)) ? 2 : (root.width > 900 ? 3 : 2)
             rowSpacing: 20
             columnSpacing: 20
 
@@ -98,7 +105,11 @@ Item {
                         }
 
                         Text {
-                            text: stateManager ? stateManager.strings.hub_audio_setup_desc : "Faders, canales, enrutamiento y vúmetros en vivo"
+                            text: (stateManager && stateManager.isPodMic)
+                                  ? (stateManager.language === "es"
+                                     ? "Ganancia de preamp digital y control de mute por USB"
+                                     : "Digital preamp gain and USB mute control")
+                                  : (stateManager ? stateManager.strings.hub_audio_setup_desc : "Faders, canales, enrutamiento y vúmetros en vivo")
                             font.pixelSize: 12
                             color: "#9A9A9E"
                             wrapMode: Text.WordWrap
@@ -181,7 +192,11 @@ Item {
                         }
 
                         Text {
-                            text: stateManager ? stateManager.strings.hub_audio_processing_desc : "Efectos APHEX®, Puerta de Ruido, Compresor, HPF, De-Esser y EQ"
+                            text: (stateManager && stateManager.isPodMic)
+                                  ? (stateManager.language === "es"
+                                     ? "VoxLab™, Filtro Paso Alto, Puerta de Ruido, Compresor y APHEX®"
+                                     : "VoxLab™, High-Pass Filter, Noise Gate, Compressor and APHEX®")
+                                  : (stateManager ? stateManager.strings.hub_audio_processing_desc : "Efectos APHEX®, Puerta de Ruido, Compresor, HPF, De-Esser y EQ")
                             font.pixelSize: 12
                             color: "#9A9A9E"
                             wrapMode: Text.WordWrap
@@ -264,7 +279,11 @@ Item {
                         }
 
                         Text {
-                            text: stateManager ? stateManager.strings.hub_device_config_desc : "Salidas, pantalla, brillo, vúmetros y sistema"
+                            text: (stateManager && stateManager.isPodMic)
+                                  ? (stateManager.language === "es"
+                                     ? "Salida de auriculares, versión de firmware y sistema"
+                                     : "Headphone output, firmware version and system")
+                                  : (stateManager ? stateManager.strings.hub_device_config_desc : "Salidas, pantalla, brillo, vúmetros y sistema")
                             font.pixelSize: 12
                             color: "#9A9A9E"
                             wrapMode: Text.WordWrap
@@ -288,6 +307,7 @@ Item {
 
             // 3. Customize SMART Pads
             Rectangle {
+                visible: !(stateManager && stateManager.isPodMic)
                 Layout.fillWidth: true
                 Layout.preferredHeight: 185
                 Layout.minimumHeight: 170
@@ -381,7 +401,7 @@ Item {
 
             // 4. Transfer Recordings (Only for Duo/Pro II with SD card support)
             Rectangle {
-                visible: !(stateManager && stateManager.isStreamerX)
+                visible: !(stateManager && (stateManager.isStreamerX || stateManager.isPodMic))
                 Layout.fillWidth: true
                 Layout.preferredHeight: 185
                 Layout.minimumHeight: 170

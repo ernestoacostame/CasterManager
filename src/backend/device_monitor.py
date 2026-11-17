@@ -30,6 +30,10 @@ STREAMER_X_PRODUCT_IDS = {
     "0055": "RØDE Streamer X",
 }
 
+PODMIC_USB_PRODUCT_IDS = {
+    "004a": "RØDE PodMic USB",
+}
+
 class HidDrainer(threading.Thread):
     """
     Prevents hardware lockup on Linux: continuously drains reports from
@@ -151,6 +155,16 @@ class DeviceMonitor(QObject):
                             virtual_faders = 0
                             pots = 2
                             physical_order = [0, 2, 1, 3]
+                        elif pid in PODMIC_USB_PRODUCT_IDS:
+                            model_type = "PodMicUSB"
+                            display_name = PODMIC_USB_PRODUCT_IDS[pid]
+                            pads_per_bank = 0
+                            pad_cols = 0
+                            pad_rows = 0
+                            physical_faders = 1
+                            virtual_faders = 0
+                            pots = 1
+                            physical_order = []
                         elif pid in PRO_II_PRODUCT_IDS:
                             model_type = "ProII"
                             display_name = "RØDECaster Pro II"
@@ -163,7 +177,8 @@ class DeviceMonitor(QObject):
                             physical_order = [0, 4, 1, 5, 2, 6, 3, 7]
                         else:
                             # Default fallback based on product name
-                            if "duo" in product_name.lower():
+                            pname_low = product_name.lower()
+                            if "duo" in pname_low:
                                 model_type = "Duo"
                                 display_name = "RØDECaster Duo"
                                 pads_per_bank = 6
@@ -173,7 +188,7 @@ class DeviceMonitor(QObject):
                                 virtual_faders = 5
                                 pots = 2
                                 physical_order = [0, 3, 1, 4, 2, 5]
-                            elif "streamer" in product_name.lower():
+                            elif "streamer" in pname_low:
                                 model_type = "StreamerX"
                                 display_name = "RØDE Streamer X"
                                 pads_per_bank = 4
@@ -183,6 +198,16 @@ class DeviceMonitor(QObject):
                                 virtual_faders = 0
                                 pots = 2
                                 physical_order = [0, 2, 1, 3]
+                            elif "podmic" in pname_low:
+                                model_type = "PodMicUSB"
+                                display_name = product_name or "RØDE PodMic USB"
+                                pads_per_bank = 0
+                                pad_cols = 0
+                                pad_rows = 0
+                                physical_faders = 1
+                                virtual_faders = 0
+                                pots = 1
+                                physical_order = []
                             else:
                                 model_type = "ProII"
                                 display_name = "RØDECaster Pro II"

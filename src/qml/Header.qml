@@ -88,7 +88,7 @@ Rectangle {
 
         // Live REC Control Button (Only on devices with onboard recorder)
         Rectangle {
-            visible: Boolean(stateManager && !stateManager.isStreamerX)
+            visible: Boolean(stateManager && !stateManager.isStreamerX && !stateManager.isPodMic)
             Layout.preferredHeight: 32
             Layout.preferredWidth: recHeaderRow.width + 24
             Layout.alignment: Qt.AlignVCenter

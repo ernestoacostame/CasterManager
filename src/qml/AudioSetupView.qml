@@ -44,7 +44,7 @@ Item {
 
             // Submix Switcher Pill (Stream / Broadcast vs Headphones / Monitor)
             Rectangle {
-                visible: true
+                visible: !(stateManager && stateManager.isPodMic)
                 height: 36
                 width: 360
                 radius: 18
@@ -167,7 +167,7 @@ Item {
 
         // Submix Information Banner
         Rectangle {
-            visible: !stateManager || !stateManager.isStreamerX
+            visible: !stateManager || (!stateManager.isStreamerX && !stateManager.isPodMic)
             Layout.fillWidth: true
             height: 38
             radius: 8
@@ -287,13 +287,14 @@ Item {
                         // Single Fader Strip
                         Rectangle {
                             Layout.fillWidth: true
+                            Layout.maximumWidth: (stateManager && stateManager.faders.length === 1) ? 280 : 10000
                             Layout.fillHeight: true
                             radius: 10
                             color: root.selectedChannelIndex === modelData.index 
                                    ? ((stateManager && stateManager.activeMixTarget === "headphones") ? "#302B1E" : "#282830")
                                    : "#222226"
-                            border.color: modelData.mute ? "#FF3B30" : ((!stateManager || !stateManager.isStreamerX) && modelData.listen ? "#34C759" : (root.selectedChannelIndex === modelData.index ? "#CBA158" : "#303036"))
-                            border.width: (root.selectedChannelIndex === modelData.index || modelData.mute || ((!stateManager || !stateManager.isStreamerX) && modelData.listen)) ? 2 : 1
+                            border.color: modelData.mute ? "#FF3B30" : ((!stateManager || (!stateManager.isStreamerX && !stateManager.isPodMic)) && modelData.listen ? "#34C759" : (root.selectedChannelIndex === modelData.index ? "#CBA158" : "#303036"))
+                            border.width: (root.selectedChannelIndex === modelData.index || modelData.mute || ((!stateManager || (!stateManager.isStreamerX && !stateManager.isPodMic)) && modelData.listen)) ? 2 : 1
 
                             ColumnLayout {
                                 anchors.fill: parent
@@ -446,7 +447,7 @@ Item {
                                     spacing: 4
 
                                     Rectangle {
-                                        visible: !stateManager || !stateManager.isStreamerX
+                                        visible: !stateManager || (!stateManager.isStreamerX && !stateManager.isPodMic)
                                         Layout.fillWidth: true
                                         height: 22
                                         radius: 5
@@ -503,7 +504,7 @@ Item {
                                     spacing: 6
 
                                     Rectangle {
-                                        visible: !stateManager || !stateManager.isStreamerX
+                                        visible: !stateManager || (!stateManager.isStreamerX && !stateManager.isPodMic)
                                         Layout.fillWidth: true
                                         height: 28
                                         radius: 6
@@ -562,6 +563,11 @@ Item {
                             }
                         }
                     }
+
+                    Item {
+                        visible: Boolean(stateManager && stateManager.faders.length === 1)
+                        Layout.fillWidth: true
+                    }
                 }
             }
         }
@@ -575,18 +581,32 @@ Item {
             RowLayout {
                 Layout.fillWidth: true
                 Text {
-                    text: stateManager ? stateManager.strings.input_sources_pool : "Fuentes de Entrada Disponibles"
+                    text: (stateManager && stateManager.isPodMic)
+                          ? (stateManager.language === "en" ? "USB Microphone Channel" : "Canal de Micrófono USB")
+                          : (stateManager ? stateManager.strings.input_sources_pool : "Fuentes de Entrada Disponibles")
                     font.pixelSize: 14
                     font.bold: true
                     color: "#FFFFFF"
                 }
                 Item { Layout.fillWidth: true }
                 Text {
-                    visible: !(stateManager && stateManager.isStreamerX)
+                    visible: !(stateManager && (stateManager.isStreamerX || stateManager.isPodMic))
                     text: (stateManager && stateManager.language === "en" ? "Click a source to assign it to " : "Haz clic en una fuente para asignarla al ") + (stateManager && stateManager.faders[root.selectedChannelIndex] ? stateManager.faders[root.selectedChannelIndex].name : (stateManager && stateManager.language === "en" ? "Channel " : "Canal ") + (root.selectedChannelIndex + 1))
                     font.pixelSize: 11
                     color: "#CBA158"
                 }
+            }
+
+            // PodMic USB: single physical USB dynamic mic channel
+            Text {
+                visible: Boolean(stateManager && stateManager.isPodMic)
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
+                font.pixelSize: 12
+                color: "#8E8E93"
+                text: stateManager && stateManager.language === "en"
+                      ? "On the RØDE PodMic USB this control adjusts the built-in digital preamp gain and hardware mute directly over USB. Use Audio Processing to configure VoxLab™, APHEX®, High-Pass Filter, Noise Gate and Compressor."
+                      : "En el RØDE PodMic USB este control ajusta la ganancia del preamplificador digital integrado y el silencio por hardware directamente vía USB. Usa Procesamiento de Audio para configurar VoxLab™, APHEX®, Filtro Paso Alto, Puerta de Ruido y Compresor."
             }
 
             // Streamer X: every channel strip is hard-wired to one physical/USB input
@@ -604,7 +624,7 @@ Item {
             }
 
             GridLayout {
-                visible: !(stateManager && stateManager.isStreamerX)
+                visible: !(stateManager && (stateManager.isStreamerX || stateManager.isPodMic))
                 Layout.fillWidth: true
                 columns: 4
                 rowSpacing: 10

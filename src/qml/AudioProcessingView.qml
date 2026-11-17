@@ -8,6 +8,20 @@ Item {
     readonly property var dsp: (stateManager && stateManager.currentDsp) ? stateManager.currentDsp : ({})
     property int activeTab: 0            // 0: VoxLab™, 1: Canal Avanzado
     property string focusedEffect: ""
+    property bool _podmicTabSynced: false
+
+    Connections {
+        target: stateManager
+        function onSelectedDeviceIndexChanged() {
+            root._podmicTabSynced = false;
+        }
+        function onDspChanged() {
+            if (stateManager && stateManager.isPodMic && !root._podmicTabSynced && root.dsp && root.dsp.voxlab_enabled !== undefined) {
+                root.activeTab = root.dsp.voxlab_enabled ? 0 : 1;
+                root._podmicTabSynced = true;
+            }
+        }
+    }
 
     // Voice profiles: the unit's own presets (FXPRESETS) when available, so the
     // selection matches the Presets screen on the RØDECaster; legacy list otherwise.
@@ -132,16 +146,22 @@ Item {
                 spacing: 4
 
                 Repeater {
-                    model: [
-                        {"id": "preamp",     "name": "Preamp",     "icon": "🎙️", "active": true},
-                        {"id": "hpf",        "name": "HPF",        "icon": "📉", "active": root.getVal("hpf_on", true)},
-                        {"id": "gate",       "name": "Gate",       "icon": "🚪", "active": root.getVal("noise_gate_on", true)},
-                        {"id": "deesser",    "name": "De-Esser",   "icon": "🔕", "active": root.getVal("deesser_on", true)},
-                        {"id": "compressor", "name": root.s("compressor", "Compresor"), "icon": "🗜️", "active": root.getVal("compressor_on", true)},
-                        {"id": "eq",         "name": "EQ",         "icon": "🎚️", "active": root.getVal("eq_on", true)},
-                        {"id": "exciter",    "name": "Exciter",    "icon": "✨", "active": root.getVal("aphex_on", true) && root.getVal("aphex_ae_mix", 0.5) > 0},
-                        {"id": "big_bottom", "name": "Big Bottom", "icon": "🔊", "active": root.getVal("aphex_on", true) && root.getVal("aphex_bb_drive", 0.5) > 0}
-                    ]
+                    model: {
+                        var list = [
+                            {"id": "preamp",     "name": "Preamp",     "icon": "🎙️", "active": true},
+                            {"id": "hpf",        "name": "HPF",        "icon": "📉", "active": root.getVal("hpf_on", true)},
+                            {"id": "gate",       "name": "Gate",       "icon": "🚪", "active": root.getVal("noise_gate_on", true)},
+                            {"id": "deesser",    "name": "De-Esser",   "icon": "🔕", "active": root.getVal("deesser_on", true)},
+                            {"id": "compressor", "name": root.s("compressor", "Compresor"), "icon": "🗜️", "active": root.getVal("compressor_on", true)},
+                            {"id": "eq",         "name": "EQ",         "icon": "🎚️", "active": root.getVal("eq_on", true)},
+                            {"id": "exciter",    "name": "Exciter",    "icon": "✨", "active": root.getVal("aphex_on", true) && root.getVal("aphex_ae_mix", 0.5) > 0},
+                            {"id": "big_bottom", "name": "Big Bottom", "icon": "🔊", "active": root.getVal("aphex_on", true) && root.getVal("aphex_bb_drive", 0.5) > 0}
+                        ];
+                        if (stateManager && stateManager.isPodMic) {
+                            return list.filter(function(item) { return item.id !== "deesser" && item.id !== "eq"; });
+                        }
+                        return list;
+                    }
 
                     Row {
                         spacing: 4
@@ -244,6 +264,9 @@ Item {
                                 onClicked: {
                                     root.activeTab = index;
                                     if (index === 0) root.focusedEffect = "";
+                                    if (stateManager && stateManager.isPodMic) {
+                                        stateManager.setDspParameter("voxlab_enabled", index === 0);
+                                    }
                                 }
                             }
                         }
@@ -473,11 +496,12 @@ Item {
                             DspSlider {
                                 label: root.s("preamp_gain", "Ganancia")
                                 prop: "preamp_gain"
-                                defVal: 45; from: 0; to: 76; stepSize: 1
+                                defVal: 45; from: 0; to: (stateManager && stateManager.isPodMic) ? 63 : 76; stepSize: 1
                                 format: function(v) { return Math.round(v) + " dB"; }
                             }
 
                             Rectangle {
+                                visible: !(stateManager && stateManager.isPodMic)
                                 readonly property bool on: root.getVal("phantom_power", false)
                                 width: 72; height: 32; radius: 6
                                 color: on ? "#3D2418" : (p48Area.containsMouse ? "#2A2A32" : "#202026")
@@ -499,6 +523,7 @@ Item {
                             }
 
                             Rectangle {
+                                visible: !(stateManager && stateManager.isPodMic)
                                 readonly property bool on: root.getVal("phase_flip", false)
                                 width: 44; height: 32; radius: 6
                                 color: on ? "#2C2618" : (phaseArea.containsMouse ? "#2A2A32" : "#202026")
@@ -539,7 +564,13 @@ Item {
                             DspSlider {
                                 label: root.s("frequency", "Frecuencia")
                                 prop: "hpf_frequency"
-                                format: function(v) { return Math.round(20 + v * 180) + " Hz"; }
+                                stepSize: (stateManager && stateManager.isPodMic) ? 1.0 : 0.01
+                                format: function(v) {
+                                    if (stateManager && stateManager.isPodMic) {
+                                        return v < 0.5 ? "75 Hz" : "150 Hz";
+                                    }
+                                    return Math.round(20 + v * 180) + " Hz";
+                                }
                             }
                         }
 
@@ -574,6 +605,7 @@ Item {
                         }
 
                         DspCard {
+                            visible: !(stateManager && stateManager.isPodMic)
                             Layout.alignment: Qt.AlignTop
                             icon: "🔕"
                             title: root.s("deesser", "De-Esser")
@@ -628,6 +660,7 @@ Item {
                         }
 
                         DspCard {
+                            visible: !(stateManager && stateManager.isPodMic)
                             Layout.alignment: Qt.AlignTop
                             icon: "🎚️"
                             title: root.s("equalizer", "Ecualizador (EQ)")

@@ -50,9 +50,10 @@ Rectangle {
                     id: devCard
                     readonly property bool hasRealDevice: modelData !== null
                     readonly property bool isSelectedDevice: hasRealDevice && (index === (stateManager ? stateManager.selectedDeviceIndex : 0))
+                    readonly property bool isCompactSelected: hasRealDevice && (modelData.model_type === "StreamerX" || modelData.model_type === "PodMicUSB")
 
                     Layout.fillWidth: true
-                    Layout.preferredHeight: (!hasRealDevice || isSelectedDevice) ? 140 : 74
+                    Layout.preferredHeight: (!hasRealDevice || isSelectedDevice) ? (isCompactSelected ? 88 : 140) : 74
                     radius: 10
                     color: isSelectedDevice ? "#212124" : (devArea.containsMouse ? "#27272C" : "#1B1B1E")
                     border.color: isSelectedDevice ? "#CBA158" : (devArea.containsMouse ? "#44444C" : "#2C2C30")
@@ -85,6 +86,7 @@ Rectangle {
                                         var m = devCard.hasRealDevice ? modelData.model_type : (stateManager ? stateManager.modelType : "Duo");
                                         if (m === "ProII") return "../../assets/rodecasterproii.svg";
                                         if (m === "StreamerX") return "../../assets/streamerx.svg";
+                                        if (m === "PodMicUSB") return "../../assets/podmic.svg";
                                         return "../../assets/rodecaster.svg";
                                     }
                                     fillMode: Image.PreserveAspectFit
@@ -168,7 +170,7 @@ Rectangle {
 
                         // SD Card / Internal Storage Meter (Shown for active device if device has storage)
                         Item {
-                            visible: (devCard.isSelectedDevice || !devCard.hasRealDevice) && !(devCard.hasRealDevice && modelData.model_type === "StreamerX")
+                            visible: (devCard.isSelectedDevice || !devCard.hasRealDevice) && !(devCard.hasRealDevice && (modelData.model_type === "StreamerX" || modelData.model_type === "PodMicUSB"))
                             Layout.fillWidth: true
                             height: 38
                             z: 20
@@ -272,10 +274,10 @@ Rectangle {
                 }
             }
 
-            // MicroSD Removable Storage Card (matches RØDECaster App - active only when MicroSD is present and not Streamer X)
+            // MicroSD Removable Storage Card (matches RØDECaster App - active only when MicroSD is present and not Streamer X / PodMic USB)
             Rectangle {
                 id: sdCardEntry
-                visible: Boolean(stateManager && !stateManager.isStreamerX)
+                visible: Boolean(stateManager && !stateManager.isStreamerX && !stateManager.isPodMic)
                 readonly property bool hasCard: Boolean(stateManager && stateManager.hasMicroSD)
                 readonly property bool isSelectedView: (stateManager && stateManager.currentView === "recordings")
                 Layout.fillWidth: true

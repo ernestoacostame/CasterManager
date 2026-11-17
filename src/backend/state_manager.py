@@ -12,6 +12,7 @@ from PyQt6.QtCore import QObject, pyqtSignal, pyqtProperty, pyqtSlot, QVariant, 
 from .device_monitor import DeviceMonitor
 from .rcp_bridge import RcpBridge, PAD_COLORS
 from .streamerx_audio import StreamerXAudioRouter
+from .podmic_hid import PodMicHidController, PROC_COMP, PROC_GATE, PROC_EXCITER, PROC_BIG_BOTTOM
 
 logger = logging.getLogger("CasterManager.state")
 
@@ -690,6 +691,8 @@ class StateManager(QObject):
         self._model_name = "RØDECaster Duo"
         self._is_duo = True
         self._is_streamer_x = False
+        self._is_podmic = False
+        self._podmic_hid = PodMicHidController()
         self._model_type = "Duo"
         self._firmware = "1.7.7"
         self._serial = ""
@@ -846,6 +849,8 @@ class StateManager(QObject):
         self.monitor.start()
 
     def _localized_dsp_channel_name(self, idx):
+        if getattr(self, "_is_podmic", False):
+            return "RØDE PodMic USB"
         is_en = (getattr(self, "_language", "es") == "en")
         if getattr(self, "_is_streamer_x", False):
             names = ["XLR Microphone", "TRRS Headset", "Wireless"] if is_en else ["Micrófono XLR", "Auriculares TRRS", "Inalámbrico"]
@@ -856,7 +861,7 @@ class StateManager(QObject):
         return names[idx] if idx < len(names) else f"Mic {idx + 1}"
 
     def _init_default_dsp_channels(self):
-        count = 3 if getattr(self, "_is_streamer_x", False) else 4
+        count = 1 if getattr(self, "_is_podmic", False) else (3 if getattr(self, "_is_streamer_x", False) else 4)
         channels = []
         for i in range(count):
             channels.append({
@@ -901,7 +906,11 @@ class StateManager(QObject):
         return channels
 
     def _init_default_faders(self):
-        if getattr(self, "_is_streamer_x", False):
+        if getattr(self, "_is_podmic", False):
+            raw = [
+                {"index": 0, "name": "PodMic USB", "color": "#FF3C3C", "icon": "mic", "level": 75, "mute": False, "listen": False, "is_virtual": False},
+            ]
+        elif getattr(self, "_is_streamer_x", False):
             raw = [
                 {"index": 0, "name": "Mic / Line", "color": "#FF3C3C", "icon": "mic", "level": 70, "mute": False, "listen": False, "is_virtual": False},
                 {"index": 1, "name": "Headset", "color": "#28C850", "icon": "mic", "level": 70, "mute": False, "listen": False, "is_virtual": False},
@@ -1027,8 +1036,12 @@ class StateManager(QObject):
         self._model_type = info.get("model_type", "Duo")
         self._is_duo = (self._model_type == "Duo")
         self._is_streamer_x = (self._model_type == "StreamerX")
-        if self._is_streamer_x:
+        self._is_podmic = (self._model_type == "PodMicUSB")
+        if self._is_streamer_x or self._is_podmic:
             self._has_sd_card = False
+            if self._active_mix_target != "main" and self._is_podmic:
+                self._active_mix_target = "main"
+                self.activeMixTargetChanged.emit()
         self._pads_per_bank = info["pads_per_bank"]
         self._pad_cols = info["pad_cols"]
         self._pad_rows = info["pad_rows"]
@@ -1079,7 +1092,16 @@ class StateManager(QObject):
         self._update_installing = False
         self._update_install_progress = 0
         self._update_complete = False
-        self._manifest_latest_version = ""
+        self._manifest_latest_version = "1.1.9" if self._is_podmic else ""
+        if self._is_podmic:
+            self._update_version = "1.1.9"
+            self._update_available = self._version_tuple("1.1.9") > self._version_tuple(self._firmware)
+        if (self._is_streamer_x or self._is_podmic) and self._current_view == "recordings":
+            self._current_view = "home"
+            self.viewChanged.emit()
+        elif self._is_podmic and self._current_view == "smartpads":
+            self._current_view = "home"
+            self.viewChanged.emit()
         if self._selected_pad_index >= self._pads_per_bank:
             self._selected_pad_index = 0
 
@@ -1145,7 +1167,62 @@ class StateManager(QObject):
             with self._sync_guard:
                 self._is_syncing = False
 
+    def _sync_podmic_state(self):
+        gen = self._device_generation
+        hidraw_path = self._permission_path
+        if not hidraw_path or not os.path.exists(hidraw_path):
+            return
+        st = self._podmic_hid.read_full_state(hidraw_path)
+        if not st or gen != self._device_generation:
+            return
+
+        fader_changed = False
+        if len(self._faders) > 0:
+            if 0 not in self._pending_fader_levels:
+                new_lvl = int(st["gain_pct"])
+                if self._faders[0].get("level") != new_lvl:
+                    self._faders[0]["level"] = new_lvl
+                    self._faders[0]["submix_level"] = new_lvl
+                    fader_changed = True
+            new_mute = bool(st["muted"])
+            if self._faders[0].get("mute") != new_mute:
+                self._faders[0]["mute"] = new_mute
+                fader_changed = True
+        if fader_changed:
+            self.fadersChanged.emit()
+
+        if len(self._dsp_channels) > 0 and (time.time() - getattr(self, "_last_dsp_write", 0) >= 1.2):
+            ch = self._dsp_channels[0]
+            before = json.dumps(ch, sort_keys=True, default=str)
+            ch["_synced"] = True
+            ch["bypass_processing"] = not bool(st["processing_on"])
+            ch["voxlab_enabled"] = not bool(st["advanced_mode"])
+            ch["preamp_gain"] = int(round((st["gain_pct"] / 100.0) * 63.0))
+            ch["voxlab_depth"] = int(st["depth"])
+            ch["voxlab_sparkle"] = int(st["sparkle"])
+            ch["voxlab_punch"] = int(st["punch"])
+            ch["hpf_on"] = (int(st["hpf_mode"]) > 0)
+            ch["hpf_frequency"] = 0.0 if int(st["hpf_mode"]) <= 1 else 1.0
+            ch["compressor_on"] = bool(st["comp_on"])
+            ch["noise_gate_on"] = bool(st["gate_on"])
+            ch["aphex_on"] = bool(st["exciter_on"] or st["big_bottom_on"])
+            ch["aphex_ae_mix"] = 0.5 if st["exciter_on"] else 0.0
+            ch["aphex_bb_drive"] = 0.5 if st["big_bottom_on"] else 0.0
+            ch["active_preset"] = detect_dsp_preset(ch)
+            if json.dumps(ch, sort_keys=True, default=str) != before:
+                self.dspChanged.emit()
+
+        self._manifest_latest_version = "1.1.9"
+        self._update_version = "1.1.9"
+        avail = self._version_tuple("1.1.9") > self._version_tuple(self._firmware)
+        if self._update_available != avail:
+            self._update_available = avail
+        self.firmwareUpdateChanged.emit()
+
     def _sync_hardware_state_once(self):
+        if getattr(self, "_is_podmic", False):
+            self._sync_podmic_state()
+            return
         try:
             # 1. Query device full dump
             gen = self._device_generation
@@ -1598,7 +1675,10 @@ class StateManager(QObject):
             if index != self._selected_device_index:
                 self._selected_device_index = index
                 self._apply_device_config(self._devices[index])
-                if getattr(self, "_is_streamer_x", False) and self._current_view == "recordings":
+                if (getattr(self, "_is_streamer_x", False) or getattr(self, "_is_podmic", False)) and self._current_view == "recordings":
+                    self._current_view = "home"
+                    self.viewChanged.emit()
+                elif getattr(self, "_is_podmic", False) and self._current_view == "smartpads":
                     self._current_view = "home"
                     self.viewChanged.emit()
                 self.devicesChanged.emit()
@@ -1616,6 +1696,10 @@ class StateManager(QObject):
     @pyqtProperty(bool, notify=stateChanged)
     def isStreamerX(self):
         return getattr(self, "_is_streamer_x", False)
+
+    @pyqtProperty(bool, notify=stateChanged)
+    def isPodMic(self):
+        return getattr(self, "_is_podmic", False)
 
     @pyqtProperty(str, notify=stateChanged)
     def modelType(self):
@@ -2233,7 +2317,7 @@ class StateManager(QObject):
         self.settings.setValue("show_name", name)
         self.settings.sync()
         self.stateChanged.emit()
-        if self._connected and not self._permission_error and not self._is_streamer_x:
+        if self._connected and not self._permission_error and not self._is_streamer_x and not self._is_podmic:
             self.executor.submit(
                 self.bridge.run_cmd,
                 ["show", "set-name", name]
@@ -2248,7 +2332,7 @@ class StateManager(QObject):
         self.settings.setValue("show_icon", icon_idx)
         self.settings.sync()
         self.stateChanged.emit()
-        if self._connected and not self._permission_error and not self._is_streamer_x:
+        if self._connected and not self._permission_error and not self._is_streamer_x and not self._is_podmic:
             self.executor.submit(
                 self.bridge.run_cmd,
                 ["show", "set-icon", str(icon_idx)]
@@ -3051,7 +3135,10 @@ class StateManager(QObject):
                 self._faders[index]["mute"] = new_mute
                 self.fadersChanged.emit()
                 if self._connected and not self._permission_error:
-                    if self.isStreamerX:
+                    if getattr(self, "_is_podmic", False):
+                        if index == 0:
+                            self.executor.submit(self._podmic_hid.set_mute, self._permission_path, new_mute)
+                    elif self.isStreamerX:
                         if index == 0:
                             self.executor.submit(self.bridge.run_cmd, ["set-property", "5", "emergencyMuteActive", f"bool:{str(new_mute).lower()}"])
                             self.executor.submit(self.bridge.run_cmd, ["set-property", "28", "channelOutputMute", f"bool:{str(new_mute).lower()}"])
@@ -3076,6 +3163,8 @@ class StateManager(QObject):
 
     @pyqtSlot(int)
     def toggleFaderListen(self, index):
+        if getattr(self, "_is_podmic", False):
+            return
         if 0 <= index < len(self._faders):
             new_listen = not self._faders[index]["listen"]
             self._faders[index]["listen"] = new_listen
@@ -3244,7 +3333,7 @@ class StateManager(QObject):
 
     @pyqtProperty(int, notify=stateChanged)
     def headphoneBusCount(self):
-        if self._is_streamer_x:
+        if self._is_streamer_x or getattr(self, "_is_podmic", False):
             return 1
         return 2 if self._is_duo else 4
 
@@ -3270,7 +3359,15 @@ class StateManager(QObject):
             return
         to_send = dict(self._pending_fader_levels)
         self._pending_fader_levels.clear()
-        if self.isStreamerX:
+        if getattr(self, "_is_podmic", False):
+            if 0 in to_send:
+                lvl = int(max(0, min(100, round(to_send[0]))))
+                self._last_dsp_write = time.time()
+                self.executor.submit(self._podmic_hid.set_gain, self._permission_path, lvl)
+                if len(self._dsp_channels) > 0:
+                    self._dsp_channels[0]["preamp_gain"] = int(round((lvl / 100.0) * 63.0))
+                    self.dspChanged.emit()
+        elif self.isStreamerX:
             sx_map = {2: 182, 3: 184, 4: 187, 5: 188}
             for idx, lvl in to_send.items():
                 if idx == 0:
@@ -3323,6 +3420,8 @@ class StateManager(QObject):
 
     @pyqtSlot()
     def toggleRecord(self):
+        if getattr(self, "_is_streamer_x", False) or getattr(self, "_is_podmic", False):
+            return
         new_state = not self._is_recording
         self._is_recording = new_state
         self._record_target_state = new_state
@@ -3594,6 +3693,9 @@ class StateManager(QObject):
     def _poll_live_hardware(self):
         if not self._connected or self._permission_error or self._transfer_mode:
             return
+        if getattr(self, "_is_podmic", False):
+            self._submit_poll(self._sync_podmic_state)
+            return
         if self._is_streamer_x and self._brightness_schedule_enabled:
             self._check_brightness_schedule()
         if self.isStreamerX:
@@ -3823,7 +3925,7 @@ class StateManager(QObject):
         if clamped != self._headphone_volume:
             self._headphone_volume = clamped
             self.headphoneVolumeChanged.emit()
-            if self._connected and not self._permission_error:
+            if self._connected and not self._permission_error and not self._is_podmic:
                 raw_f64 = round(clamped / 100.0, 4)
                 self.executor.submit(
                     self.bridge.run_cmd,
@@ -3835,7 +3937,7 @@ class StateManager(QObject):
         new_mute = not self._headphone_mute
         self._headphone_mute = new_mute
         self.headphoneVolumeChanged.emit()
-        if self._connected and not self._permission_error:
+        if self._connected and not self._permission_error and not self._is_podmic:
             self.executor.submit(
                 self.bridge.run_cmd,
                 ["set-property", "13", "outputMonMute", f"bool:{str(new_mute).lower()}"]
@@ -4125,6 +4227,9 @@ class StateManager(QObject):
         is_en = (self._language == "en")
         target_ver = self.firmwareUpdateVersion
         if self._update_checking:
+            if getattr(self, "_is_podmic", False):
+                return ("Checking firmware version for RØDE PodMic USB..."
+                        if is_en else "Comprobando versión de firmware del RØDE PodMic USB...")
             return ("Checking for firmware updates on console and RØDE servers..."
                     if is_en else "Buscando actualizaciones en la consola y servidores de RØDE...")
         if self._update_complete:
@@ -4151,6 +4256,9 @@ class StateManager(QObject):
         if self._update_no_internet and self._manifest_latest_version:
             return (f"Your firmware (v{self._firmware}) matches the latest official release (console offline)."
                     if is_en else f"Tu firmware (v{self._firmware}) coincide con la última versión oficial (consola sin internet).")
+        if getattr(self, "_is_podmic", False):
+            return (f"Your RØDE PodMic USB is up to date (v{self._firmware})."
+                    if is_en else f"Tu RØDE PodMic USB está actualizado (v{self._firmware}).")
         return (f"Your RØDECaster is up to date (v{self._firmware})."
                 if is_en else f"Tu RØDECaster está actualizada (v{self._firmware}).")
 
@@ -4158,6 +4266,19 @@ class StateManager(QObject):
         """Worker that optionally toggles systemBetaMode, triggers updateCheckRequested,
         fetches the official manifest from RØDE, and refreshes SYSTEM properties."""
         gen = self._device_generation
+        if getattr(self, "_is_podmic", False):
+            time.sleep(0.4)
+            if gen != self._device_generation:
+                return
+            self._manifest_latest_version = "1.1.9"
+            self._update_version = "1.1.9"
+            self._update_available = self._version_tuple("1.1.9") > self._version_tuple(self._firmware)
+            self._update_checking = False
+            self.firmwareUpdateChanged.emit()
+            is_en = (self._language == "en")
+            msg = (f"New firmware available: v1.1.9" if self._update_available else f"Firmware is up to date (v{self._firmware})") if is_en else (f"Nueva versión disponible: v1.1.9" if self._update_available else f"Firmware actualizado (v{self._firmware})")
+            self.toastMessage.emit(msg)
+            return
         sys_node = self._find_root_child_index("SYSTEM")
         if self._connected and not self._permission_error and not self._is_streamer_x:
             if new_beta is not None:
@@ -4212,7 +4333,7 @@ class StateManager(QObject):
 
     @pyqtSlot(bool)
     def setBetaFirmwareMode(self, val):
-        if self._is_streamer_x:
+        if self._is_streamer_x or self._is_podmic:
             return
         val = bool(val)
         self._beta_mode = val
@@ -4238,7 +4359,7 @@ class StateManager(QObject):
 
     @pyqtSlot()
     def startFirmwareDownload(self):
-        if self._is_streamer_x or not self._connected or self._permission_error:
+        if self._is_streamer_x or self._is_podmic or not self._connected or self._permission_error:
             return
         if self._update_no_internet or self._update_downloading or self._update_downloaded or self._update_installing:
             return
@@ -4256,7 +4377,7 @@ class StateManager(QObject):
 
     @pyqtSlot()
     def cancelFirmwareDownload(self):
-        if self._is_streamer_x or not self._connected or self._permission_error:
+        if self._is_streamer_x or self._is_podmic or not self._connected or self._permission_error:
             return
         self._update_downloading = False
         self._update_download_progress = 0
@@ -4271,7 +4392,7 @@ class StateManager(QObject):
 
     @pyqtSlot()
     def startFirmwareInstall(self):
-        if self._is_streamer_x or not self._connected or self._permission_error:
+        if self._is_streamer_x or self._is_podmic or not self._connected or self._permission_error:
             return
         if not self._update_downloaded or self._update_installing or self._update_complete:
             return
@@ -4289,7 +4410,7 @@ class StateManager(QObject):
 
     @pyqtSlot()
     def rebootForFirmwareUpdate(self):
-        if self._is_streamer_x or not self._connected or self._permission_error:
+        if self._is_streamer_x or self._is_podmic or not self._connected or self._permission_error:
             return
         sys_node = self._find_root_child_index("SYSTEM")
         self.executor.submit(
@@ -4906,6 +5027,52 @@ class StateManager(QObject):
         if not self._connected or self._permission_error:
             return
 
+        if getattr(self, "_is_podmic", False):
+            hidraw_path = self._permission_path
+            if name == "preamp_gain":
+                pct = max(0, min(100, int(round((float(value) / 63.0) * 100.0))))
+                if len(self._faders) > 0:
+                    self._faders[0]["level"] = pct
+                    self._faders[0]["submix_level"] = pct
+                    self.fadersChanged.emit()
+                self.executor.submit(self._podmic_hid.set_gain, hidraw_path, pct)
+            elif name in ("hpf_on", "hpf_frequency"):
+                self.executor.submit(
+                    self._podmic_hid.set_hpf,
+                    hidraw_path,
+                    bool(ch.get("hpf_on", False)),
+                    float(ch.get("hpf_frequency", 0.0)),
+                )
+            elif name == "noise_gate_on":
+                self.executor.submit(self._podmic_hid.set_processor_enable, hidraw_path, PROC_GATE, bool(value))
+            elif name == "compressor_on":
+                self.executor.submit(self._podmic_hid.set_processor_enable, hidraw_path, PROC_COMP, bool(value))
+            elif name == "aphex_on":
+                ae_val = 0.5 if value else 0.0
+                bb_val = 0.5 if value else 0.0
+                ch["aphex_ae_mix"] = ae_val
+                ch["aphex_bb_drive"] = bb_val
+                self.dspChanged.emit()
+                def do_podmic_aphex():
+                    self._podmic_hid.set_processor_enable(hidraw_path, PROC_EXCITER, bool(value))
+                    self._podmic_hid.set_processor_enable(hidraw_path, PROC_BIG_BOTTOM, bool(value))
+                self.executor.submit(do_podmic_aphex)
+            elif name == "aphex_ae_mix":
+                on_ae = float(value) > 0.05
+                ch["aphex_on"] = bool(on_ae or float(ch.get("aphex_bb_drive", 0.0)) > 0.05)
+                self.dspChanged.emit()
+                self.executor.submit(self._podmic_hid.set_processor_enable, hidraw_path, PROC_EXCITER, on_ae)
+            elif name == "aphex_bb_drive":
+                on_bb = float(value) > 0.05
+                ch["aphex_on"] = bool(on_bb or float(ch.get("aphex_ae_mix", 0.0)) > 0.05)
+                self.dspChanged.emit()
+                self.executor.submit(self._podmic_hid.set_processor_enable, hidraw_path, PROC_BIG_BOTTOM, on_bb)
+            elif name == "voxlab_enabled":
+                self.executor.submit(self._podmic_hid.set_advanced_mode, hidraw_path, not bool(value))
+            elif name == "bypass_processing":
+                self.executor.submit(self._podmic_hid.set_processing_enabled, hidraw_path, not bool(value))
+            return
+
         channel_node_idx = ch.get("channel_idx", 28 + self._active_dsp_channel)
         input_node_idx = ch.get("input_idx", 191 + self._active_dsp_channel)
 
@@ -5168,6 +5335,14 @@ class StateManager(QObject):
         if not self._connected or self._permission_error:
             return
 
+        if getattr(self, "_is_podmic", False):
+            ch["voxlab_enabled"] = True
+            ch["bypass_processing"] = False
+            self._last_dsp_write = time.time()
+            self.dspChanged.emit()
+            self.executor.submit(self._podmic_hid.set_voxlab, self._permission_path, macro_name, val)
+            return
+
         d = ch.get("voxlab_depth", 50) / 100.0
         s = ch.get("voxlab_sparkle", 50) / 100.0
         p = ch.get("voxlab_punch", 50) / 100.0
@@ -5253,7 +5428,10 @@ class StateManager(QObject):
         if preset_name in presets:
             p_data = presets[preset_name]
             for k, v in p_data.items():
-                self.setDspParameter(k, v)
+                if getattr(self, "_is_podmic", False) and k.startswith("voxlab_"):
+                    self.setVoxlabMacro(k.replace("voxlab_", ""), v)
+                else:
+                    self.setDspParameter(k, v)
             ch["active_preset"] = preset_name
             self.dspChanged.emit()
             preset_labels = {
