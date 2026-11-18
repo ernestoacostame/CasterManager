@@ -21,12 +21,14 @@
 
 ---
 
-<img width="1310" height="900" alt="castermanager_new" src="https://github.com/user-attachments/assets/5a801bd9-fa28-49d4-acf2-3edb60840cd1" />
-<img width="1310" height="900" alt="castermanager_system" src="https://github.com/user-attachments/assets/e3f71d46-b7a8-46ee-a3ff-59a7a5154680" />
 <img width="1310" height="900" alt="castermanager_pad" src="https://github.com/user-attachments/assets/5dcc845d-d8d3-434e-983b-0a5dfff4e30e" />
-<img width="1310" height="900" alt="castermanager_display" src="https://github.com/user-attachments/assets/d72cb0f8-e331-468e-9cd1-3592a73c5038" />
-<img width="1310" height="900" alt="castermanager_devicespng" src="https://github.com/user-attachments/assets/0f719030-8116-41bd-ae1c-eb2399c560b1" />
-<img width="1310" height="900" alt="castermanager_audio" src="https://github.com/user-attachments/assets/d7eddd9d-c8e6-4dd8-947b-5c9a58dd4924" />
+<img width="1310" height="900" alt="castermanager_update" src="https://github.com/user-attachments/assets/59566adc-08ff-4615-a996-47fda0b60521" />
+<img width="1310" height="898" alt="castermanager_microsd" src="https://github.com/user-attachments/assets/b47c0ba0-83d9-4fbd-9873-70aaecbcb35a" />
+<img width="1310" height="900" alt="castermanager_podmic" src="https://github.com/user-attachments/assets/271ffa2b-1632-4566-b077-e76f75e3e8a8" />
+<img width="1310" height="898" alt="castermanager_rodecaster" src="https://github.com/user-attachments/assets/351346f4-15c4-43f1-8e2c-77fa84add138" />
+<img width="1310" height="949" alt="castermanager_streamerx" src="https://github.com/user-attachments/assets/7a120609-642d-469c-a131-81224b88eecc" />
+
+
 
 ## Overview
 
@@ -265,13 +267,6 @@ This project is licensed under the [MIT License](LICENSE).
 </p>
 
 ---
-
-<img width="1310" height="900" alt="castermanager_new" src="https://github.com/user-attachments/assets/5a801bd9-fa28-49d4-acf2-3edb60840cd1" />
-<img width="1310" height="900" alt="castermanager_system" src="https://github.com/user-attachments/assets/e3f71d46-b7a8-46ee-a3ff-59a7a5154680" />
-<img width="1310" height="900" alt="castermanager_pad" src="https://github.com/user-attachments/assets/5dcc845d-d8d3-434e-983b-0a5dfff4e30e" />
-<img width="1310" height="900" alt="castermanager_display" src="https://github.com/user-attachments/assets/d72cb0f8-e331-468e-9cd1-3592a73c5038" />
-<img width="1310" height="900" alt="castermanager_devicespng" src="https://github.com/user-attachments/assets/0f719030-8116-41bd-ae1c-eb2399c560b1" />
-<img width="1310" height="900" alt="castermanager_audio" src="https://github.com/user-attachments/assets/d7eddd9d-c8e6-4dd8-947b-5c9a58dd4924" />
 
 ## Descripción
 
